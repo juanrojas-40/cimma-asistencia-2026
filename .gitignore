@@ -1,0 +1,20 @@
+# Archivos sensibles
+CLASES 2026.xlsx
+credentials.json
+
+# Entorno virtual
+venv/
+env/
+*.env
+
+# Archivos temporales de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.ipynb_checkpoints
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
