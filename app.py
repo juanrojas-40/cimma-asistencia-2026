@@ -17,7 +17,7 @@ def get_client():
     return gspread.authorize(creds)
 
 # ==============================
-# Cargar cursos desde "CLASES 2026" (Google Sheet)
+# Cargar cursos desde "CLASES 2026"
 # ==============================
 @st.cache_data(ttl=300)
 def load_courses():
@@ -28,46 +28,60 @@ def load_courses():
     for worksheet in clases_sheet.worksheets():
         sheet_name = worksheet.title
         try:
-            # Leer todas las celdas
-            all_values = worksheet.get_all_values()
-            if not all_values:
+            # Leer toda la columna A
+            colA_raw = worksheet.col_values(1)
+            colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
+            colA_upper = [s.upper() for s in colA]
+
+            # Buscar índices clave
+            try:
+                idx_prof = colA_upper.index("PROFESOR")
+                profesor = colA[idx_prof + 1]
+            except (ValueError, IndexError):
                 continue
 
-            # Convertir a diccionario columna A -> columna B
-            data = {}
-            fechas = []
-            estudiantes = []
+            try:
+                idx_dia = colA_upper.index("DIA")
+                dia = colA[idx_dia + 1]
+            except (ValueError, IndexError):
+                continue
 
-            for row in all_values:
-                if len(row) < 2:
-                    continue
-                key = row[0].strip().lower() if row[0] else ""
-                value = row[1].strip() if len(row) > 1 and row[1] else ""
+            try:
+                idx_curso = colA_upper.index("CURSO")
+                curso_id = colA[idx_curso + 1]
+                # El horario está en la siguiente línea
+                horario = colA[idx_curso + 2]
+            except (ValueError, IndexError):
+                continue
 
-                if key == "profesor":
-                    data["profesor"] = value
-                elif key == "dia":
-                    data["dia"] = value
-                elif key == "horario":
-                    data["horario"] = value
-                elif key == "fechas":
-                    # Las fechas están en la misma fila, desde columna C en adelante
-                    fechas = [cell.strip() for cell in row[2:] if cell.strip()]
-                elif key == "nombres estudiantes":
-                    # Los estudiantes empiezan en la siguiente fila
-                    start_row = all_values.index(row) + 1
-                    for i in range(start_row, len(all_values)):
-                        if len(all_values[i]) > 0 and all_values[i][0].strip():
-                            estudiante = all_values[i][0].strip()
-                            if any(c.isalpha() for c in estudiante):
-                                estudiantes.append(estudiante)
-                        else:
-                            break
+            try:
+                idx_fechas = colA_upper.index("FECHAS")
+                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
 
-            if "profesor" in data and estudiantes:
-                data["fechas"] = fechas or ["Sin fechas"]
-                data["estudiantes"] = estudiantes
-                courses[sheet_name] = data
+                # Fechas: desde después de "FECHAS" hasta antes de "NOMBRES ESTUDIANTES"
+                fechas = []
+                for i in range(idx_fechas + 1, idx_estudiantes):
+                    if i < len(colA):
+                        fechas.append(colA[i])
+
+                # Estudiantes: desde después de "NOMBRES ESTUDIANTES" hasta el final
+                estudiantes = []
+                for i in range(idx_estudiantes + 1, len(colA)):
+                    estudiantes.append(colA[i])
+
+            except (ValueError, IndexError):
+                fechas = ["Sin fechas"]
+                estudiantes = []
+
+            if profesor and dia and horario and estudiantes:
+                courses[sheet_name] = {
+                    "profesor": profesor,
+                    "dia": dia,
+                    "horario": horario,
+                    "curso_id": curso_id,
+                    "fechas": fechas,
+                    "estudiantes": estudiantes
+                }
 
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
@@ -105,7 +119,7 @@ if st.button("💾 Guardar Asistencia"):
         client = get_client()
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
 
-        # Usar hoja con nombre del curso
+        # Usar hoja con nombre del curso (JR_1, JR_2, etc.)
         try:
             sheet = asistencia_sheet.worksheet(curso_seleccionado)
         except gspread.exceptions.WorksheetNotFound:
