@@ -2,14 +2,13 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import json
+from datetime import datetime
 
 # ==============================
-# CONFIGURACIÓN DESDE SECRETS
+# Conexión a Google Sheets usando Secrets
 # ==============================
-CLASES_SHEET_ID = st.secrets["google"]["clases_sheet_id"]   # ID de "CLASES 2026" (Google Sheet)
-ASISTENCIA_SHEET_ID = st.secrets["google"]["asistencia_sheet_id"]  # ID de "Asistencia 2026"
-
-def get_google_client():
+@st.cache_resource
+def get_client():
     creds_dict = json.loads(st.secrets["google"]["credentials"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=[
         "https://spreadsheets.google.com/feeds",
@@ -18,80 +17,69 @@ def get_google_client():
     return gspread.authorize(creds)
 
 # ==============================
-# CARGAR CURSOS DESDE GOOGLE SHEETS
+# Cargar cursos desde Google Sheet "CLASES 2026"
 # ==============================
-@st.cache_data(ttl=300)  # Cache por 5 minutos
-def load_courses_from_gsheets():
-    client = get_google_client()
-    clases_sheet = client.open_by_key(CLASES_SHEET_ID)
+@st.cache_data(ttl=300)
+def load_courses():
+    client = get_client()
+    clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
-    
+
     for worksheet in clases_sheet.worksheets():
         sheet_name = worksheet.title
         try:
-            # Leer todas las celdas
             all_values = worksheet.get_all_values()
             if not all_values:
                 continue
-            
-            # Convertir a diccionario columna A -> columna B
-            data = {}
+
+            # Extraer columna A como lista
+            colA = []
+            for row in all_values:
+                if row and row[0].strip():
+                    colA.append(row[0].strip())
+                else:
+                    colA.append("")
+
+            colA_lower = [s.lower() for s in colA]
+
+            def find_next_value(key):
+                try:
+                    idx = colA_lower.index(key)
+                    for i in range(idx + 1, len(colA)):
+                        if colA[i]:
+                            return colA[i]
+                    return ""
+                except ValueError:
+                    return ""
+
+            profesor = find_next_value("profesor:")
+            dia = find_next_value("dia:")
+            horario = find_next_value("horario")
+
+            # Extraer fechas y estudiantes
             fechas = []
             estudiantes = []
-            reading_fechas = False
-            reading_estudiantes = False
+            try:
+                fecha_idx = colA_lower.index("fecha:")
+                for i in range(fecha_idx + 1, len(colA)):
+                    val = colA[i]
+                    if val and any(c.isalpha() for c in val):
+                        estudiantes.append(val)
+                    elif val:
+                        fechas.append(val)
+            except ValueError:
+                pass
 
-            for row in all_values:
-                if len(row) == 0:
-                    continue
-                cell = row[0].strip() if row[0] else ""
-                
-                if cell == "profesor:" and len(row) > 1:
-                    data["profesor"] = row[1].strip()
-                elif cell == "dia:" and len(row) > 1:
-                    data["dia"] = row[1].strip()
-                elif cell == "horario" and len(row) > 1:
-                    data["horario"] = row[1].strip()
-                elif cell == "fecha:":
-                    reading_fechas = True
-                    reading_estudiantes = False
-                    # Fechas pueden estar en la misma fila o siguientes
-                    fechas = [f.strip() for f in row[1:] if f.strip()]
-                elif reading_fechas and cell == "":
-                    # Continuar leyendo fechas en filas siguientes si hay más columnas
-                    if len(row) > 1:
-                        fechas.extend([f.strip() for f in row[1:] if f.strip()])
-                    else:
-                        reading_fechas = False
-                        reading_estudiantes = True
-                elif cell and any(c.isalpha() for c in cell):
-                    # Es un nombre de estudiante
-                    estudiantes.append(cell)
-                    reading_estudiantes = True
-                elif reading_estudiantes and cell == "" and len(row) > 0 and row[0]:
-                    # Caso raro: estudiante en celda no primera
-                    pass
-
-            # Si no se encontraron fechas, intentar desde fila 4
-            if not fechas:
-                if len(all_values) > 4:
-                    fechas = [f.strip() for f in all_values[4][1:] if f.strip()]
-
-            # Si no hay estudiantes, tomar desde fila 5 en adelante, columna A
-            if not estudiantes:
-                for i in range(5, len(all_values)):
-                    if len(all_values[i]) > 0 and all_values[i][0].strip():
-                        val = all_values[i][0].strip()
-                        if any(c.isalpha() for c in val):
-                            estudiantes.append(val)
-
-            if "profesor" in data and estudiantes:
-                data["fechas"] = fechas or ["Sin fechas"]
-                data["estudiantes"] = estudiantes
-                courses[sheet_name] = data
-
+            if profesor and dia and horario and estudiantes:
+                courses[sheet_name] = {
+                    "profesor": profesor,
+                    "dia": dia,
+                    "horario": horario,
+                    "fechas": fechas or ["Sin fechas"],
+                    "estudiantes": estudiantes
+                }
         except Exception as e:
-            st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:100]}")
+            st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
 
     return courses
@@ -102,7 +90,7 @@ def load_courses_from_gsheets():
 st.set_page_config(page_title="Asistencia Cursos 2026", layout="centered")
 st.title("✅ Registro de Asistencia – Cursos 2026")
 
-courses = load_courses_from_gsheets()
+courses = load_courses()
 
 if not courses:
     st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
@@ -123,17 +111,16 @@ for est in data["estudiantes"]:
 
 if st.button("💾 Guardar Asistencia"):
     try:
-        client = get_google_client()
-        asistencia_sheet = client.open_by_key(ASISTENCIA_SHEET_ID)
-        
+        client = get_client()
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+
         # Usar hoja con nombre del curso
-        sheet_name = curso_seleccionado
         try:
-            sheet = asistencia_sheet.worksheet(sheet_name)
+            sheet = asistencia_sheet.worksheet(curso_seleccionado)
         except gspread.exceptions.WorksheetNotFound:
-            sheet = asistencia_sheet.add_worksheet(title=sheet_name, rows=100, cols=5)
+            sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=5)
             sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Hora Registro"])
-        
+
         rows = []
         for estudiante, presente in asistencia.items():
             rows.append([
@@ -141,11 +128,10 @@ if st.button("💾 Guardar Asistencia"):
                 fecha_seleccionada,
                 estudiante,
                 1 if presente else 0,
-                st.session_state.get('timestamp', '') or 
-                __import__('datetime').datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             ])
-        
+
         sheet.append_rows(rows)
-        st.success(f"✅ Asistencia guardada en la hoja '{sheet_name}'!")
+        st.success(f"✅ Asistencia guardada en la hoja '{curso_seleccionado}'!")
     except Exception as e:
         st.error(f"❌ Error al guardar: {e}")
