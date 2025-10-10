@@ -28,47 +28,47 @@ def load_courses():
     for worksheet in clases_sheet.worksheets():
         sheet_name = worksheet.title
         try:
-            # Leer solo la primera columna (A)
-            colA_raw = worksheet.col_values(1)  # Columna A
-            colA = [cell.strip() for cell in colA_raw if isinstance(cell, str)]
-            colA_lower = [s.lower() for s in colA]
+            # Leer todas las celdas
+            all_values = worksheet.get_all_values()
+            if not all_values:
+                continue
 
-            def find_next_value(key):
-                try:
-                    idx = colA_lower.index(key)
-                    for i in range(idx + 1, len(colA)):
-                        if colA[i]:
-                            return colA[i]
-                    return ""
-                except ValueError:
-                    return ""
-
-            profesor = find_next_value("profesor:")
-            dia = find_next_value("dia:")
-            horario = find_next_value("horario")
-
-            # Extraer fechas y estudiantes
+            # Convertir a diccionario columna A -> columna B
+            data = {}
             fechas = []
             estudiantes = []
-            try:
-                fecha_idx = colA_lower.index("fecha:")
-                for i in range(fecha_idx + 1, len(colA)):
-                    val = colA[i]
-                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
-                        estudiantes.append(val)
-                    elif val and not any(c.isalpha() for c in val):
-                        fechas.append(val)
-            except ValueError:
-                pass
 
-            if profesor and dia and horario and estudiantes:
-                courses[sheet_name] = {
-                    "profesor": profesor,
-                    "dia": dia,
-                    "horario": horario,
-                    "fechas": fechas or ["Sin fechas"],
-                    "estudiantes": estudiantes
-                }
+            for row in all_values:
+                if len(row) < 2:
+                    continue
+                key = row[0].strip().lower() if row[0] else ""
+                value = row[1].strip() if len(row) > 1 and row[1] else ""
+
+                if key == "profesor":
+                    data["profesor"] = value
+                elif key == "dia":
+                    data["dia"] = value
+                elif key == "horario":
+                    data["horario"] = value
+                elif key == "fechas":
+                    # Las fechas están en la misma fila, desde columna C en adelante
+                    fechas = [cell.strip() for cell in row[2:] if cell.strip()]
+                elif key == "nombres estudiantes":
+                    # Los estudiantes empiezan en la siguiente fila
+                    start_row = all_values.index(row) + 1
+                    for i in range(start_row, len(all_values)):
+                        if len(all_values[i]) > 0 and all_values[i][0].strip():
+                            estudiante = all_values[i][0].strip()
+                            if any(c.isalpha() for c in estudiante):
+                                estudiantes.append(estudiante)
+                        else:
+                            break
+
+            if "profesor" in data and estudiantes:
+                data["fechas"] = fechas or ["Sin fechas"]
+                data["estudiantes"] = estudiantes
+                courses[sheet_name] = data
+
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
