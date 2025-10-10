@@ -1,5 +1,6 @@
-CLASES 2026.xlsx
+.streamlit/
 credentials.json
+CLASES 2026.xlsx
 venv/
 __pycache__/
 *.pyc

@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 
 # ==============================
-# Conexión a Google Sheets usando Secrets
+# Conexión a Google Sheets (usando Secrets)
 # ==============================
 @st.cache_resource
 def get_client():
@@ -17,7 +17,7 @@ def get_client():
     return gspread.authorize(creds)
 
 # ==============================
-# Cargar cursos desde Google Sheet "CLASES 2026"
+# Cargar cursos desde "CLASES 2026" (Google Sheet)
 # ==============================
 @st.cache_data(ttl=300)
 def load_courses():
@@ -28,18 +28,9 @@ def load_courses():
     for worksheet in clases_sheet.worksheets():
         sheet_name = worksheet.title
         try:
-            all_values = worksheet.get_all_values()
-            if not all_values:
-                continue
-
-            # Extraer columna A como lista
-            colA = []
-            for row in all_values:
-                if row and row[0].strip():
-                    colA.append(row[0].strip())
-                else:
-                    colA.append("")
-
+            # Leer solo la primera columna (A)
+            colA_raw = worksheet.col_values(1)  # Columna A
+            colA = [cell.strip() for cell in colA_raw if isinstance(cell, str)]
             colA_lower = [s.lower() for s in colA]
 
             def find_next_value(key):
@@ -63,9 +54,9 @@ def load_courses():
                 fecha_idx = colA_lower.index("fecha:")
                 for i in range(fecha_idx + 1, len(colA)):
                     val = colA[i]
-                    if val and any(c.isalpha() for c in val):
+                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
                         estudiantes.append(val)
-                    elif val:
+                    elif val and not any(c.isalpha() for c in val):
                         fechas.append(val)
             except ValueError:
                 pass
