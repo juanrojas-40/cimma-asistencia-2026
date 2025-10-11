@@ -126,8 +126,10 @@ def load_emails():
     emails = {}
     for row in data:
         nombre = row.get("NOMBRE ESTUDIANTE", "").strip().lower()
+        nombre_apoderado = row.get("NOMBRE APODERADO", "").strip().lower()
         mail_estudiante = row.get("MAIL ESTUDIANTE", "").strip()
         mail_apoderado = row.get("MAIL APODERADO", "").strip()
+
 
         # Usamos el mail del apoderado si está disponible, sino el del estudiante
         email_to_use = mail_apoderado if mail_apoderado else mail_estudiante
@@ -210,9 +212,9 @@ if st.button("💾 Guardar Asistencia"):
             estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
             subject = f"Reporte de Asistencia - Curso {curso_seleccionado} - {fecha_seleccionada}"
             body = f"""
-Hola,
+Hola {nombre_apoderado},
 
-Este es un reporte automático de asistencia para el curso **{curso_seleccionado}**.
+Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 
 📅 Fecha: {fecha_seleccionada}
 👨‍🎓 Estudiante: {estudiante}
