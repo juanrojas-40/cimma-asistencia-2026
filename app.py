@@ -62,14 +62,22 @@ def load_courses():
         sheet_name = worksheet.title
         try:
             colA_raw = worksheet.col_values(1)
-            colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
+            # Filtrar solo celdas no vacías y convertir a str
+            colA = []
+            for cell in colA_raw:
+                if cell and str(cell).strip():
+                    colA.append(str(cell).strip())
+            
+            if not colA:
+                continue
+
             colA_lower = [s.lower() for s in colA]
 
             def find_next_value(key):
                 try:
                     idx = colA_lower.index(key)
                     for i in range(idx + 1, len(colA)):
-                        if colA[i]:
+                        if colA[i] and colA[i].lower() not in ["profesor:", "dia:", "horario", "fecha:"]:
                             return colA[i]
                     return ""
                 except ValueError:
@@ -79,30 +87,34 @@ def load_courses():
             dia = find_next_value("dia:")
             horario = find_next_value("horario")
 
+            # Fechas y estudiantes
             fechas = []
             estudiantes = []
             try:
                 fecha_idx = colA_lower.index("fecha:")
                 for i in range(fecha_idx + 1, len(colA)):
                     val = colA[i]
-                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
+                    if any(c.isalpha() for c in val) and val.lower() not in ["profesor:", "dia:", "horario", "fecha:"]:
                         estudiantes.append(val)
-                    elif val and not any(c.isalpha() for c in val):
+                    elif not any(c.isalpha() for c in val):
                         fechas.append(val)
             except ValueError:
                 pass
 
-            if profesor and dia and horario and estudiantes:
+            if profesor and dia and horario:
+                # Si no hay estudiantes, al menos crea el curso
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
                     "fechas": fechas or ["Sin fechas"],
-                    "estudiantes": estudiantes
+                    "estudiantes": estudiantes or ["Sin estudiantes"]
                 }
+
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
+
     return courses
 
 @st.cache_data(ttl=3600)
