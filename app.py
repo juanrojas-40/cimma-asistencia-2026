@@ -7,11 +7,14 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
+
 # ==============================
-# Conexión a Google Sheets (usando Secrets)
+# CONFIGURACIÓN Y CONEXIONES
 # ==============================
+
 @st.cache_resource
 def get_client():
+    """Conecta a Google Sheets usando credenciales desde Secrets."""
     creds_dict = json.loads(st.secrets["google"]["credentials"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=[
         "https://spreadsheets.google.com/feeds",
@@ -19,10 +22,9 @@ def get_client():
     ])
     return gspread.authorize(creds)
 
-# ==============================
-# Función para enviar correo
-# ==============================
-def send_email(to_email, subject, body):
+
+def send_email(to_email: str, subject: str, body: str) -> bool:
+    """Envía un correo electrónico usando SMTP."""
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
         smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
@@ -39,17 +41,19 @@ def send_email(to_email, subject, body):
             server.starttls()
             server.login(sender_email, sender_password)
             server.send_message(msg)
-
         return True
     except Exception as e:
         st.warning(f"⚠️ Error al enviar correo a {to_email}: {e}")
         return False
 
+
 # ==============================
-# Cargar cursos desde "CLASES 2026"
+# CARGA DE DATOS
 # ==============================
+
 @st.cache_data(ttl=300)
 def load_courses():
+    """Carga cursos desde el Google Sheet 'CLASES 2026'."""
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
@@ -61,18 +65,21 @@ def load_courses():
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
 
+            # Extraer profesor
             try:
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
             except (ValueError, IndexError):
                 continue
 
+            # Extraer día
             try:
                 idx_dia = colA_upper.index("DIA")
                 dia = colA[idx_dia + 1]
             except (ValueError, IndexError):
                 continue
 
+            # Extraer curso y horario
             try:
                 idx_curso = colA_upper.index("CURSO")
                 curso_id = colA[idx_curso + 1]
@@ -80,18 +87,13 @@ def load_courses():
             except (ValueError, IndexError):
                 continue
 
+            # Extraer fechas y estudiantes
             try:
                 idx_fechas = colA_upper.index("FECHAS")
                 idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
 
-                fechas = []
-                for i in range(idx_fechas + 1, idx_estudiantes):
-                    if i < len(colA):
-                        fechas.append(colA[i])
-
-                estudiantes = []
-                for i in range(idx_estudiantes + 1, len(colA)):
-                    estudiantes.append(colA[i])
+                fechas = [colA[i] for i in range(idx_fechas + 1, idx_estudiantes) if i < len(colA)]
+                estudiantes = [colA[i] for i in range(idx_estudiantes + 1, len(colA))]
 
             except (ValueError, IndexError):
                 fechas = ["Sin fechas"]
@@ -113,106 +115,100 @@ def load_courses():
 
     return courses
 
-# ==============================
-# Cargar correos desde hoja "MAILS"
-# ==============================
-@st.cache_data(ttl=3600)  # Cache por 1 hora
+
+@st.cache_data(ttl=3600)
 def load_emails():
+    """Carga correos y nombres de apoderados desde la hoja 'MAILS'."""
     client = get_client()
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     mails_sheet = asistencia_sheet.worksheet("MAILS")
 
     data = mails_sheet.get_all_records()
     emails = {}
+    nombres_apoderados = {}
+
     for row in data:
-        nombre = row.get("NOMBRE ESTUDIANTE", "").strip().lower()
-        nombre_apoderado = row.get("NOMBRE APODERADO", "").strip().lower()
-        mail_estudiante = row.get("MAIL ESTUDIANTE", "").strip()
+        nombre_estudiante = row.get("NOMBRE ESTUDIANTE", "").strip().lower()
+        nombre_apoderado = row.get("NOMBRE APODERADO", "").strip()
         mail_apoderado = row.get("MAIL APODERADO", "").strip()
+        mail_estudiante = row.get("MAIL ESTUDIANTE", "").strip()
 
-
-        # Usamos el mail del apoderado si está disponible, sino el del estudiante
         email_to_use = mail_apoderado if mail_apoderado else mail_estudiante
 
         if email_to_use:
-            emails[nombre] = email_to_use
+            emails[nombre_estudiante] = email_to_use
+            nombres_apoderados[nombre_estudiante] = nombre_apoderado
 
-    return emails
+    return emails, nombres_apoderados
+
 
 # ==============================
 # APP PRINCIPAL
 # ==============================
-st.set_page_config(page_title="Asistencia Cursos 2026", layout="centered")
-st.title("✅ Registro de Asistencia – Cursos 2026")
 
-courses = load_courses()
+def main():
+    st.set_page_config(page_title="Asistencia Cursos 2026", layout="centered")
+    st.title("✅ Registro de Asistencia – Cursos 2026")
 
-if not courses:
-    st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
-    st.stop()
+    courses = load_courses()
+    if not courses:
+        st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
+        st.stop()
 
-curso_seleccionado = st.selectbox("Selecciona el curso", list(courses.keys()))
-data = courses[curso_seleccionado]
+    curso_seleccionado = st.selectbox("Selecciona el curso", list(courses.keys()))
+    data = courses[curso_seleccionado]
 
-st.write(f"**Profesor:** {data['profesor']}")
-st.write(f"**Día:** {data['dia']} | **Horario:** {data['horario']}")
+    st.write(f"**Profesor:** {data['profesor']}")
+    st.write(f"**Día:** {data['dia']} | **Horario:** {data['horario']}")
 
-fecha_seleccionada = st.selectbox("Selecciona la fecha", data["fechas"])
+    fecha_seleccionada = st.selectbox("Selecciona la fecha", data["fechas"])
 
-st.header("📋 Estudiantes")
-asistencia = {}
-for est in data["estudiantes"]:
-    asistencia[est] = st.checkbox(est, key=f"{curso_seleccionado}_{est}")
+    st.header("📋 Estudiantes")
+    asistencia = {}
+    for est in data["estudiantes"]:
+        asistencia[est] = st.checkbox(est, key=f"{curso_seleccionado}_{est}")
 
-if st.button("💾 Guardar Asistencia"):
-    try:
-        client = get_client()
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-
-        # Usar hoja con nombre del curso
+    if st.button("💾 Guardar Asistencia"):
         try:
-            sheet = asistencia_sheet.worksheet(curso_seleccionado)
-        except gspread.exceptions.WorksheetNotFound:
-            sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=5)
-            sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Hora Registro"])
+            client = get_client()
+            asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
 
-        rows = []
-        for estudiante, presente in asistencia.items():
-            rows.append([
-                curso_seleccionado,
-                fecha_seleccionada,
-                estudiante,
-                1 if presente else 0,
-                datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            ])
+            # Crear o usar hoja del curso
+            try:
+                sheet = asistencia_sheet.worksheet(curso_seleccionado)
+            except gspread.exceptions.WorksheetNotFound:
+                sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=5)
+                sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Hora Registro"])
 
-        sheet.append_rows(rows)
-        st.success(f"✅ Asistencia guardada en la hoja '{curso_seleccionado}'!")
+            # Guardar asistencia
+            rows = []
+            for estudiante, presente in asistencia.items():
+                rows.append([
+                    curso_seleccionado,
+                    fecha_seleccionada,
+                    estudiante,
+                    1 if presente else 0,
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ])
+            sheet.append_rows(rows)
+            st.success(f"✅ Asistencia guardada en la hoja '{curso_seleccionado}'!")
 
-        # ==============================
-        # ENVIAR CORREOS
-        # ==============================
-        st.info("📩 Enviando correos de confirmación...")
+            # Enviar correos
+            st.info("📩 Enviando correos de confirmación...")
+            emails, nombres_apoderados = load_emails()
 
-        # Cargar correos
-        emails = load_emails()
+            for estudiante, presente in asistencia.items():
+                nombre_lower = estudiante.strip().lower()
+                correo_destino = emails.get(nombre_lower)
+                nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
 
-        # Para cada estudiante, enviar correo
-        for estudiante, presente in asistencia.items():
-            # Normalizar nombre para buscar en la tabla de correos
-            nombre_lower = estudiante.strip().lower()
+                if not correo_destino:
+                    st.warning(f"📧 No se encontró correo para: {estudiante}")
+                    continue
 
-            # Buscar correo
-            correo_destino = emails.get(nombre_lower)
-            if not correo_destino:
-                st.warning(f"📧 No se encontró correo para: {estudiante}")
-                continue
-
-            # Preparar mensaje
-            estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
-            subject = f"Reporte de Asistencia - Curso {curso_seleccionado} - {fecha_seleccionada}"
-            body = f"""
-Hola {nombre_apoderado},
+                estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
+                subject = f"Reporte de Asistencia - Curso {curso_seleccionado} - {fecha_seleccionada}"
+                body = f"""Hola {nombre_apoderado},
 
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 
@@ -221,14 +217,16 @@ Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 📌 Estado: {estado}
 
 Saludos cordiales,
-Equipo Académico
-"""
+Equipo Académico"""
 
-            # Enviar correo
-            if send_email(correo_destino, subject, body):
-                st.success(f"📧 Correo enviado a: {correo_destino}")
-            else:
-                st.error(f"❌ Fallo al enviar a: {correo_destino}")
+                if send_email(correo_destino, subject, body):
+                    st.success(f"📧 Correo enviado a: {correo_destino}")
+                else:
+                    st.error(f"❌ Fallo al enviar a: {correo_destino}")
 
-    except Exception as e:
-        st.error(f"❌ Error al guardar o enviar correos: {e}")
+        except Exception as e:
+            st.error(f"❌ Error al guardar o enviar correos: {e}")
+
+
+if __name__ == "__main__":
+    main()
