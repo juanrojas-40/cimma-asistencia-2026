@@ -119,28 +119,43 @@ def load_courses():
 @st.cache_data(ttl=3600)
 def load_emails():
     """Carga correos y nombres de apoderados desde la hoja 'MAILS'."""
-    client = get_client()
-    asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-    mails_sheet = asistencia_sheet.worksheet("MAILS")
+    try:
+        client = get_client()
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        # Verifica que la hoja "MAILS" exista
+        sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
+        if "MAILS" not in sheet_names:
+            st.error("❌ La hoja 'MAILS' no existe en 'Asistencia 2026'.")
+            return {}, {}
 
-    data = mails_sheet.get_all_records()
-    emails = {}
-    nombres_apoderados = {}
+        mails_sheet = asistencia_sheet.worksheet("MAILS")
+        data = mails_sheet.get_all_records()
 
-    for row in data:
-        nombre_estudiante = row.get("NOMBRE ESTUDIANTE", "").strip().lower()
-        nombre_apoderado = row.get("NOMBRE APODERADO", "").strip()
-        mail_apoderado = row.get("MAIL APODERADO", "").strip()
-        mail_estudiante = row.get("MAIL ESTUDIANTE", "").strip()
+        if not data:
+            st.warning("⚠️ La hoja 'MAILS' está vacía.")
+            return {}, {}
 
-        email_to_use = mail_apoderado if mail_apoderado else mail_estudiante
+        emails = {}
+        nombres_apoderados = {}
 
-        if email_to_use:
-            emails[nombre_estudiante] = email_to_use
-            nombres_apoderados[nombre_estudiante] = nombre_apoderado
+        for row in data:
+            nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
+            nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
+            mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
+            mail_estudiante = str(row.get("MAIL ESTUDIANTE", "")).strip()
 
-    return emails, nombres_apoderados
+            email_to_use = mail_apoderado if mail_apoderado else mail_estudiante
 
+            if email_to_use and nombre_estudiante:
+                emails[nombre_estudiante] = email_to_use
+                nombres_apoderados[nombre_estudiante] = nombre_apoderado
+
+        return emails, nombres_apoderados
+
+    except Exception as e:
+        st.error(f"❌ Error al cargar la hoja 'MAILS': {e}")
+        return {}, {}
 
 # ==============================
 # APP PRINCIPAL
