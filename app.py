@@ -6,7 +6,7 @@ from datetime import datetime
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-
+import pytz
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -14,7 +14,6 @@ from email.mime.multipart import MIMEMultipart
 
 @st.cache_resource
 def get_client():
-    """Conecta a Google Sheets usando credenciales desde Secrets."""
     creds_dict = json.loads(st.secrets["google"]["credentials"])
     creds = Credentials.from_service_account_info(creds_dict, scopes=[
         "https://spreadsheets.google.com/feeds",
@@ -22,9 +21,12 @@ def get_client():
     ])
     return gspread.authorize(creds)
 
+def get_chile_time():
+    """Obtiene la hora actual en Chile (Santiago)."""
+    chile_tz = pytz.timezone("America/Santiago")
+    return datetime.now(chile_tz)
 
 def send_email(to_email: str, subject: str, body: str) -> bool:
-    """Envía un correo electrónico usando SMTP."""
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
         smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
@@ -46,14 +48,12 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         st.warning(f"⚠️ Error al enviar correo a {to_email}: {e}")
         return False
 
-
 # ==============================
 # CARGA DE DATOS
 # ==============================
 
 @st.cache_data(ttl=300)
 def load_courses():
-    """Carga cursos desde el Google Sheet 'CLASES 2026'."""
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
@@ -63,67 +63,53 @@ def load_courses():
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_upper = [s.upper() for s in colA]
+            colA_lower = [s.lower() for s in colA]
 
-            # Extraer profesor
+            def find_next_value(key):
+                try:
+                    idx = colA_lower.index(key)
+                    for i in range(idx + 1, len(colA)):
+                        if colA[i]:
+                            return colA[i]
+                    return ""
+                except ValueError:
+                    return ""
+
+            profesor = find_next_value("profesor:")
+            dia = find_next_value("dia:")
+            horario = find_next_value("horario")
+
+            fechas = []
+            estudiantes = []
             try:
-                idx_prof = colA_upper.index("PROFESOR")
-                profesor = colA[idx_prof + 1]
-            except (ValueError, IndexError):
-                continue
-
-            # Extraer día
-            try:
-                idx_dia = colA_upper.index("DIA")
-                dia = colA[idx_dia + 1]
-            except (ValueError, IndexError):
-                continue
-
-            # Extraer curso y horario
-            try:
-                idx_curso = colA_upper.index("CURSO")
-                curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]
-            except (ValueError, IndexError):
-                continue
-
-            # Extraer fechas y estudiantes
-            try:
-                idx_fechas = colA_upper.index("FECHAS")
-                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
-
-                fechas = [colA[i] for i in range(idx_fechas + 1, idx_estudiantes) if i < len(colA)]
-                estudiantes = [colA[i] for i in range(idx_estudiantes + 1, len(colA))]
-
-            except (ValueError, IndexError):
-                fechas = ["Sin fechas"]
-                estudiantes = []
+                fecha_idx = colA_lower.index("fecha:")
+                for i in range(fecha_idx + 1, len(colA)):
+                    val = colA[i]
+                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
+                        estudiantes.append(val)
+                    elif val and not any(c.isalpha() for c in val):
+                        fechas.append(val)
+            except ValueError:
+                pass
 
             if profesor and dia and horario and estudiantes:
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
-                    "curso_id": curso_id,
-                    "fechas": fechas,
+                    "fechas": fechas or ["Sin fechas"],
                     "estudiantes": estudiantes
                 }
-
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
-
     return courses
-
 
 @st.cache_data(ttl=3600)
 def load_emails():
-    """Carga correos y nombres de apoderados desde la hoja 'MAILS'."""
     try:
         client = get_client()
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-        
-        # Verifica que la hoja "MAILS" exista
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
         if "MAILS" not in sheet_names:
             st.error("❌ La hoja 'MAILS' no existe en 'Asistencia 2026'.")
@@ -131,28 +117,22 @@ def load_emails():
 
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
-
         if not data:
             st.warning("⚠️ La hoja 'MAILS' está vacía.")
             return {}, {}
 
         emails = {}
         nombres_apoderados = {}
-
         for row in data:
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
             mail_estudiante = str(row.get("MAIL ESTUDIANTE", "")).strip()
-
             email_to_use = mail_apoderado if mail_apoderado else mail_estudiante
-
             if email_to_use and nombre_estudiante:
                 emails[nombre_estudiante] = email_to_use
                 nombres_apoderados[nombre_estudiante] = nombre_apoderado
-
         return emails, nombres_apoderados
-
     except Exception as e:
         st.error(f"❌ Error al cargar la hoja 'MAILS': {e}")
         return {}, {}
@@ -176,8 +156,45 @@ def main():
     st.write(f"**Profesor:** {data['profesor']}")
     st.write(f"**Día:** {data['dia']} | **Horario:** {data['horario']}")
 
-    fecha_seleccionada = st.selectbox("Selecciona la fecha", data["fechas"])
+    # Opción: Clase no realizada
+    clase_realizada = st.radio(
+        "¿Se realizó la clase?",
+        ("Sí", "No"),
+        index=0,
+        help="Selecciona 'No' en caso de feriado, suspensión o imprevisto."
+    )
 
+    if clase_realizada == "No":
+        motivo = st.text_area("Motivo de la no realización", placeholder="Ej: Feriado nacional, suspensión por evento escolar, etc.")
+        fecha_seleccionada = st.selectbox("Fecha afectada", data["fechas"])
+        
+        if st.button("💾 Registrar suspensión"):
+            try:
+                client = get_client()
+                asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+                try:
+                    sheet = asistencia_sheet.worksheet(curso_seleccionado)
+                except gspread.exceptions.WorksheetNotFound:
+                    sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
+                    sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
+
+                chile_time = get_chile_time()
+                log = f"{chile_time.strftime('%Y-%m-%d')}: Clase no realizada. Motivo registrado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
+                sheet.append_row([
+                    curso_seleccionado,
+                    fecha_seleccionada,
+                    "TODOS",
+                    0,
+                    log,
+                    motivo
+                ])
+                st.success(f"✅ Suspensión registrada para la fecha {fecha_seleccionada}.")
+            except Exception as e:
+                st.error(f"❌ Error al registrar suspensión: {e}")
+        return
+
+    # Registro normal de asistencia
+    fecha_seleccionada = st.selectbox("Selecciona la fecha", data["fechas"])
     st.header("📋 Estudiantes")
     asistencia = {}
     for est in data["estudiantes"]:
@@ -187,15 +204,15 @@ def main():
         try:
             client = get_client()
             asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-
-            # Crear o usar hoja del curso
             try:
                 sheet = asistencia_sheet.worksheet(curso_seleccionado)
             except gspread.exceptions.WorksheetNotFound:
-                sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=5)
-                sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Hora Registro"])
+                sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
+                sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
 
-            # Guardar asistencia
+            chile_time = get_chile_time()
+            log_base = f"{chile_time.strftime('%Y-%m-%d')}: Mail de asistencia enviado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
+
             rows = []
             for estudiante, presente in asistencia.items():
                 rows.append([
@@ -203,7 +220,8 @@ def main():
                     fecha_seleccionada,
                     estudiante,
                     1 if presente else 0,
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    log_base,
+                    ""
                 ])
             sheet.append_rows(rows)
             st.success(f"✅ Asistencia guardada en la hoja '{curso_seleccionado}'!")
@@ -211,14 +229,11 @@ def main():
             # Enviar correos
             st.info("📩 Enviando correos de confirmación...")
             emails, nombres_apoderados = load_emails()
-
             for estudiante, presente in asistencia.items():
                 nombre_lower = estudiante.strip().lower()
                 correo_destino = emails.get(nombre_lower)
                 nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
-
                 if not correo_destino:
-                    st.warning(f"📧 No se encontró correo para: {estudiante}")
                     continue
 
                 estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
@@ -233,15 +248,10 @@ Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 
 Saludos cordiales,
 Equipo Académico"""
-
-                if send_email(correo_destino, subject, body):
-                    st.success(f"📧 Correo enviado a: {correo_destino}")
-                else:
-                    st.error(f"❌ Fallo al enviar a: {correo_destino}")
+                send_email(correo_destino, subject, body)
 
         except Exception as e:
             st.error(f"❌ Error al guardar o enviar correos: {e}")
-
 
 if __name__ == "__main__":
     main()
