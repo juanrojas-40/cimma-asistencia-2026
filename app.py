@@ -62,53 +62,46 @@ def load_courses():
         sheet_name = worksheet.title
         try:
             colA_raw = worksheet.col_values(1)
-            # Filtrar solo celdas no vacías y convertir a str
-            colA = []
-            for cell in colA_raw:
-                if cell and str(cell).strip():
-                    colA.append(str(cell).strip())
-            
-            if not colA:
-                continue
-
-            colA_lower = [s.lower() for s in colA]
+            colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
+            colA_upper = [s.upper() for s in colA]
 
             def find_next_value(key):
                 try:
-                    idx = colA_lower.index(key)
+                    idx = colA_upper.index(key)
                     for i in range(idx + 1, len(colA)):
-                        if colA[i] and colA[i].lower() not in ["profesor:", "dia:", "horario", "fecha:"]:
+                        if colA[i]:
                             return colA[i]
                     return ""
                 except ValueError:
                     return ""
 
-            profesor = find_next_value("profesor:")
-            dia = find_next_value("dia:")
-            horario = find_next_value("horario")
+            profesor = find_next_value("PROFESOR")
+            dia = find_next_value("DIA")
+            curso_id = find_next_value("CURSO")
+            horario = find_next_value("HORARIO")
 
-            # Fechas y estudiantes
+            # Extraer fechas
             fechas = []
             estudiantes = []
             try:
-                fecha_idx = colA_lower.index("fecha:")
+                fecha_idx = colA_upper.index("FECHAS")
                 for i in range(fecha_idx + 1, len(colA)):
                     val = colA[i]
-                    if any(c.isalpha() for c in val) and val.lower() not in ["profesor:", "dia:", "horario", "fecha:"]:
-                        estudiantes.append(val)
-                    elif not any(c.isalpha() for c in val):
+                    if val and not any(c.isalpha() for c in val):  # Es una fecha (no tiene letras)
                         fechas.append(val)
+                    elif val and any(c.isalpha() for c in val):  # Es un nombre (tiene letras)
+                        estudiantes.append(val)
             except ValueError:
                 pass
 
-            if profesor and dia and horario:
-                # Si no hay estudiantes, al menos crea el curso
+            if profesor and dia and curso_id and horario and estudiantes:
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
+                    "curso_id": curso_id,
                     "fechas": fechas or ["Sin fechas"],
-                    "estudiantes": estudiantes or ["Sin estudiantes"]
+                    "estudiantes": estudiantes
                 }
 
         except Exception as e:
