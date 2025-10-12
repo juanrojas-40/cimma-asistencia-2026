@@ -220,47 +220,28 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
 
-     # === BLOQUE CORREGIDO: BOTONES ROJO/AZUL CON INTERACCIÓN REAL ===
-    estado_key = f"asistencia_estado_{curso_seleccionado}"
-    if estado_key not in st.session_state:
-        st.session_state[estado_key] = {est: False for est in data["estudiantes"]}
-
-    asistencia_estado = st.session_state[estado_key]
-
-    # Inyectar CSS una sola vez
-    st.markdown(
-    <style>
-    .btn-rojo {
-        background-color: #FF6B6B !important;
-        color: white !important;
-        border: none !important;
-    }
-    .btn-azul {
-        background-color: #1A3B8F !important;
-        color: white !important;
-        border: none !important;
-    }
-    </style>
-    , unsafe_allow_html=True)
+    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES PARA MÓVIL ===
+    if "asistencia_estado" not in st.session_state:
+        st.session_state.asistencia_estado = {est: False for est in data["estudiantes"]}
 
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
-        estado_actual = asistencia_estado[est]
+        estado_actual = st.session_state.asistencia_estado[est]
 
         if estado_actual:
             label = f"✅ {est} — ASISTIÓ"
-            btn_class = "btn-azul"
+            btn_type = "primary"
         else:
             label = f"❌ {est} — AUSENTE"
-            btn_class = "btn-rojo"
+            btn_type = "secondary"
 
-        # Botón real + clase CSS
-        if st.button(label, key=key, use_container_width=True):
-            asistencia_estado[est] = not asistencia_estado[est]
+        if st.button(label, key=key, use_container_width=True, type=btn_type):
+            st.session_state.asistencia_estado[est] = not st.session_state.asistencia_estado[est]
             st.rerun()
 
-    asistencia = asistencia_estado
-    # === FIN DEL BLOQUE CORREGIDO ===
+    # Usar el estado para guardar
+    asistencia = st.session_state.asistencia_estado
+    # === FIN DEL BLOQUE ACTUALIZADO ===
 
     if st.button("💾 Guardar Asistencia", use_container_width=True):
         try:
