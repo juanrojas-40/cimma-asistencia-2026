@@ -220,54 +220,47 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
 
-    # === BLOQUE DE ASISTENCIA CON BOTONES ROJO/AZUL ===
+     # === BLOQUE CORREGIDO: BOTONES ROJO/AZUL CON INTERACCIÓN REAL ===
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
         st.session_state[estado_key] = {est: False for est in data["estudiantes"]}
 
     asistencia_estado = st.session_state[estado_key]
 
+    # Inyectar CSS una sola vez
+    st.markdown("""
+    <style>
+    .btn-rojo {
+        background-color: #FF6B6B !important;
+        color: white !important;
+        border: none !important;
+    }
+    .btn-azul {
+        background-color: #1A3B8F !important;
+        color: white !important;
+        border: none !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
         estado_actual = asistencia_estado[est]
 
         if estado_actual:
-            color_fondo = "#1A3B8F"  # Azul del logo CIMMA
-            icono = "✅"
-            texto = "ASISTIÓ"
-            color_texto = "white"
+            label = f"✅ {est} — ASISTIÓ"
+            btn_class = "btn-azul"
         else:
-            color_fondo = "#FF6B6B"  # Rojo suave
-            icono = "❌"
-            texto = "AUSENTE"
-            color_texto = "white"
+            label = f"❌ {est} — AUSENTE"
+            btn_class = "btn-rojo"
 
-        # Botón personalizado con HTML/CSS
-        button_html = f"""
-        <div style="
-            background-color: {color_fondo};
-            color: {color_texto};
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 5px 0;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            transition: all 0.2s ease;
-        ">
-            {icono} {est} — {texto}
-        </div>
-        """
-
-        # Mostrar botón
-        if st.markdown(button_html, unsafe_allow_html=True):
-            # Al hacer clic, cambiar estado
+        # Botón real + clase CSS
+        if st.button(label, key=key, use_container_width=True):
             asistencia_estado[est] = not asistencia_estado[est]
             st.rerun()
 
     asistencia = asistencia_estado
-    # === FIN DEL BLOQUE ===
+    # === FIN DEL BLOQUE CORREGIDO ===
 
     if st.button("💾 Guardar Asistencia", use_container_width=True):
         try:
