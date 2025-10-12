@@ -220,7 +220,34 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
 
-    # === BLOQUE SIMPLE: SIN CSS, SOLO STREAMLIT NATIVO ===
+    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
+    # Inyectar CSS personalizado para los botones
+    st.markdown("""
+    <style>
+    /* Estilo para botones primary (asistió - azul) */
+    .stButton > button[kind="primary"] {
+        background-color: #1A3B8F !important;
+        color: white !important;
+        border: none !important;
+        padding: 8px 16px !important;
+        border-radius: 4px !important;
+        width: 100% !important;
+        font-size: 16px !important;
+    }
+
+    /* Estilo para botones secondary (ausente - rojo) */
+    .stButton > button[kind="secondary"] {
+        background-color: #FF6B6B !important;
+        color: white !important;
+        border: none !important;
+        padding: 8px 16px !important;
+        border-radius: 4px !important;
+        width: 100% !important;
+        font-size: 16px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
         st.session_state[estado_key] = {est: False for est in data["estudiantes"]}
@@ -233,17 +260,19 @@ def main():
 
         if estado_actual:
             # Botón AZUL (primary) → asistió
-            if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
-                asistencia_estado[est] = False
-                st.rerun()
+            label = f"✅ {est} — ASISTIÓ"
+            btn_type = "primary"
         else:
-            # Botón GRIS (secondary) → ausente (conceptualmente "rojo" por el emoji y texto)
-            if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
-                asistencia_estado[est] = True
-                st.rerun()
+            # Botón ROJO (secondary) → ausente
+            label = f"❌ {est} — AUSENTE"
+            btn_type = "secondary"
+
+        if st.button(label, key=key, use_container_width=True, type=btn_type):
+            asistencia_estado[est] = not asistencia_estado[est]  # Alternar estado
+            st.rerun()
 
     asistencia = asistencia_estado
-    # === FIN DEL BLOQUE ===
+    # === FIN DEL BLOQUE ACTUALIZADO ===
 
 
 
