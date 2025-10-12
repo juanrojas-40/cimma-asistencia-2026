@@ -156,7 +156,7 @@ def main():
     # Mostrar logo
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_column_width=True)
+        st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
 
     st.title("📱 Registro de Asistencia")
     st.subheader("Preuniversitario CIMMA 2026")
