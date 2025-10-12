@@ -122,13 +122,13 @@ def load_emails():
 
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
-        if not 
+        if not data:
             st.warning("⚠️ La hoja 'MAILS' está vacía.")
             return {}, {}
 
         emails = {}
         nombres_apoderados = {}
-        for row in 
+        for row in data:
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
@@ -143,7 +143,7 @@ def load_emails():
         return {}, {}
 
 # ==============================
-# APP PRINCIPAL (con botones táctiles personalizados)
+# APP PRINCIPAL (con bloque de asistencia táctil)
 # ==============================
 
 def main():
@@ -220,43 +220,26 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
 
-    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON COLORES DEL LOGO ===
+    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES PARA MÓVIL ===
     if "asistencia_estado" not in st.session_state:
         st.session_state.asistencia_estado = {est: False for est in data["estudiantes"]}
 
     for est in data["estudiantes"]:
+        key = f"btn_{curso_seleccionado}_{est}"
         estado_actual = st.session_state.asistencia_estado[est]
-        
+
         if estado_actual:
             label = f"✅ {est} — ASISTIÓ"
-            bg_color = "#1A3B8F"  # Azul del logo CIMMA
+            btn_type = "primary"
         else:
             label = f"❌ {est} — AUSENTE"
-            bg_color = "#FF6B6B"  # Rojo suave
+            btn_type = "secondary"
 
-        # Botón personalizado con HTML/CSS
-        button_html = f"""
-        <button style="
-            background-color: {bg_color};
-            color: white;
-            border: none;
-            padding: 14px;
-            width: 100%;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            margin: 4px 0;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        ">{label}</button>
-        """
-        
-        # Mostrar botón y manejar clic
-        clicked = st.button(label, key=f"btn_{curso_seleccionado}_{est}", use_container_width=True)
-        if clicked:
+        if st.button(label, key=key, use_container_width=True, type=btn_type):
             st.session_state.asistencia_estado[est] = not st.session_state.asistencia_estado[est]
             st.rerun()
 
+    # Usar el estado para guardar
     asistencia = st.session_state.asistencia_estado
     # === FIN DEL BLOQUE ACTUALIZADO ===
 
