@@ -245,6 +245,17 @@ def main():
         width: 100% !important;
         font-size: 16px !important;
     }
+
+    /* Estilo para el botón Guardar Asistencia (gris, más grande) */
+    .stButton > button[key="guardar_asistencia"] {
+        background-color: #808080 !important;
+        color: white !important;
+        border: none !important;
+        padding: 12px 24px !important;
+        border-radius: 6px !important;
+        width: 100% !important;
+        font-size:  18px !important;
+    }           
     </style>
     """, unsafe_allow_html=True)
 
@@ -276,7 +287,7 @@ def main():
 
 
 
-    if st.button("💾 Guardar Asistencia", use_container_width=True):
+    if st.button("💾 Guardar Asistencia", key="guardar_asistencia",use_container_width=True):
         try:
             client = get_client()
             asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
