@@ -221,6 +221,7 @@ def main():
     st.header("👥 Lista de estudiantes")
 
     # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES PARA MÓVIL ===
+    # === BLOQUE DE ASISTENCIA: SIMPLE Y NATIVO ===
     if "asistencia_estado" not in st.session_state:
         st.session_state.asistencia_estado = {est: False for est in data["estudiantes"]}
 
@@ -229,19 +230,18 @@ def main():
         estado_actual = st.session_state.asistencia_estado[est]
 
         if estado_actual:
-            label = f"✅ {est} — ASISTIÓ"
-            btn_type = "primary"
+            # Botón azul (primary) → asistió
+            if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
+                st.session_state.asistencia_estado[est] = False
+                st.rerun()
         else:
-            label = f"❌ {est} — AUSENTE"
-            btn_type = "secondary"
+            # Botón gris (secondary) → ausente (conceptualmente "rojo" por el emoji y texto)
+            if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
+                st.session_state.asistencia_estado[est] = True
+                st.rerun()
 
-        if st.button(label, key=key, use_container_width=True, type=btn_type):
-            st.session_state.asistencia_estado[est] = not st.session_state.asistencia_estado[est]
-            st.rerun()
-
-    # Usar el estado para guardar
     asistencia = st.session_state.asistencia_estado
-    # === FIN DEL BLOQUE ACTUALIZADO ===
+    # === FIN DEL BLOQUE ===
 
     if st.button("💾 Guardar Asistencia", use_container_width=True):
         try:
