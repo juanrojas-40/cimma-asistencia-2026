@@ -143,12 +143,12 @@ def load_emails():
         return {}, {}
 
 # ==============================
-# APP PRINCIPAL (con mejoras estéticas)
+# APP PRINCIPAL (con bloque de asistencia táctil)
 # ==============================
 
 def main():
     st.set_page_config(
-        page_title="Asistencia Cursos 2026",
+        page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
         page_icon="✅",
         layout="centered"
     )
@@ -169,8 +169,7 @@ def main():
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(courses.keys()))
     data = courses[curso_seleccionado]
 
-    # Información del curso en formato compacto
-    st.markdown(f"**👨‍🏫 Profesor:** {data['profesor']}")
+    st.markdown(f"**🧑‍🏫 Profesor(a):** {data['profesor']}")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -178,7 +177,6 @@ def main():
     with col2:
         st.markdown(f"**⏰ Horario:** {data['horario']}")
 
-    # Opción: Clase no realizada
     clase_realizada = st.radio(
         "✅ ¿Se realizó la clase?",
         ("Sí", "No"),
@@ -221,10 +219,29 @@ def main():
     # Registro normal de asistencia
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
-    
-    asistencia = {}
+
+    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES PARA MÓVIL ===
+    if "asistencia_estado" not in st.session_state:
+        st.session_state.asistencia_estado = {est: False for est in data["estudiantes"]}
+
     for est in data["estudiantes"]:
-        asistencia[est] = st.checkbox(f"👤 {est}", key=f"{curso_seleccionado}_{est}")
+        key = f"btn_{curso_seleccionado}_{est}"
+        estado_actual = st.session_state.asistencia_estado[est]
+
+        if estado_actual:
+            label = f"✅ {est} — ASISTIÓ"
+            btn_type = "primary"
+        else:
+            label = f"❌ {est} — AUSENTE"
+            btn_type = "secondary"
+
+        if st.button(label, key=key, use_container_width=True, type=btn_type):
+            st.session_state.asistencia_estado[est] = not st.session_state.asistencia_estado[est]
+            st.rerun()
+
+    # Usar el estado para guardar
+    asistencia = st.session_state.asistencia_estado
+    # === FIN DEL BLOQUE ACTUALIZADO ===
 
     if st.button("💾 Guardar Asistencia", use_container_width=True):
         try:
@@ -252,7 +269,6 @@ def main():
             sheet.append_rows(rows)
             st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
 
-            # Enviar correos
             st.info("📧 Enviando notificaciones a apoderados...")
             emails, nombres_apoderados = load_emails()
             for estudiante, presente in asistencia.items():
@@ -273,7 +289,7 @@ Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 📌 Estado: {estado}
 
 Saludos cordiales,
-Preuniversitario 2026"""
+Preuniversitario CIMMA 2026"""
                 send_email(correo_destino, subject, body)
 
         except Exception as e:
