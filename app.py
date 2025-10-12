@@ -220,7 +220,7 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
 
-    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
+# === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
     # Inyectar CSS personalizado para los botones
     st.markdown("""
     <style>
@@ -246,16 +246,21 @@ def main():
         font-size: 16px !important;
     }
 
-    /* Estilo para el botón Guardar Asistencia (gris, más grande) */
+    /* Estilo para el botón Guardar Asistencia (gris, más grande, mejorado) */
     .stButton > button[key="guardar_asistencia"] {
-        background-color: #808080 !important;
+        background-color: #6B7280 !important;
         color: white !important;
-        border: none !important;
-        padding: 12px 24px !important;
+        border: 2px solid #4B5563 !important;
+        padding: 16px 32px !important;
         border-radius: 6px !important;
         width: 100% !important;
-        font-size:  18px !important;
-    }           
+        font-size: 20px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+        transition: background-color 0.2s ease !important;
+    }
+    .stButton > button[key="guardar_asistencia"]:hover {
+        background-color: #4B5563 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
