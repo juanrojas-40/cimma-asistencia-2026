@@ -22,7 +22,6 @@ def get_client():
     return gspread.authorize(creds)
 
 def get_chile_time():
-    """Obtiene la hora actual en Chile (Santiago)."""
     chile_tz = pytz.timezone("America/Santiago")
     return datetime.now(chile_tz)
 
@@ -49,12 +48,11 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS
+# CARGA DE DATOS (sin cambios)
 # ==============================
 
 @st.cache_data(ttl=300)
 def load_courses():
-    """Carga cursos desde el Google Sheet 'CLASES 2026'."""
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
@@ -66,21 +64,18 @@ def load_courses():
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
 
-            # Extraer profesor
             try:
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
             except (ValueError, IndexError):
                 continue
 
-            # Extraer día
             try:
                 idx_dia = colA_upper.index("DIA")
                 dia = colA[idx_dia + 1]
             except (ValueError, IndexError):
                 continue
 
-            # Extraer curso y horario
             try:
                 idx_curso = colA_upper.index("CURSO")
                 curso_id = colA[idx_curso + 1]
@@ -88,7 +83,6 @@ def load_courses():
             except (ValueError, IndexError):
                 continue
 
-            # Extraer fechas y estudiantes
             try:
                 idx_fechas = colA_upper.index("FECHAS")
                 idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
@@ -149,37 +143,52 @@ def load_emails():
         return {}, {}
 
 # ==============================
-# APP PRINCIPAL
+# APP PRINCIPAL (con mejoras estéticas)
 # ==============================
 
 def main():
-    st.set_page_config(page_title="Asistencia Cursos 2026", layout="centered")
-    st.title("✅ Registro de Asistencia – Cursos 2026")
+    st.set_page_config(
+        page_title="Asistencia Cursos 2026",
+        page_icon="✅",
+        layout="centered"
+    )
+    
+    st.title("📱 Registro de Asistencia")
+    st.subheader("Preuniversitario 2026")
 
     courses = load_courses()
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
 
-    curso_seleccionado = st.selectbox("Selecciona el curso", list(courses.keys()))
+    curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(courses.keys()))
     data = courses[curso_seleccionado]
 
-    st.write(f"**Profesor:** {data['profesor']}")
-    st.write(f"**Día:** {data['dia']} | **Horario:** {data['horario']}")
+    # Información del curso en formato compacto
+    st.markdown(f"**👨‍🏫 Profesor:** {data['profesor']}")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**📅 Día:** {data['dia']}")
+    with col2:
+        st.markdown(f"**⏰ Horario:** {data['horario']}")
 
     # Opción: Clase no realizada
     clase_realizada = st.radio(
-        "¿Se realizó la clase?",
+        "✅ ¿Se realizó la clase?",
         ("Sí", "No"),
         index=0,
         help="Selecciona 'No' en caso de feriado, suspensión o imprevisto."
     )
 
     if clase_realizada == "No":
-        motivo = st.text_area("Motivo de la no realización", placeholder="Ej: Feriado nacional, suspensión por evento escolar, etc.")
-        fecha_seleccionada = st.selectbox("Fecha afectada", data["fechas"])
+        motivo = st.text_area(
+            "📝 Motivo de la no realización",
+            placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc."
+        )
+        fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", data["fechas"])
         
-        if st.button("💾 Registrar suspensión"):
+        if st.button("💾 Registrar suspensión", use_container_width=True):
             try:
                 client = get_client()
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
@@ -199,19 +208,20 @@ def main():
                     log,
                     motivo
                 ])
-                st.success(f"✅ Suspensión registrada para la fecha {fecha_seleccionada}.")
+                st.success(f"✅ Suspensión registrada para la fecha **{fecha_seleccionada}**.")
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
 
     # Registro normal de asistencia
-    fecha_seleccionada = st.selectbox("Selecciona la fecha", data["fechas"])
-    st.header("📋 Estudiantes")
+    fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
+    st.header("👥 Lista de estudiantes")
+    
     asistencia = {}
     for est in data["estudiantes"]:
-        asistencia[est] = st.checkbox(est, key=f"{curso_seleccionado}_{est}")
+        asistencia[est] = st.checkbox(f"👤 {est}", key=f"{curso_seleccionado}_{est}")
 
-    if st.button("💾 Guardar Asistencia"):
+    if st.button("💾 Guardar Asistencia", use_container_width=True):
         try:
             client = get_client()
             asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
@@ -235,10 +245,10 @@ def main():
                     ""
                 ])
             sheet.append_rows(rows)
-            st.success(f"✅ Asistencia guardada en la hoja '{curso_seleccionado}'!")
+            st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
 
             # Enviar correos
-            st.info("📩 Enviando correos de confirmación...")
+            st.info("📧 Enviando notificaciones a apoderados...")
             emails, nombres_apoderados = load_emails()
             for estudiante, presente in asistencia.items():
                 nombre_lower = estudiante.strip().lower()
@@ -248,7 +258,7 @@ def main():
                     continue
 
                 estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
-                subject = f"Reporte de Asistencia - Curso {curso_seleccionado} - {fecha_seleccionada}"
+                subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
                 body = f"""Hola {nombre_apoderado},
 
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
@@ -258,11 +268,11 @@ Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 📌 Estado: {estado}
 
 Saludos cordiales,
-Equipo Académico"""
+Preuniversitario 2026"""
                 send_email(correo_destino, subject, body)
 
         except Exception as e:
-            st.error(f"❌ Error al guardar o enviar correos: {e}")
+            st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
 
 if __name__ == "__main__":
     main()
