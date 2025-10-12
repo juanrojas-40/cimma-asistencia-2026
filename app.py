@@ -287,7 +287,7 @@ def main():
 
 
 
-    if st.button("💾 Guardar Asistencia", key="guardar_asistencia",use_container_width=True):
+    if st.button("💾 Guardar Asistencia", key="guardar_asistencia", use_container_width=True):
         try:
             client = get_client()
             asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
