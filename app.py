@@ -246,11 +246,11 @@ def main():
         font-size: 16px !important;
     }
 
-    /* Estilo para el botón Guardar Asistencia (gris, más grande, mejorado) */
+    /* Estilo para el botón Guardar Asistencia (blanco puro, más grande, mejorado) */
     .stButton > button[key="guardar_asistencia"] {
-        background-color: #6B7280 !important;
-        color: white !important;
-        border: 2px solid #4B5563 !important;
+        background-color: #FFFFFF !important;
+        color: #000000 !important;
+        border: 2px solid #6B7280 !important;
         padding: 16px 32px !important;
         border-radius: 6px !important;
         width: 100% !important;
@@ -259,7 +259,7 @@ def main():
         transition: background-color 0.2s ease !important;
     }
     .stButton > button[key="guardar_asistencia"]:hover {
-        background-color: #4B5563 !important;
+        background-color: #E5E7EB !important;
     }
     </style>
     """, unsafe_allow_html=True)
