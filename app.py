@@ -154,7 +154,7 @@ def main():
     )
     
     st.title("📱 Registro de Asistencia")
-    st.subheader("Preuniversitario 2026")
+    st.subheader("Preuniversitario CIMMA 2026")
 
     courses = load_courses()
     if not courses:
