@@ -153,6 +153,9 @@ def main():
         layout="centered"
     )
     
+    # Mostrar logo
+    st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", width=180)
+
     st.title("📱 Registro de Asistencia")
     st.subheader("Preuniversitario CIMMA 2026")
 
