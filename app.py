@@ -220,81 +220,30 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Lista de estudiantes")
 
-import streamlit as st
+    # === BLOQUE SIMPLE: SIN CSS, SOLO STREAMLIT NATIVO ===
+    estado_key = f"asistencia_estado_{curso_seleccionado}"
+    if estado_key not in st.session_state:
+        st.session_state[estado_key] = {est: False for est in data["estudiantes"]}
 
-# === BLOQUE DE ASISTENCIA CON BOTONES ROJO/AZUL ===
-estado_key = f"asistencia_estado_{curso_seleccionado}"
-if estado_key not in st.session_state:
-    st.session_state[estado_key] = {est: False for est in data["estudiantes"]}
+    asistencia_estado = st.session_state[estado_key]
 
-asistencia_estado = st.session_state[estado_key]
+    for est in data["estudiantes"]:
+        key = f"btn_{curso_seleccionado}_{est}"
+        estado_actual = asistencia_estado[est]
 
-# Inyectar CSS
-st.markdown("""
-<style>
-.btn-rojo {
-    background-color: #FF6B6B !important;
-    color: white !important;
-    border: none !important;
-    padding: 8px 16px;
-    border-radius: 4px;
-    width: 100%;
-    text-align: center;
-    cursor: pointer;
-}
-.btn-azul {
-    background-color: #1A3B8F !important;
-    color: white !important;
-    border: none !important;
-    padding: 8px 16px;
-    border-radius: 4px;
-    width: 100%;
-    text-align: center;
-    cursor: pointer;
-}
-</style>
-""", unsafe_allow_html=True)
+        if estado_actual:
+            # Botón AZUL (primary) → asistió
+            if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
+                asistencia_estado[est] = False
+                st.rerun()
+        else:
+            # Botón GRIS (secondary) → ausente (conceptualmente "rojo" por el emoji y texto)
+            if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
+                asistencia_estado[est] = True
+                st.rerun()
 
-for est in data["estudiantes"]:
-    key = f"btn_{curso_seleccionado}_{est}"
-    estado_actual = asistencia_estado[est]
-
-    if estado_actual:
-        label = f"✅ {est} — ASISTIÓ"
-        btn_class = "btn-azul"
-    else:
-        label = f"❌ {est} — AUSENTE"
-        btn_class = "btn-rojo"
-
-    # Botón HTML personalizado
-    st.markdown(
-        f"""
-        <button class="{btn_class}" onclick="streamlitCallback('{key}')">{label}</button>
-        """,
-        unsafe_allow_html=True
-    )
-
-    # JavaScript para manejar el clic (necesita un componente personalizado)
-    st.components.v1.html(
-        f"""
-        <script>
-        function streamlitCallback(key) {{
-            // Enviar el evento de clic a Streamlit
-            Streamlit.setComponentValue(key);
-        }}
-        </script>
-        """,
-        height=0
-    )
-
-    # Detectar el clic
-    if st.session_state.get(key, False):
-        asistencia_estado[est] = not asistencia_estado[est]
-        st.session_state[key] = False  # Resetear el estado
-        st.rerun()
-
-asistencia = asistencia_estado
-# === FIN DEL BLOQUE ===
+    asistencia = asistencia_estado
+    # === FIN DEL BLOQUE ===
 
 
 
