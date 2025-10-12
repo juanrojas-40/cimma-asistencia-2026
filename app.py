@@ -228,7 +228,7 @@ def main():
     asistencia_estado = st.session_state[estado_key]
 
     # Inyectar CSS una sola vez
-    st.markdown("""
+    st.markdown(
     <style>
     .btn-rojo {
         background-color: #FF6B6B !important;
@@ -241,7 +241,7 @@ def main():
         border: none !important;
     }
     </style>
-    """, unsafe_allow_html=True)
+    , unsafe_allow_html=True)
 
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
