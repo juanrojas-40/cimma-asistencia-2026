@@ -220,119 +220,91 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Estudiantes")
 
-    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
-    st.markdown("""
-    <style>
-    /* Botones de estudiantes: AUSENTE (rojo) */
-    .stButton > button[kind="secondary"]:not([key="guardar_asistencia"]) {
-        background-color: #FF6B6B !important;
-        color: white !important;
-        border: none !important;
-        padding: 12px !important;
-        border-radius: 8px !important;
-        width: 100% !important;
-        font-size: 16px !important;
-        font-weight: bold !important;
-    }
-
-    /* Botones de estudiantes: ASISTIÓ (azul) */
-    .stButton > button[kind="primary"]:not([key="guardar_asistencia"]) {
-        background-color: #1A3B8F !important;
-        color: white !important;
-        border: none !important;
-        padding: 12px !important;
-        border-radius: 8px !important;
-        width: 100% !important;
-        font-size: 16px !important;
-        font-weight: bold !important;
-    }
-
-    /* Botón GUARDAR ASISTENCIA: blanco con borde */
-    .stButton > button[key="guardar_asistencia"] {
-        background-color: #FFFFFF !important;
-        color: #000000 !important;
-        border: 2px solid #6B7280 !important;
-        padding: 16px !important;
-        border-radius: 8px !important;
-        width: 100% !important;
-        font-size: 22px !important;
-        font-weight: bold !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
-        transition: background-color 0.2s, box-shadow 0.2s !important;
-    }
-    .stButton > button[key="guardar_asistencia"]:hover {
-        background-color: #F9FAFB !important;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15) !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
+    # === BLOQUE DE ASISTENCIA: BOTONES ROJO/AZUL (solo para estudiantes) ===
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
         st.session_state[estado_key] = {est: False for est in data["estudiantes"]}
 
     asistencia_estado = st.session_state[estado_key]
 
+    # CSS solo para los botones de estudiantes
+    st.markdown("""
+    <style>
+    div[data-testid="stButton"] button[kind="secondary"] {
+        background-color: #FF6B6B !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+    }
+    div[data-testid="stButton"] button[kind="primary"] {
+        background-color: #1A3B8F !important;
+        color: white !important;
+        border: none !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
         estado_actual = asistencia_estado[est]
 
         if estado_actual:
-            # Botón AZUL (primary) → asistió
-            label = f"✅ {est} — ASISTIÓ"
-            btn_type = "primary"
+            if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
+                asistencia_estado[est] = False
+                st.rerun()
         else:
-            # Botón ROJO (secondary) → ausente
-            label = f"❌ {est} — AUSENTE"
-            btn_type = "secondary"
-
-        if st.button(label, key=key, use_container_width=True, type=btn_type):
-            asistencia_estado[est] = not asistencia_estado[est]  # Alternar estado
-            st.rerun()
+            if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
+                asistencia_estado[est] = True
+                st.rerun()
 
     asistencia = asistencia_estado
-    # === FIN DEL BLOQUE ACTUALIZADO ===
+    # === FIN DEL BLOQUE DE ESTUDIANTES ===
 
-
-
-    if st.button("💾 Guardar Asistencia", key="guardar_asistencia", use_container_width=True):
-        try:
-            client = get_client()
-            asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+    # === BOTÓN DE GUARDAR: USAR UN CONTENEDOR NEUTRO ===
+    st.divider()
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("💾 Guardar Asistencia", use_container_width=True, type="secondary"):
             try:
-                sheet = asistencia_sheet.worksheet(curso_seleccionado)
-            except gspread.exceptions.WorksheetNotFound:
-                sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
-                sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
+                client = get_client()
+                asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+                try:
+                    sheet = asistencia_sheet.worksheet(curso_seleccionado)
+                except gspread.exceptions.WorksheetNotFound:
+                    sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
+                    sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
 
-            chile_time = get_chile_time()
-            log_base = f"{chile_time.strftime('%Y-%m-%d')}: Mail de asistencia enviado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
+                chile_time = get_chile_time()
+                log_base = f"{chile_time.strftime('%Y-%m-%d')}: Mail de asistencia enviado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
 
-            rows = []
-            for estudiante, presente in asistencia.items():
-                rows.append([
-                    curso_seleccionado,
-                    fecha_seleccionada,
-                    estudiante,
-                    1 if presente else 0,
-                    log_base,
-                    ""
-                ])
-            sheet.append_rows(rows)
-            st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
+                rows = []
+                for estudiante, presente in asistencia.items():
+                    rows.append([
+                        curso_seleccionado,
+                        fecha_seleccionada,
+                        estudiante,
+                        1 if presente else 0,
+                        log_base,
+                        ""
+                    ])
+                sheet.append_rows(rows)
+                st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
 
-            st.info("📧 Enviando notificaciones a apoderados...")
-            emails, nombres_apoderados = load_emails()
-            for estudiante, presente in asistencia.items():
-                nombre_lower = estudiante.strip().lower()
-                correo_destino = emails.get(nombre_lower)
-                nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
-                if not correo_destino:
-                    continue
+                st.info("📧 Enviando notificaciones a apoderados...")
+                emails, nombres_apoderados = load_emails()
+                for estudiante, presente in asistencia.items():
+                    nombre_lower = estudiante.strip().lower()
+                    correo_destino = emails.get(nombre_lower)
+                    nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
+                    if not correo_destino:
+                        continue
 
-                estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
-                subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                body = f"""Hola {nombre_apoderado},
+                    estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
+                    subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
+                    body = f"""Hola {nombre_apoderado},
 
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 
@@ -342,10 +314,10 @@ Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 
 Saludos cordiales,
 Preuniversitario CIMMA 2026"""
-                send_email(correo_destino, subject, body)
+                    send_email(correo_destino, subject, body)
 
-        except Exception as e:
-            st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
+            except Exception as e:
+                st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
 
 if __name__ == "__main__":
     main()
