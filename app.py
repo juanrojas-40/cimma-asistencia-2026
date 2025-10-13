@@ -218,7 +218,7 @@ def main():
 
     # Registro normal de asistencia
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
-    st.header("👥 Lista de estudiantes")
+    st.header("👥 Estudiantes")
 
 # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
     # Inyectar CSS personalizado para los botones
