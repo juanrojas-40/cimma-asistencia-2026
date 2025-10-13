@@ -230,33 +230,29 @@ def main():
     # CSS solo para los botones de estudiantes
     st.markdown("""
     <style>
-    div[data-testid="stButton"] button[kind="secondary"] {
+    /* Solo aplica rojo/azul a los botones de estudiantes */
+    div[data-testid="stButton"] button[kind="secondary"]:not([key="guardar_asistencia"]) {
         background-color: #FF6B6B !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
         font-weight: bold !important;
     }
-    div[data-testid="stButton"] button[kind="primary"] {
+    div[data-testid="stButton"] button[kind="primary"]:not([key="guardar_asistencia"]) {
         background-color: #1A3B8F !important;
         color: white !important;
         border: none !important;
         border-radius: 8px !important;
         font-weight: bold !important;
     }
-                    div[data-testid="stButton"] button[key="guardar_asistencia"] {
-        background-color: #9CA3AF !important;
-        color: white !important;
-        border: 2px solid #6B7280 !important;
-        border-radius: 8px !important;
+
+    /* Botón GUARDAR: forzar blanco */
+    div[data-testid="stButton"] button[key="guardar_asistencia"] {
+        background-color: white !important;
+        color: black !important;
+        border: 2px solid #6c757d !important;
         font-weight: bold !important;
-        padding: 10px 20px !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-        transition: background-color 0.2s ease !important;
-        width: 100% !important;
-    }
-    div[data-testid="stButton"] button[key="guardar_asistencia"]:hover {
-        background-color: #6B7280 !important;
+        border-radius: 8px !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -281,7 +277,7 @@ def main():
     st.divider()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("💾 Guardar Asistencia",key="guardar_asistencia", use_container_width=True):
+        if st.button("💾 Guardar Asistencia",key="guardar_asistencia", use_container_width=True,type="primary"):
             try:
                 client = get_client()
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
