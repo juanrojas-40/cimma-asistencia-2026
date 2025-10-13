@@ -277,6 +277,7 @@ def main():
     # === FIN DEL BLOQUE DE ESTUDIANTES ===
 
     # === BOTÓN DE GUARDAR: USAR UN CONTENEDOR NEUTRO ===
+    st.header("📝 Registra Asistencia")
     st.divider()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
