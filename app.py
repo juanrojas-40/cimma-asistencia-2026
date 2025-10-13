@@ -278,7 +278,7 @@ def main():
 
     # === BOTÓN DE GUARDAR: USAR UN CONTENEDOR NEUTRO ===
     
-    st.divider()
+    st.markdown("<hr style='border: 2px solid #6c757d; margin: 10px 0;'>", unsafe_allow_html=True)
     st.header("📝 Registra Asistencia haciendo click")
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
