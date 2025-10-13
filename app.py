@@ -255,7 +255,7 @@ def main():
         padding: 16px !important;
         border-radius: 8px !important;
         width: 100% !important;
-        font-size: 20px !important;
+        font-size: 22px !important;
         font-weight: bold !important;
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
         transition: background-color 0.2s, box-shadow 0.2s !important;
