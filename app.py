@@ -267,7 +267,7 @@ def main():
     st.divider()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("💾 Guardar Asistencia", use_container_width=True, type="secondary"):
+        if st.button("💾 Guardar Asistencia", use_container_width=True):
             try:
                 client = get_client()
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
