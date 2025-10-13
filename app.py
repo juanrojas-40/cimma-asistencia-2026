@@ -244,6 +244,20 @@ def main():
         border-radius: 8px !important;
         font-weight: bold !important;
     }
+                    div[data-testid="stButton"] button[key="guardar_asistencia"] {
+        background-color: #9CA3AF !important;
+        color: white !important;
+        border: 2px solid #6B7280 !important;
+        border-radius: 8px !important;
+        font-weight: bold !important;
+        padding: 10px 20px !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+        transition: background-color 0.2s ease !important;
+        width: 100% !important;
+    }
+    div[data-testid="stButton"] button[key="guardar_asistencia"]:hover {
+        background-color: #6B7280 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -267,7 +281,7 @@ def main():
     st.divider()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("💾 Guardar Asistencia", use_container_width=True):
+        if st.button("💾 Guardar Asistencia",key="guardar_asistencia", use_container_width=True):
             try:
                 client = get_client()
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
