@@ -245,10 +245,9 @@ def main():
         border-radius: 8px !important;
         font-weight: bold !important;
     }
-
     /* Botón GUARDAR: forzar verde */
     div[data-testid="stButton"] button[key="guardar_asistencia"] {
-        background-color: #28A745 !important;
+        background-color: #10B981 !important;
         color: white !important;
         border: 2px solid #6c757d !important;
         font-weight: bold !important;
@@ -256,7 +255,7 @@ def main():
         transition: background-color 0.2s ease !important;
     }
     div[data-testid="stButton"] button[key="guardar_asistencia"]:hover {
-        background-color: #218838 !important;
+        background-color: #059669 !important;
     }
     </style>
     """, unsafe_allow_html=True)
