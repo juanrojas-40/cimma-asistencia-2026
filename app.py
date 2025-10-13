@@ -220,45 +220,50 @@ def main():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Estudiantes")
 
-# === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
-    # Inyectar CSS personalizado para los botones
+    # === BLOQUE ACTUALIZADO: BOTONES TÁCTILES CON CSS PERSONALIZADO ===
     st.markdown("""
     <style>
-    /* Estilo para botones primary (asistió - azul) */
-    .stButton > button[kind="primary"] {
-        background-color: #1A3B8F !important;
-        color: white !important;
-        border: none !important;
-        padding: 8px 16px !important;
-        border-radius: 4px !important;
-        width: 100% !important;
-        font-size: 16px !important;
-    }
-
-    /* Estilo para botones secondary (ausente - rojo) */
-    .stButton > button[kind="secondary"] {
+    /* Botones de estudiantes: AUSENTE (rojo) */
+    .stButton > button[kind="secondary"]:not([key="guardar_asistencia"]) {
         background-color: #FF6B6B !important;
         color: white !important;
         border: none !important;
-        padding: 8px 16px !important;
-        border-radius: 4px !important;
+        padding: 12px !important;
+        border-radius: 8px !important;
         width: 100% !important;
         font-size: 16px !important;
+        font-weight: bold !important;
     }
 
-    /* Estilo para el botón Guardar Asistencia (blanco puro, más grande, mejorado) */
+    /* Botones de estudiantes: ASISTIÓ (azul) */
+    .stButton > button[kind="primary"]:not([key="guardar_asistencia"]) {
+        background-color: #1A3B8F !important;
+        color: white !important;
+        border: none !important;
+        padding: 12px !important;
+        border-radius: 8px !important;
+        width: 100% !important;
+        font-size: 16px !important;
+        font-weight: bold !important;
+    }
+
+    /* Botón GUARDAR ASISTENCIA: blanco con borde */
     .stButton > button[key="guardar_asistencia"] {
         background-color: #FFFFFF !important;
         color: #000000 !important;
         border: 2px solid #6B7280 !important;
-        padding: 16px 32px !important;
-        border-radius: 6px !important;
+        padding: 16px !important;
+        border-radius: 8px !important;
         width: 100% !important;
         font-size: 20px !important;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
-        transition: background-color 0.2s ease !important;
+        font-weight: bold !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+        transition: background-color 0.2s, box-shadow 0.2s !important;
     }
-
+    .stButton > button[key="guardar_asistencia"]:hover {
+        background-color: #F9FAFB !important;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15) !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
