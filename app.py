@@ -246,13 +246,17 @@ def main():
         font-weight: bold !important;
     }
 
-    /* Botón GUARDAR: forzar blanco */
+    /* Botón GUARDAR: forzar verde */
     div[data-testid="stButton"] button[key="guardar_asistencia"] {
-        background-color: white !important;
-        color: black !important;
+        background-color: #28A745 !important;
+        color: white !important;
         border: 2px solid #6c757d !important;
         font-weight: bold !important;
         border-radius: 8px !important;
+        transition: background-color 0.2s ease !important;
+    }
+    div[data-testid="stButton"] button[key="guardar_asistencia"]:hover {
+        background-color: #218838 !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -277,7 +281,7 @@ def main():
     st.divider()
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("💾 Guardar Asistencia",key="guardar_asistencia", use_container_width=True,type="primary"):
+        if st.button("💾 Guardar Asistencia",key="guardar_asistencia", use_container_width=True):
             try:
                 client = get_client()
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
