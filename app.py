@@ -258,9 +258,7 @@ def main():
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
         transition: background-color 0.2s ease !important;
     }
-    .stButton > button[key="guardar_asistencia"]:hover {
-        background-color: #E5E7EB !important;
-    }
+
     </style>
     """, unsafe_allow_html=True)
 
