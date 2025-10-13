@@ -279,6 +279,7 @@ def main():
     # === BOTÓN DE GUARDAR: USAR UN CONTENEDOR NEUTRO ===
     
     st.divider()
+    st.header("📝 Registra Asistencia haciendo click")
     col1, col2, col3 = st.columns([1, 2, 1])
     st.header("📝 Registra Asistencia")
     with col2:
