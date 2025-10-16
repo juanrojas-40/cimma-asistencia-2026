@@ -49,10 +49,10 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS (CORREGIDA)
+# CARGA DE DATOS (sin cambios)
 # ==============================
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def load_courses():
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
@@ -63,48 +63,54 @@ def load_courses():
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_lower = [s.lower() for s in colA]
+            colA_upper = [s.upper() for s in colA]
 
-            def find_next_value(key):
-                try:
-                    idx = colA_lower.index(key)
-                    for i in range(idx + 1, len(colA)):
-                        if colA[i]:
-                            return colA[i]
-                    return ""
-                except ValueError:
-                    return ""
-
-            profesor = find_next_value("profesor:")
-            dia = find_next_value("dia:")
-            horario = find_next_value("horario")
-
-            fechas = []
-            estudiantes = []
             try:
-                fecha_idx = colA_lower.index("fecha:")
-                for i in range(fecha_idx + 1, len(colA)):
-                    val = colA[i]
-                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
-                        estudiantes.append(val)
-                    elif val and not any(c.isalpha() for c in val):
-                        fechas.append(val)
-            except ValueError:
-                pass
+                idx_prof = colA_upper.index("PROFESOR")
+                profesor = colA[idx_prof + 1]
+            except (ValueError, IndexError):
+                continue
+
+            try:
+                idx_dia = colA_upper.index("DIA")
+                dia = colA[idx_dia + 1]
+            except (ValueError, IndexError):
+                continue
+
+            try:
+                idx_curso = colA_upper.index("CURSO")
+                curso_id = colA[idx_curso + 1]
+                horario = colA[idx_curso + 2]
+            except (ValueError, IndexError):
+                continue
+
+            try:
+                idx_fechas = colA_upper.index("FECHAS")
+                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
+
+                fechas = [colA[i] for i in range(idx_fechas + 1, idx_estudiantes) if i < len(colA)]
+                estudiantes = [colA[i] for i in range(idx_estudiantes + 1, len(colA))]
+
+            except (ValueError, IndexError):
+                fechas = ["Sin fechas"]
+                estudiantes = []
 
             if profesor and dia and horario and estudiantes:
-                estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
-                    "fechas": fechas or ["Sin fechas"],
+                    "curso_id": curso_id,
+                    "fechas": fechas,
                     "estudiantes": estudiantes
                 }
+
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
+
     return courses
+
 
 @st.cache_data(ttl=3600)
 def load_emails():
@@ -119,7 +125,7 @@ def load_emails():
         data = mails_sheet.get_all_records()
         emails = {}
         nombres_apoderados = {}
-        for row in data:  # ← CORREGIDO: faltaba "data"
+        for row in data:
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
@@ -142,7 +148,7 @@ def load_all_asistencia():
             continue
         try:
             data = worksheet.get_all_records()
-            for row in data:  # ← CORREGIDO: faltaba "data"
+            for row in data:
                 row["Curso"] = worksheet.title
                 all_data.append(row)
         except:
@@ -150,7 +156,7 @@ def load_all_asistencia():
     return pd.DataFrame(all_data)
 
 # ==============================
-# MENÚ LATERAL Y AUTENTICACIÓN
+# MENÚ LATERAL Y AUTENTICACIÓN (SEGURA)
 # ==============================
 
 def main():
@@ -160,19 +166,17 @@ def main():
         layout="centered"
     )
 
-    # === MENÚ LATERAL ===
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.title("🔐 Acceso")
-        
-        # Autenticación
+
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
 
         if st.session_state["user_type"] is None:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
-            
+
             if user_type == "Profesor":
                 profesores = st.secrets.get("profesores", {})
                 if profesores:
@@ -188,23 +192,26 @@ def main():
                 else:
                     st.error("No hay profesores configurados en Secrets.")
             else:
-                admins = {"Adm_1": "clave123", "Adm_2": "clave456", "Adm_3": "clave789"}
-                nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
-                clave = st.text_input("Clave", type="password", key="admin_pass")
-                if st.button("Ingresar como Admin"):
-                    if admins.get(nombre) == clave:
-                        st.session_state["user_type"] = "admin"
-                        st.session_state["user_name"] = nombre
-                        st.rerun()
-                    else:
-                        st.error("❌ Clave incorrecta")
+                # Carga administradores desde Secrets (seguro)
+                admins = st.secrets.get("administradores", {})
+                if admins:
+                    nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
+                    clave = st.text_input("Clave", type="password", key="admin_pass")
+                    if st.button("Ingresar como Admin"):
+                        if admins.get(nombre) == clave:
+                            st.session_state["user_type"] = "admin"
+                            st.session_state["user_name"] = nombre
+                            st.rerun()
+                        else:
+                            st.error("❌ Clave incorrecta")
+                else:
+                    st.error("No hay administradores configurados en Secrets.")
         else:
             st.success(f"👤 {st.session_state['user_name']}")
             if st.button("Cerrar sesión"):
                 st.session_state.clear()
                 st.rerun()
 
-    # === CONTENIDO PRINCIPAL ===
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
