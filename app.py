@@ -49,7 +49,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS (sin cambios)
+# CARGA DE DATOS (CORREGIDA PARA TU ESTRUCTURA REAL)
 # ==============================
 
 @st.cache_data(ttl=3600)
@@ -81,7 +81,7 @@ def load_courses():
             try:
                 idx_curso = colA_upper.index("CURSO")
                 curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]  # Horario está en la siguiente celda
+                horario = colA[idx_curso + 2]
             except (ValueError, IndexError):
                 continue
 
@@ -92,20 +92,17 @@ def load_courses():
                 idx_fechas = colA_upper.index("FECHAS")
                 idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
 
-                # Fechas: desde después de "FECHAS" hasta antes de "NOMBRES ESTUDIANTES"
                 for i in range(idx_fechas + 1, idx_estudiantes):
                     if i < len(colA):
                         fechas.append(colA[i])
 
-                # Estudiantes: desde después de "NOMBRES ESTUDIANTES" hasta el final
                 for i in range(idx_estudiantes + 1, len(colA)):
-                    if colA[i].strip() and any(c.isalpha() for c in colA[i]):
+                    if colA[i]:
                         estudiantes.append(colA[i])
             except ValueError:
                 pass
 
             if profesor and dia and curso_id and horario and estudiantes:
-                # Ordenar alfabéticamente
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
@@ -121,7 +118,6 @@ def load_courses():
             continue
 
     return courses
-
 
 @st.cache_data(ttl=3600)
 def load_emails():
@@ -155,15 +151,76 @@ def load_all_asistencia():
     all_data = []
 
     for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title == "MAILS" or worksheet.title == "MEJORAS":
+        if worksheet.title in ["MAILS", "MEJORAS"]:
             continue
+
         try:
-            data = worksheet.get_all_records()
-            for row in data:
-                row["Curso"] = worksheet.title
-                all_data.append(row)
-        except:
+            # Leer todas las celdas
+            all_values = worksheet.get_all_values()
+            if not all_values or len(all_values) < 2:
+                continue
+
+            # Usar primera fila como encabezados
+            headers = all_values[0]
+            # Normalizar encabezados a mayúsculas y eliminar espacios
+            headers = [h.strip().upper() for h in headers]
+
+            # Buscar índice de las columnas clave
+            curso_col = None
+            fecha_col = None
+            estudiante_col = None
+            asistencia_col = None
+            hora_registro_col = None
+            informacion_col = None
+
+            for i, h in enumerate(headers):
+                if "CURSO" in h:
+                    curso_col = i
+                elif "FECHA" in h:
+                    fecha_col = i
+                elif "ESTUDIANTE" in h:
+                    estudiante_col = i
+                elif "ASISTENCIA" in h:
+                    asistencia_col = i
+                elif "HORA REGISTRO" in h:
+                    hora_registro_col = i
+                elif "INFORMACION" in h:
+                    informacion_col = i
+
+            # Si no se encuentran las columnas clave, saltar
+            if asistencia_col is None:
+                continue
+
+            # Procesar filas de datos
+            for row in all_values[1:]:
+                if len(row) <= asistencia_col:
+                    continue
+
+                try:
+                    asistencia_val = int(row[asistencia_col])
+                except (ValueError, TypeError):
+                    asistencia_val = 0
+
+                # Obtener otros valores
+                curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
+                fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
+                estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
+                hora_registro = row[hora_registro_col] if hora_registro_col is not None and hora_registro_col < len(row) else ""
+                informacion = row[informacion_col] if informacion_col is not None and informacion_col < len(row) else ""
+
+                all_data.append({
+                    "Curso": curso,
+                    "Fecha": fecha,
+                    "Estudiante": estudiante,
+                    "Asistencia": asistencia_val,
+                    "Hora Registro": hora_registro,
+                    "Información": informacion
+                })
+
+        except Exception as e:
+            st.warning(f"⚠️ Error al procesar hoja '{worksheet.title}': {str(e)[:80]}")
             continue
+
     return pd.DataFrame(all_data)
 
 # ==============================
@@ -203,7 +260,6 @@ def main():
                 else:
                     st.error("No hay profesores configurados en Secrets.")
             else:
-                # Carga administradores desde Secrets (seguro)
                 admins = st.secrets.get("administradores", {})
                 if admins:
                     nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
