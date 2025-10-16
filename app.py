@@ -49,10 +49,10 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS (OPTIMIZADA)
+# CARGA DE DATOS (CORREGIDA)
 # ==============================
 
-@st.cache_data(ttl=3600)  # Cache por 1 hora
+@st.cache_data(ttl=3600)
 def load_courses():
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
@@ -93,7 +93,6 @@ def load_courses():
                 pass
 
             if profesor and dia and horario and estudiantes:
-                # Ordenar alfabéticamente
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
@@ -120,7 +119,7 @@ def load_emails():
         data = mails_sheet.get_all_records()
         emails = {}
         nombres_apoderados = {}
-        for row in 
+        for row in data:  # ← CORREGIDO: faltaba "data"
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
@@ -134,7 +133,6 @@ def load_emails():
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
-    """Carga todo el historial de asistencia para análisis (solo admin)"""
     client = get_client()
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
@@ -144,7 +142,7 @@ def load_all_asistencia():
             continue
         try:
             data = worksheet.get_all_records()
-            for row in 
+            for row in data:  # ← CORREGIDO: faltaba "data"
                 row["Curso"] = worksheet.title
                 all_data.append(row)
         except:
@@ -152,43 +150,71 @@ def load_all_asistencia():
     return pd.DataFrame(all_data)
 
 # ==============================
-# AUTENTICACIÓN SEGURA (USANDO SECRETS)
+# MENÚ LATERAL Y AUTENTICACIÓN
 # ==============================
 
-def authenticate_user():
-    """Devuelve (tipo, nombre) o None si falla."""
-    if "user_type" in st.session_state and "user_name" in st.session_state:
-        return st.session_state["user_type"], st.session_state["user_name"]
+def main():
+    st.set_page_config(
+        page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
+        page_icon="✅",
+        layout="centered"
+    )
 
-    st.title("🔐 Acceso Restringido - Preuniversitario CIMMA")
-    st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", width=200)
+    # === MENÚ LATERAL ===
+    with st.sidebar:
+        st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
+        st.title("🔐 Acceso")
+        
+        # Autenticación
+        if "user_type" not in st.session_state:
+            st.session_state["user_type"] = None
+            st.session_state["user_name"] = None
 
-    # Cargar profesores y admins desde Secrets
-    profesores = st.secrets.get("profesores", {})
-    admins = {"Adm_1": "clave123", "Adm_2": "clave456", "Adm_3": "clave789"}
-
-    user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"])
-    if user_type == "Profesor":
-        nombre = st.selectbox("Nombre", list(profesores.keys()))
-        clave = st.text_input("Clave", type="password")
-        if st.button("Ingresar"):
-            if profesores.get(nombre) == clave:
-                st.session_state["user_type"] = "profesor"
-                st.session_state["user_name"] = nombre
-                st.rerun()
+        if st.session_state["user_type"] is None:
+            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
+            
+            if user_type == "Profesor":
+                profesores = st.secrets.get("profesores", {})
+                if profesores:
+                    nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
+                    clave = st.text_input("Clave", type="password", key="prof_pass")
+                    if st.button("Ingresar como Profesor"):
+                        if profesores.get(nombre) == clave:
+                            st.session_state["user_type"] = "profesor"
+                            st.session_state["user_name"] = nombre
+                            st.rerun()
+                        else:
+                            st.error("❌ Clave incorrecta")
+                else:
+                    st.error("No hay profesores configurados en Secrets.")
             else:
-                st.error("❌ Clave incorrecta")
+                admins = {"Adm_1": "clave123", "Adm_2": "clave456", "Adm_3": "clave789"}
+                nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
+                clave = st.text_input("Clave", type="password", key="admin_pass")
+                if st.button("Ingresar como Admin"):
+                    if admins.get(nombre) == clave:
+                        st.session_state["user_type"] = "admin"
+                        st.session_state["user_name"] = nombre
+                        st.rerun()
+                    else:
+                        st.error("❌ Clave incorrecta")
+        else:
+            st.success(f"👤 {st.session_state['user_name']}")
+            if st.button("Cerrar sesión"):
+                st.session_state.clear()
+                st.rerun()
+
+    # === CONTENIDO PRINCIPAL ===
+    if st.session_state["user_type"] is None:
+        st.title("📱 Registro de Asistencia")
+        st.subheader("Preuniversitario CIMMA 2026")
+        st.info("Por favor, inicia sesión desde el menú lateral.")
+        return
+
+    if st.session_state["user_type"] == "admin":
+        admin_panel()
     else:
-        nombre = st.selectbox("Usuario", list(admins.keys()))
-        clave = st.text_input("Clave", type="password")
-        if st.button("Ingresar"):
-            if admins.get(nombre) == clave:
-                st.session_state["user_type"] = "admin"
-                st.session_state["user_name"] = nombre
-                st.rerun()
-            else:
-                st.error("❌ Clave incorrecta")
-    st.stop()
+        main_app()
 
 # ==============================
 # PANEL ADMINISTRATIVO
@@ -203,24 +229,20 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Filtros
     cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
     curso_sel = st.selectbox("Curso", cursos)
     if curso_sel != "Todos":
         df = df[df["Curso"] == curso_sel]
 
-    # Gráfico: Asistencia por curso
     st.subheader("📈 Porcentaje de Asistencia por Curso")
     asistencia_curso = df.groupby("Curso").apply(
         lambda x: (x["Asistencia"].sum() / len(x)) * 100
     ).reset_index(name="Porcentaje")
     st.bar_chart(asistencia_curso.set_index("Curso"))
 
-    # Tabla detallada
     st.subheader("📋 Registro Detallado")
     st.dataframe(df)
 
-    # Exportar
     if st.button("📤 Descargar como CSV"):
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("Descargar CSV", csv, "asistencia.csv", "text/csv")
@@ -230,18 +252,14 @@ def admin_panel():
 # ==============================
 
 def main_app():
-    st.set_page_config(
-        page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
-        page_icon="✅",
-        layout="centered"
-    )
+    st.title("📱 Registro de Asistencia")
+    st.subheader("Preuniversitario CIMMA 2026")
 
     courses = load_courses()
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
 
-    # Filtrar cursos del profesor
     cursos_filtrados = {
         k: v for k, v in courses.items()
         if v["profesor"] == st.session_state["user_name"]
@@ -303,10 +321,9 @@ def main_app():
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Estudiantes")
 
-    # === LÓGICA INVERTIDA: TODOS PRESENTES POR DEFECTO ===
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
-        st.session_state[estado_key] = {est: True for est in data["estudiantes"]}  # True = presente
+        st.session_state[estado_key] = {est: True for est in data["estudiantes"]}
 
     asistencia_estado = st.session_state[estado_key]
 
@@ -351,7 +368,6 @@ def main_app():
 
     asistencia = asistencia_estado
 
-    # === RECORDATORIO Y BOTÓN DE GUARDAR ===
     st.warning("📧 Al guardar, se enviará un reporte automático a los apoderados.")
 
     st.markdown("<hr>", unsafe_allow_html=True)
@@ -383,13 +399,11 @@ def main_app():
                 sheet.append_rows(rows)
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
 
-                # === RESUMEN TRAS GUARDAR ===
                 st.subheader("📊 Resumen de esta sesión")
                 for est, presente in asistencia.items():
                     estado = "✅" if presente else "❌"
                     st.write(f"{estado} {est}")
 
-                # Enviar correos
                 emails, nombres_apoderados = load_emails()
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
@@ -415,7 +429,6 @@ Preuniversitario CIMMA 2026"""
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
 
-    # === FORMULARIO DE MEJORAS ===
     st.divider()
     st.caption("💡 ¿Tienes ideas para mejorar esta plataforma?")
     mejora = st.text_area("Sugerencia:", placeholder="Ej: Agregar notificación por WhatsApp...")
@@ -432,18 +445,6 @@ Preuniversitario CIMMA 2026"""
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
-
-# ==============================
-# FUNCIÓN PRINCIPAL
-# ==============================
-
-def main():
-    user_type, user_name = authenticate_user()
-
-    if user_type == "admin":
-        admin_panel()
-    else:
-        main_app()
 
 if __name__ == "__main__":
     main()
