@@ -52,7 +52,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 # CARGA DE DATOS (sin cambios)
 # ==============================
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=3600)
 def load_courses():
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
@@ -65,6 +65,7 @@ def load_courses():
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
 
+            # Buscar índices clave
             try:
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
@@ -80,28 +81,38 @@ def load_courses():
             try:
                 idx_curso = colA_upper.index("CURSO")
                 curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]
+                horario = colA[idx_curso + 2]  # Horario está en la siguiente celda
             except (ValueError, IndexError):
                 continue
 
+            # Extraer fechas y estudiantes
+            fechas = []
+            estudiantes = []
             try:
                 idx_fechas = colA_upper.index("FECHAS")
                 idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
 
-                fechas = [colA[i] for i in range(idx_fechas + 1, idx_estudiantes) if i < len(colA)]
-                estudiantes = [colA[i] for i in range(idx_estudiantes + 1, len(colA))]
+                # Fechas: desde después de "FECHAS" hasta antes de "NOMBRES ESTUDIANTES"
+                for i in range(idx_fechas + 1, idx_estudiantes):
+                    if i < len(colA):
+                        fechas.append(colA[i])
 
-            except (ValueError, IndexError):
-                fechas = ["Sin fechas"]
-                estudiantes = []
+                # Estudiantes: desde después de "NOMBRES ESTUDIANTES" hasta el final
+                for i in range(idx_estudiantes + 1, len(colA)):
+                    if colA[i].strip() and any(c.isalpha() for c in colA[i]):
+                        estudiantes.append(colA[i])
+            except ValueError:
+                pass
 
-            if profesor and dia and horario and estudiantes:
+            if profesor and dia and curso_id and horario and estudiantes:
+                # Ordenar alfabéticamente
+                estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
                     "curso_id": curso_id,
-                    "fechas": fechas,
+                    "fechas": fechas or ["Sin fechas"],
                     "estudiantes": estudiantes
                 }
 
