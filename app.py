@@ -8,8 +8,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pytz
 import pandas as pd
-import random
-import time
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -51,7 +49,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS
+# CARGA DE DATOS (CORREGIDA PARA TU ESTRUCTURA REAL)
 # ==============================
 
 @st.cache_data(ttl=3600)
@@ -67,6 +65,7 @@ def load_courses():
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
 
+            # Buscar índices clave
             try:
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
@@ -86,6 +85,7 @@ def load_courses():
             except (ValueError, IndexError):
                 continue
 
+            # Extraer fechas y estudiantes
             fechas = []
             estudiantes = []
             try:
@@ -155,6 +155,7 @@ def load_all_asistencia():
             continue
 
         try:
+            # Leer todas las celdas
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 2:
                 continue
@@ -172,7 +173,6 @@ def load_all_asistencia():
             hora_registro_col = None
             informacion_col = None
 
-
             for i, h in enumerate(headers):
                 if "CURSO" in h:
                     curso_col = i
@@ -187,9 +187,11 @@ def load_all_asistencia():
                 elif "INFORMACION" in h:
                     informacion_col = i
 
+            # Si no se encuentran las columnas clave, saltar
             if asistencia_col is None:
                 continue
 
+            # Procesar filas de datos
             for row in all_values[1:]:
                 if len(row) <= asistencia_col:
                     continue
@@ -199,6 +201,7 @@ def load_all_asistencia():
                 except (ValueError, TypeError):
                     asistencia_val = 0
 
+                # Obtener otros valores
                 curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
                 fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
                 estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
@@ -221,43 +224,7 @@ def load_all_asistencia():
     return pd.DataFrame(all_data)
 
 # ==============================
-# AUTENTICACIÓN DE ADMIN CON 2FA POR EMAIL
-# ==============================
-
-def generate_and_send_code(admin_name: str, admin_email: str) -> str:
-    code = f"{random.randint(100000, 999999)}"
-    subject = "🔐 Código de acceso - Panel Administrativo CIMMA"
-    body = f"""Hola {admin_name},
-
-Se ha solicitado acceso al panel administrativo.
-Tu código de verificación es:
-
-**{code}**
-
-Este código expira en 5 minutos.
-
-Saludos,
-Equipo CIMMA 2026"""
-
-    if send_email(admin_email, subject, body):
-        st.session_state["admin_2fa_code"] = code
-        st.session_state["admin_2fa_time"] = time.time()
-        st.session_state["admin_2fa_user"] = admin_name
-        return code
-    else:
-        st.error("❌ No se pudo enviar el código por correo.")
-        return None
-
-def verify_2fa_code(input_code: str) -> bool:
-    if "admin_2fa_code" not in st.session_state:
-        return False
-    if time.time() - st.session_state.get("admin_2fa_time", 0) > 300:  # 5 minutos
-        st.error("⏰ El código ha expirado. Solicita uno nuevo.")
-        return False
-    return input_code == st.session_state["admin_2fa_code"]
-
-# ==============================
-# MENÚ LATERAL Y AUTENTICACIÓN
+# MENÚ LATERAL Y AUTENTICACIÓN (SEGURA)
 # ==============================
 
 def main():
@@ -275,37 +242,7 @@ def main():
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
 
-        # Si ya está autenticado
-        if st.session_state["user_type"] is not None:
-            st.success(f"👤 {st.session_state['user_name']}")
-            if st.button("Cerrar sesión"):
-                st.session_state.clear()
-                st.rerun()
-            return
-
-        # Flujo de autenticación
-        if "awaiting_2fa" not in st.session_state:
-            st.session_state["awaiting_2fa"] = False
-
-        if st.session_state["awaiting_2fa"]:
-            st.subheader("🔐 Verificación en dos pasos")
-            admin_name = st.session_state.get("temp_admin_name", "Administrador")
-            code_input = st.text_input("Ingresa el código enviado a tu correo", max_chars=6)
-            if st.button("Verificar código"):
-                if verify_2fa_code(code_input):
-                    st.session_state["user_type"] = "admin"
-                    st.session_state["user_name"] = admin_name
-                    # Limpiar datos temporales
-                    for key in ["awaiting_2fa", "temp_admin_name", "admin_2fa_code", "admin_2fa_time"]:
-                        st.session_state.pop(key, None)
-                    st.rerun()
-                else:
-                    st.error("❌ Código incorrecto o expirado.")
-            if st.button("Cancelar"):
-                for key in ["awaiting_2fa", "temp_admin_name", "admin_2fa_code", "admin_2fa_time"]:
-                    st.session_state.pop(key, None)
-                st.rerun()
-        else:
+        if st.session_state["user_type"] is None:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
 
             if user_type == "Profesor":
@@ -324,31 +261,28 @@ def main():
                     st.error("No hay profesores configurados en Secrets.")
             else:
                 admins = st.secrets.get("administradores", {})
-                admin_emails = st.secrets.get("admin_emails", {})
-                if not admins or not admin_emails:
-                    st.error("No hay administradores o correos configurados en Secrets.")
-                else:
+                if admins:
                     nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
                     clave = st.text_input("Clave", type="password", key="admin_pass")
-                    if st.button("Enviar código de verificación"):
+                    if st.button("Ingresar como Admin"):
                         if admins.get(nombre) == clave:
-                            email = admin_emails.get(nombre)
-                            if email:
-                                generate_and_send_code(nombre, email)
-                                st.session_state["awaiting_2fa"] = True
-                                st.session_state["temp_admin_name"] = nombre
-                                st.success(f"✅ Código enviado a {email}. Revisa tu bandeja de entrada.")
-                                st.rerun()
-                            else:
-                                st.error("❌ No se encontró correo para este administrador.")
+                            st.session_state["user_type"] = "admin"
+                            st.session_state["user_name"] = nombre
+                            st.rerun()
                         else:
                             st.error("❌ Clave incorrecta")
+                else:
+                    st.error("No hay administradores configurados en Secrets.")
+        else:
+            st.success(f"👤 {st.session_state['user_name']}")
+            if st.button("Cerrar sesión"):
+                st.session_state.clear()
+                st.rerun()
 
-    # Contenido principal si no está autenticado
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
-        st.info("Por favor, inicia sesión desde el menú lateral izquierdo.")
+        st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
         return
 
     if st.session_state["user_type"] == "admin":
