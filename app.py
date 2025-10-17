@@ -30,10 +30,10 @@ st.markdown(
         background-repeat: no-repeat;
         background-attachment: fixed;
         background-position: center;
-        opacity: 0.5;  /* Ajusta la opacidad para que el texto sea legible */
+        opacity: 0.9;  /* Ajusta la opacidad para que el texto sea legible */
     }
     .main-content {
-        background-color: rgba(255, 255, 255, 0.8);  /* Fondo semi-transparente para el contenido principal */
+        background-color: rgba(255, 255, 255, 0.2);  /* Fondo semi-transparente para el contenido principal */
         padding: 20px;
         border-radius: 10px;
     }
