@@ -8,6 +8,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pytz
 import pandas as pd
+import random
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -49,7 +50,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS (CORREGIDA PARA TU ESTRUCTURA REAL)
+# CARGA DE DATOS (CORREGIDA)
 # ==============================
 
 @st.cache_data(ttl=3600)
@@ -63,60 +64,47 @@ def load_courses():
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_upper = [s.upper() for s in colA]
+            colA_lower = [s.lower() for s in colA]
 
-            # Buscar índices clave
-            try:
-                idx_prof = colA_upper.index("PROFESOR")
-                profesor = colA[idx_prof + 1]
-            except (ValueError, IndexError):
-                continue
+            def find_next_value(key):
+                try:
+                    idx = colA_lower.index(key)
+                    for i in range(idx + 1, len(colA)):
+                        if colA[i]:
+                            return colA[i]
+                    return ""
+                except ValueError:
+                    return ""
 
-            try:
-                idx_dia = colA_upper.index("DIA")
-                dia = colA[idx_dia + 1]
-            except (ValueError, IndexError):
-                continue
+            profesor = find_next_value("profesor:")
+            dia = find_next_value("dia:")
+            horario = find_next_value("horario")
 
-            try:
-                idx_curso = colA_upper.index("CURSO")
-                curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]
-            except (ValueError, IndexError):
-                continue
-
-            # Extraer fechas y estudiantes
             fechas = []
             estudiantes = []
             try:
-                idx_fechas = colA_upper.index("FECHAS")
-                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
-
-                for i in range(idx_fechas + 1, idx_estudiantes):
-                    if i < len(colA):
-                        fechas.append(colA[i])
-
-                for i in range(idx_estudiantes + 1, len(colA)):
-                    if colA[i]:
-                        estudiantes.append(colA[i])
+                fecha_idx = colA_lower.index("fecha:")
+                for i in range(fecha_idx + 1, len(colA)):
+                    val = colA[i]
+                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
+                        estudiantes.append(val)
+                    elif val and not any(c.isalpha() for c in val):
+                        fechas.append(val)
             except ValueError:
                 pass
 
-            if profesor and dia and curso_id and horario and estudiantes:
+            if profesor and dia and horario and estudiantes:
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
-                    "curso_id": curso_id,
                     "fechas": fechas or ["Sin fechas"],
                     "estudiantes": estudiantes
                 }
-
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
-
     return courses
 
 @st.cache_data(ttl=3600)
@@ -132,7 +120,7 @@ def load_emails():
         data = mails_sheet.get_all_records()
         emails = {}
         nombres_apoderados = {}
-        for row in data:
+        for row in 
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
@@ -155,76 +143,46 @@ def load_all_asistencia():
             continue
 
         try:
-            # Leer todas las celdas
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 2:
                 continue
 
-            # Usar primera fila como encabezados
-            headers = all_values[0]
-            # Normalizar encabezados a mayúsculas y eliminar espacios
-            headers = [h.strip().upper() for h in headers]
-
-            # Buscar índice de las columnas clave
-            curso_col = None
-            fecha_col = None
-            estudiante_col = None
-            asistencia_col = None
-            hora_registro_col = None
-            informacion_col = None
+            headers = [h.strip().upper() for h in all_values[0]]
+            curso_col = fecha_col = estudiante_col = asistencia_col = None
 
             for i, h in enumerate(headers):
-                if "CURSO" in h:
-                    curso_col = i
-                elif "FECHA" in h:
-                    fecha_col = i
-                elif "ESTUDIANTE" in h:
-                    estudiante_col = i
-                elif "ASISTENCIA" in h:
-                    asistencia_col = i
-                elif "HORA REGISTRO" in h:
-                    hora_registro_col = i
-                elif "INFORMACION" in h:
-                    informacion_col = i
+                if "CURSO" in h: curso_col = i
+                elif "FECHA" in h: fecha_col = i
+                elif "ESTUDIANTE" in h: estudiante_col = i
+                elif "ASISTENCIA" in h: asistencia_col = i
 
-            # Si no se encuentran las columnas clave, saltar
-            if asistencia_col is None:
-                continue
+            if asistencia_col is None: continue
 
-            # Procesar filas de datos
             for row in all_values[1:]:
-                if len(row) <= asistencia_col:
-                    continue
-
+                if len(row) <= asistencia_col: continue
                 try:
                     asistencia_val = int(row[asistencia_col])
-                except (ValueError, TypeError):
+                except:
                     asistencia_val = 0
 
-                # Obtener otros valores
                 curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
                 fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
                 estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
-                hora_registro = row[hora_registro_col] if hora_registro_col is not None and hora_registro_col < len(row) else ""
-                informacion = row[informacion_col] if informacion_col is not None and informacion_col < len(row) else ""
 
                 all_data.append({
                     "Curso": curso,
                     "Fecha": fecha,
                     "Estudiante": estudiante,
-                    "Asistencia": asistencia_val,
-                    "Hora Registro": hora_registro,
-                    "Información": informacion
+                    "Asistencia": asistencia_val
                 })
-
         except Exception as e:
-            st.warning(f"⚠️ Error al procesar hoja '{worksheet.title}': {str(e)[:80]}")
+            st.warning(f"⚠️ Error en hoja '{worksheet.title}': {str(e)[:80]}")
             continue
 
     return pd.DataFrame(all_data)
 
 # ==============================
-# MENÚ LATERAL Y AUTENTICACIÓN (SEGURA)
+# MENÚ LATERAL Y AUTENTICACIÓN CON 2FA
 # ==============================
 
 def main():
@@ -238,51 +196,91 @@ def main():
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.title("🔐 Acceso")
 
+        # Inicializar estado
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
+            st.session_state["2fa_pendiente"] = None
+            st.session_state["2fa_codigo"] = None
 
-        if st.session_state["user_type"] is None:
-            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
-
-            if user_type == "Profesor":
-                profesores = st.secrets.get("profesores", {})
-                if profesores:
-                    nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
-                    clave = st.text_input("Clave", type="password", key="prof_pass")
-                    if st.button("Ingresar como Profesor"):
-                        if profesores.get(nombre) == clave:
-                            st.session_state["user_type"] = "profesor"
-                            st.session_state["user_name"] = nombre
-                            st.rerun()
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay profesores configurados en Secrets.")
-            else:
-                admins = st.secrets.get("administradores", {})
-                if admins:
-                    nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
-                    clave = st.text_input("Clave", type="password", key="admin_pass")
-                    if st.button("Ingresar como Admin"):
-                        if admins.get(nombre) == clave:
-                            st.session_state["user_type"] = "admin"
-                            st.session_state["user_name"] = nombre
-                            st.rerun()
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay administradores configurados en Secrets.")
-        else:
+        # Si ya está autenticado
+        if st.session_state["user_type"]:
             st.success(f"👤 {st.session_state['user_name']}")
             if st.button("Cerrar sesión"):
                 st.session_state.clear()
                 st.rerun()
+            return
 
+        # Si está en paso 2 (2FA)
+        if st.session_state["2fa_pendiente"]:
+            st.subheader("🔐 Verificación en 2 pasos")
+            st.info(f"Se envió un código a tu correo.")
+            codigo_ingresado = st.text_input("Código de verificación", max_chars=6)
+            if st.button("Verificar"):
+                if codigo_ingresado == st.session_state["2fa_codigo"]:
+                    st.session_state["user_type"] = "admin"
+                    st.session_state["user_name"] = st.session_state["2fa_pendiente"]
+                    # Limpiar 2FA
+                    st.session_state["2fa_pendiente"] = None
+                    st.session_state["2fa_codigo"] = None
+                    st.rerun()
+                else:
+                    st.error("❌ Código incorrecto")
+            if st.button("Cancelar"):
+                st.session_state["2fa_pendiente"] = None
+                st.session_state["2fa_codigo"] = None
+                st.rerun()
+            return
+
+        # Paso 1: Selección de rol
+        user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
+
+        if user_type == "Profesor":
+            profesores = st.secrets.get("profesores", {})
+            if profesores:
+                nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
+                clave = st.text_input("Clave", type="password", key="prof_pass")
+                if st.button("Ingresar como Profesor"):
+                    if profesores.get(nombre) == clave:
+                        st.session_state["user_type"] = "profesor"
+                        st.session_state["user_name"] = nombre
+                        st.rerun()
+                    else:
+                        st.error("❌ Clave incorrecta")
+            else:
+                st.error("No hay profesores configurados en Secrets.")
+        else:
+            admins = st.secrets.get("administradores", {})
+            admin_emails = st.secrets.get("admin_emails", {})
+            if admins and admin_emails:
+                nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
+                clave = st.text_input("Clave", type="password", key="admin_pass")
+                if st.button("Enviar código de verificación"):
+                    if admins.get(nombre) == clave:
+                        # Generar código de 6 dígitos
+                        codigo = str(random.randint(100000, 999999))
+                        email_destino = admin_emails.get(nombre)
+                        if email_destino:
+                            send_email(
+                                email_destino,
+                                "🔐 Código de Verificación - CIMMA",
+                                f"Tu código de acceso es: {codigo}\nVálido por 5 minutos."
+                            )
+                            st.session_state["2fa_pendiente"] = nombre
+                            st.session_state["2fa_codigo"] = codigo
+                            st.info("✅ Código enviado a tu correo.")
+                        else:
+                            st.error("❌ Correo no configurado para este administrador.")
+                    else:
+                        st.error("❌ Clave incorrecta")
+            else:
+                st.error("No hay administradores o correos configurados en Secrets.")
+
+    # === CONTENIDO PRINCIPAL ===
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
-        st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
+        st.info("Por favor, inicia sesión desde el menú lateral.")
         return
 
     if st.session_state["user_type"] == "admin":
@@ -326,6 +324,7 @@ def admin_panel():
 # ==============================
 
 def main_app():
+    # ... (igual que antes, sin cambios) ...
     st.title("📱 Registro de Asistencia")
     st.subheader("Preuniversitario CIMMA 2026")
 
