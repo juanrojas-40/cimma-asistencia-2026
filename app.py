@@ -14,7 +14,7 @@ import plotly.express as px
 from twilio.rest import Client as TwilioClient
 from googleapiclient.discovery import build
 
-# Configuración inicial con fondo temático
+# Configuración inicial con fondo temático usando la imagen adjunta (o similar)
 st.set_page_config(
     page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
     page_icon="✅",
@@ -25,10 +25,17 @@ st.markdown(
     """
     <style>
     .stApp {
-        background-image: url('https://example.com/background.png');
+        background-image: url('https://thumbs.dreamstime.com/b/science-line-logo-scientific-research-sketch-outline-icons-chemistry-laboratory-analysis-dna-molecule-atom-symbols-biology-lab-385164964.jpg');
         background-size: cover;
         background-repeat: no-repeat;
         background-attachment: fixed;
+        background-position: center;
+        opacity: 0.9;  /* Ajusta la opacidad para que el texto sea legible */
+    }
+    .main-content {
+        background-color: rgba(255, 255, 255, 0.8);  /* Fondo semi-transparente para el contenido principal */
+        padding: 20px;
+        border-radius: 10px;
     }
     @media (prefers-color-scheme: dark) {
         .stApp { background-color: #1a1a1a; }
@@ -115,7 +122,7 @@ def sync_to_calendar(event_data):
         service.events().insert(calendarId="primary", body=event).execute()
         st.success("Sincronizado con Google Calendar!")
     except Exception as e:
-        st.error(f"Error al sincronizar con calendario: {e}")
+        st.error(f"Error al sincronizar con calendario: {e}. Asegúrate de que la API de Google Calendar esté habilitada en tu proyecto.")
 
 def log_action(action: str, user: str):
     client = get_client()
@@ -454,13 +461,10 @@ def admin_panel():
     st.subheader("📈 Porcentaje de Asistencia por Curso")
     asistencia_curso = df.groupby("Curso").apply(lambda x: (x["Asistencia"].sum() / len(x)) * 100).reset_index(name="Porcentaje")
     st.bar_chart(asistencia_curso.set_index("Curso"))
-    try:
-        fig_line = px.line(df, x="Fecha", y="Asistencia", color="Estudiante", title="Tendencias de Asistencia")
-        st.plotly_chart(fig_line)
-        fig_heatmap = px.imshow(df.pivot_table(index="Fecha", columns="Estudiante", values="Asistencia"), title="Heatmap de Asistencia")
-        st.plotly_chart(fig_heatmap)
-    except Exception as e:
-        st.warning(f"Error en visualizaciones: {e}. Verifica los datos de Fecha y Asistencia.")
+    fig_line = px.line(df, x="Fecha", y="Asistencia", color="Estudiante", title="Tendencias de Asistencia")
+    st.plotly_chart(fig_line)
+    fig_heatmap = px.imshow(df.pivot_table(index="Fecha", columns="Estudiante", values="Asistencia"), title="Heatmap de Asistencia")
+    st.plotly_chart(fig_heatmap)
     st.subheader("📋 Registro Detallado")
     st.dataframe(df)
     if st.button("📤 Descargar como CSV"):
@@ -480,31 +484,25 @@ def check_consecutive_absences(df):
         if "alerted_students" not in st.session_state:
             st.session_state["alerted_students"] = {}
         
-        try:
-            df_sorted = df.sort_values(["Estudiante", "Fecha"])
-            df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
-            df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
-            
-            for estudiante in df_consecutive["Estudiante"].unique():
-                student_df = df_consecutive[df_consecutive["Estudiante"] == estudiante]
-                absences = len(student_df)
-                if absences >= 3:
-                    streak_start = pd.to_datetime(student_df["Fecha"].iloc[0], errors='coerce')
-                    streak_end = pd.to_datetime(student_df["Fecha"].iloc[-1], errors='coerce')
-                    if pd.isna(streak_start) or pd.isna(streak_end):
-                        st.warning(f"Fecha inválida para {estudiante}. Saltando alerta.")
-                        continue
-                    student_key = f"{estudiante}_{streak_start.strftime('%Y-%m-%d')}_{streak_end.strftime('%Y-%m-%d')}"
-                    if student_key not in st.session_state["alerted_students"]:
-                        emails, nombres_apoderados = load_emails()
-                        email = emails.get(estudiante.lower().strip())
-                        if email:
-                            send_email(email, "Alerta de Ausencias", f"Hola {nombres_apoderados.get(estudiante.lower().strip(), 'Apoderado')},\nTu estudiante {estudiante} ha faltado 3 o más veces consecutivas desde {streak_start.strftime('%Y-%m-%d')} hasta {streak_end.strftime('%Y-%m-%d')}. Por favor, contáctenos.\nSaludos,\nPreuniversitario CIMMA")
-                            st.warning(f"Alerta enviada a {email} por ausencias de {estudiante}.")
-                            st.session_state["alerted_students"][student_key] = True
-                            log_action(f"Alerta Ausencias {estudiante} ({streak_start.strftime('%Y-%m-%d')}-{streak_end.strftime('%Y-%m-%d')})", st.session_state["user_name"])
-        except Exception as e:
-            st.error(f"Error en check_consecutive_absences: {e}")
+        df_sorted = df.sort_values(["Estudiante", "Fecha"])
+        df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
+        df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
+        
+        for estudiante in df_consecutive["Estudiante"].unique():
+            student_df = df_consecutive[df_consecutive["Estudiante"] == estudiante]
+            absences = len(student_df)
+            if absences >= 3:
+                streak_start = student_df["Fecha"].iloc[0]
+                streak_end = student_df["Fecha"].iloc[-1]
+                student_key = f"{estudiante}_{streak_start}_{streak_end}"
+                if student_key not in st.session_state["alerted_students"]:
+                    emails, nombres_apoderados = load_emails()
+                    email = emails.get(estudiante.lower().strip())
+                    if email:
+                        send_email(email, "Alerta de Ausencias", f"Hola {nombres_apoderados.get(estudiante.lower().strip(), 'Apoderado')},\nTu estudiante {estudiante} ha faltado 3 o más veces consecutivas desde {streak_start} hasta {streak_end}. Por favor, contáctenos.\nSaludos,\nPreuniversitario CIMMA")
+                        st.warning(f"Alerta enviada a {email} por ausencias de {estudiante}.")
+                        st.session_state["alerted_students"][student_key] = True
+                        log_action(f"Alerta Ausencias {estudiante} ({streak_start}-{streak_end})", st.session_state["user_name"])
 
 # ==============================
 # APP PRINCIPAL (PROFESOR)
@@ -517,7 +515,10 @@ def main_app():
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
-    cursos_filtrados = {k: v for k, v in courses.items() if v["profesor"] == st.session_state["user_name"]}
+    cursos_filtrados = {
+        k: v for k, v in courses.items()
+        if v["profesor"] == st.session_state["user_name"]
+    }
     if not cursos_filtrados:
         st.warning("No tienes cursos asignados.")
         st.stop()
@@ -529,10 +530,19 @@ def main_app():
         st.markdown(f"**📅 Día:** {data['dia']}")
     with col2:
         st.markdown(f"**⏰ Horario:** {data['horario']}")
-    clase_realizada = st.radio("✅ ¿Se realizó la clase?", ("Sí", "No"), index=0, help="Selecciona 'No' en caso de feriado, suspensión o imprevisto.")
+    clase_realizada = st.radio(
+        "✅ ¿Se realizó la clase?",
+        ("Sí", "No"),
+        index=0,
+        help="Selecciona 'No' en caso de feriado, suspensión o imprevisto."
+    )
     if clase_realizada == "No":
-        motivo = st.text_area("📝 Motivo de la no realización", placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc.")
+        motivo = st.text_area(
+            "📝 Motivo de la no realización",
+            placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc."
+        )
         fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", data["fechas"])
+        
         if st.button("💾 Registrar suspensión", use_container_width=True):
             try:
                 client = get_client()
@@ -545,20 +555,31 @@ def main_app():
                 except gspread.exceptions.WorksheetNotFound:
                     sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
                     sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
+
                 chile_time = get_chile_time()
                 log = f"{chile_time.strftime('%Y-%m-%d')}: Clase no realizada. Motivo registrado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
-                sheet.append_row([curso_seleccionado, fecha_seleccionada, "TODOS", 0, log, motivo])
+                sheet.append_row([
+                    curso_seleccionado,
+                    fecha_seleccionada,
+                    "TODOS",
+                    0,
+                    log,
+                    motivo
+                ])
                 st.success(f"✅ Suspensión registrada para la fecha **{fecha_seleccionada}**.")
-                log_action(f"Suspensión Registrada {curso_seleccionado}", st.session_state["user_name"])
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
+
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Estudiantes")
+
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
         st.session_state[estado_key] = {est: True for est in data["estudiantes"]}
+
     asistencia_estado = st.session_state[estado_key]
+
     st.markdown("""
     <style>
     div[data-testid="stButton"] button[kind="secondary"]:not([key="guardar_asistencia"]) {
@@ -584,9 +605,11 @@ def main_app():
     }
     </style>
     """, unsafe_allow_html=True)
+
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
         estado_actual = asistencia_estado[est]
+
         if estado_actual:
             if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
                 asistencia_estado[est] = False
@@ -595,9 +618,11 @@ def main_app():
             if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
                 asistencia_estado[est] = True
                 st.rerun()
+
     asistencia = asistencia_estado
+
     st.warning("📧 Al guardar, se enviará un reporte automático a los apoderados.")
-    send_whatsapp = st.checkbox("Enviar por WhatsApp", key="whatsapp_notify")
+
     st.markdown("<hr>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -613,42 +638,50 @@ def main_app():
                 except gspread.exceptions.WorksheetNotFound:
                     sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
                     sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
+
                 chile_time = get_chile_time()
                 log_base = f"{chile_time.strftime('%Y-%m-%d')}: Mail de asistencia enviado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
+
                 rows = []
                 for estudiante, presente in asistencia.items():
-                    rows.append([curso_seleccionado, fecha_seleccionada, estudiante, 1 if presente else 0, log_base, ""])
+                    rows.append([
+                        curso_seleccionado,
+                        fecha_seleccionada,
+                        estudiante,
+                        1 if presente else 0,
+                        log_base,
+                        ""
+                    ])
                 sheet.append_rows(rows)
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
+
                 emails, nombres_apoderados = load_emails()
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
                     correo_destino = emails.get(nombre_lower)
                     nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
-                    if correo_destino:
-                        estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
-                        subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                        body = f"""Hola {nombre_apoderado},
+                    if not correo_destino:
+                        continue
+
+                    estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
+                    subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
+                    body = f"""Hola {nombre_apoderado},
+
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
+
 📅 Fecha: {fecha_seleccionada}
 👨‍🎓 Estudiante: {estudiante}
 📌 Estado: {estado}
+
 Saludos cordiales,
 Preuniversitario CIMMA 2026"""
-                        send_email(correo_destino, subject, body)
-                        if send_whatsapp and st.secrets.get("TWILIO"):
-                            phone = st.secrets.get("phones", {}).get(nombre_lower, "default_phone")
-                            send_whatsapp_notification(phone, f"Reporte: {estudiante} {estado} el {fecha_seleccionada}")
-                log_action(f"Asistencia Guardada {curso_seleccionado}", st.session_state["user_name"])
+                    send_email(correo_destino, subject, body)
+
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
-    if st.button("Sincronizar con Calendario"):
-        for course in courses.values():
-            sync_to_calendar({"curso_id": course["curso_id"], "fecha": course["fechas"][0]})
+
     st.divider()
     st.caption("💡 ¿Tienes ideas para mejorar esta plataforma?")
-    rating = st.slider("Calificación (1-5)", 1, 5, 3, key="rating")
-    category = st.selectbox("Categoría", ["Usabilidad", "Funcionalidades", "Otros"], key="category")
     mejora = st.text_area("Sugerencia:", placeholder="Ej: Agregar notificación por WhatsApp...")
     if st.button("📤 Enviar sugerencia"):
         try:
@@ -660,16 +693,15 @@ Preuniversitario CIMMA 2026"""
             try:
                 mejoras_sheet = sheet.worksheet("MEJORAS")
             except gspread.exceptions.WorksheetNotFound:
-                mejoras_sheet = sheet.add_worksheet("MEJORAS", 100, 4)
-                mejoras_sheet.append_row(["Fecha", "Sugerencia", "Usuario", "Calificación", "Categoría"])
-            mejoras_sheet.append_row([get_chile_time().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"], rating, category])
+                mejoras_sheet = sheet.add_worksheet("MEJORAS", 100, 3)
+                mejoras_sheet.append_row(["Fecha", "Sugerencia", "Usuario"])
+            mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
             st.success("¡Gracias por tu aporte!")
-            log_action(f"Sugerencia Enviada {category}", st.session_state["user_name"])
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
 
 # ==============================
-# PORTAL ESTUDIANTE
+# PORTAL ESTUDIANTIL
 # ==============================
 
 def student_portal():
