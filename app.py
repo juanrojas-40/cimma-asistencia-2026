@@ -8,8 +8,6 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pytz
 import pandas as pd
-import random
-import time
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -57,12 +55,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 @st.cache_data(ttl=3600)
 def load_courses():
     client = get_client()
-    try:
-        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
-    except Exception as e:
-        st.error(f"❌ No se pudo abrir 'CLASES 2026'. Verifica el ID o permisos: {str(e)[:100]}")
-        return {}
-
+    clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
 
     for worksheet in clases_sheet.worksheets():
@@ -70,25 +63,25 @@ def load_courses():
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_upper = [s.upper().strip() for s in colA]
+            colA_upper = [s.upper() for s in colA]
 
             # Buscar índices clave
             try:
                 idx_prof = colA_upper.index("PROFESOR")
-                profesor = colA[idx_prof + 1].strip().upper() if idx_prof + 1 < len(colA) else ""
+                profesor = colA[idx_prof + 1]
             except (ValueError, IndexError):
                 continue
 
             try:
                 idx_dia = colA_upper.index("DIA")
-                dia = colA[idx_dia + 1].strip() if idx_dia + 1 < len(colA) else ""
+                dia = colA[idx_dia + 1]
             except (ValueError, IndexError):
                 continue
 
             try:
                 idx_curso = colA_upper.index("CURSO")
-                curso_id = colA[idx_curso + 1].strip() if idx_curso + 1 < len(colA) else ""
-                horario = colA[idx_curso + 2].strip() if idx_curso + 2 < len(colA) else ""
+                curso_id = colA[idx_curso + 1]
+                horario = colA[idx_curso + 2]
             except (ValueError, IndexError):
                 continue
 
@@ -101,16 +94,16 @@ def load_courses():
 
                 for i in range(idx_fechas + 1, idx_estudiantes):
                     if i < len(colA):
-                        fechas.append(colA[i].strip())
+                        fechas.append(colA[i])
 
                 for i in range(idx_estudiantes + 1, len(colA)):
                     if colA[i]:
-                        estudiantes.append(colA[i].strip())
+                        estudiantes.append(colA[i])
             except ValueError:
                 pass
 
             if profesor and dia and curso_id and horario and estudiantes:
-                estudiantes = sorted([e for e in estudiantes if e])
+                estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
@@ -148,19 +141,13 @@ def load_emails():
                 emails[nombre_estudiante] = email_to_use
                 nombres_apoderados[nombre_estudiante] = nombre_apoderado
         return emails, nombres_apoderados
-    except Exception as e:
-        st.warning(f"⚠️ Error al cargar correos: {e}")
+    except:
         return {}, {}
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
     client = get_client()
-    try:
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-    except Exception as e:
-        st.error(f"❌ No se pudo abrir 'ASISTENCIA 2026'. Verifica el ID o permisos: {str(e)[:100]}")
-        return pd.DataFrame()
-
+    asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
 
     for worksheet in asistencia_sheet.worksheets():
@@ -168,13 +155,23 @@ def load_all_asistencia():
             continue
 
         try:
+            # Leer todas las celdas
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 2:
                 continue
 
-            headers = [h.strip().upper() for h in all_values[0]]
+            # Usar primera fila como encabezados
+            headers = all_values[0]
+            # Normalizar encabezados a mayúsculas y eliminar espacios
+            headers = [h.strip().upper() for h in headers]
 
-            curso_col = fecha_col = estudiante_col = asistencia_col = hora_registro_col = informacion_col = None
+            # Buscar índice de las columnas clave
+            curso_col = None
+            fecha_col = None
+            estudiante_col = None
+            asistencia_col = None
+            hora_registro_col = None
+            informacion_col = None
 
             for i, h in enumerate(headers):
                 if "CURSO" in h:
@@ -190,9 +187,11 @@ def load_all_asistencia():
                 elif "INFORMACION" in h:
                     informacion_col = i
 
+            # Si no se encuentran las columnas clave, saltar
             if asistencia_col is None:
                 continue
 
+            # Procesar filas de datos
             for row in all_values[1:]:
                 if len(row) <= asistencia_col:
                     continue
@@ -202,6 +201,7 @@ def load_all_asistencia():
                 except (ValueError, TypeError):
                     asistencia_val = 0
 
+                # Obtener otros valores
                 curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
                 fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
                 estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
@@ -224,36 +224,6 @@ def load_all_asistencia():
     return pd.DataFrame(all_data)
 
 # ==============================
-# FUNCIÓN PARA 2FA POR EMAIL
-# ==============================
-
-def send_2fa_code(admin_name: str, admin_email: str) -> str:
-    code = f"{random.randint(100000, 999999)}"
-    subject = "🔐 Código de acceso - Panel Administrativo CIMMA"
-    body = f"""Hola {admin_name},
-
-Se ha solicitado acceso al panel administrativo.
-Tu código de verificación es:
-
-**{code}**
-
-Este código expira en 5 minutos.
-
-Saludos,
-Equipo CIMMA 2026"""
-    if send_email(admin_email, subject, body):
-        return code
-    else:
-        return None
-
-def is_2fa_code_valid(input_code: str) -> bool:
-    if "admin_2fa_code" not in st.session_state:
-        return False
-    if time.time() - st.session_state.get("admin_2fa_timestamp", 0) > 300:  # 5 minutos
-        return False
-    return input_code == st.session_state["admin_2fa_code"]
-
-# ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN (SEGURA)
 # ==============================
 
@@ -272,33 +242,7 @@ def main():
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
 
-        # Si ya está autenticado
-        if st.session_state["user_type"] is not None:
-            st.success(f"👤 {st.session_state['user_name']}")
-            if st.button("Cerrar sesión"):
-                st.session_state.clear()
-                st.rerun()
-            return
-
-        # Estado: ¿está esperando el código 2FA?
-        if st.session_state.get("awaiting_2fa", False):
-            st.subheader("📧 Verificación en dos pasos")
-            code_input = st.text_input("Código enviado a tu correo", max_chars=6)
-            if st.button("Verificar"):
-                if is_2fa_code_valid(code_input):
-                    st.session_state["user_type"] = "admin"
-                    st.session_state["user_name"] = st.session_state["temp_admin_name"]
-                    # Limpiar estado temporal
-                    for k in ["awaiting_2fa", "temp_admin_name", "admin_2fa_code", "admin_2fa_timestamp"]:
-                        st.session_state.pop(k, None)
-                    st.rerun()
-                else:
-                    st.error("❌ Código incorrecto o expirado.")
-            if st.button("Cancelar"):
-                for k in ["awaiting_2fa", "temp_admin_name", "admin_2fa_code", "admin_2fa_timestamp"]:
-                    st.session_state.pop(k, None)
-                st.rerun()
-        else:
+        if st.session_state["user_type"] is None:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
 
             if user_type == "Profesor":
@@ -317,35 +261,28 @@ def main():
                     st.error("No hay profesores configurados en Secrets.")
             else:
                 admins = st.secrets.get("administradores", {})
-                admin_emails = st.secrets.get("admin_emails", {})
-                if not admins or not admin_emails:
-                    st.error("Faltan datos de administradores o correos en Secrets.")
-                else:
+                if admins:
                     nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
-                    clave1 = st.text_input("Primera clave", type="password", key="admin_pass1")
-                    if st.button("Enviar código de verificación"):
-                        if admins.get(nombre) == clave1:
-                            email = admin_emails.get(nombre)
-                            if email:
-                                code = send_2fa_code(nombre, email)
-                                if code:
-                                    st.session_state["admin_2fa_code"] = code
-                                    st.session_state["admin_2fa_timestamp"] = time.time()
-                                    st.session_state["temp_admin_name"] = nombre
-                                    st.session_state["awaiting_2fa"] = True
-                                    st.success(f"✅ Código enviado a {email}")
-                                    st.rerun()
-                                else:
-                                    st.error("❌ No se pudo enviar el correo.")
-                            else:
-                                st.error("❌ No se encontró correo para este administrador.")
+                    clave = st.text_input("Clave", type="password", key="admin_pass")
+                    if st.button("Ingresar como Admin"):
+                        if admins.get(nombre) == clave:
+                            st.session_state["user_type"] = "admin"
+                            st.session_state["user_name"] = nombre
+                            st.rerun()
                         else:
-                            st.error("❌ Primera clave incorrecta.")
+                            st.error("❌ Clave incorrecta")
+                else:
+                    st.error("No hay administradores configurados en Secrets.")
+        else:
+            st.success(f"👤 {st.session_state['user_name']}")
+            if st.button("Cerrar sesión"):
+                st.session_state.clear()
+                st.rerun()
 
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
-        st.info("Por favor, inicia sesión desde el menú lateral izquierdo.")
+        st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
         return
 
     if st.session_state["user_type"] == "admin":
@@ -393,43 +330,19 @@ def main_app():
     st.subheader("Preuniversitario CIMMA 2026")
 
     courses = load_courses()
-    
-    # === DIAGNÓSTICO AUTOMÁTICO ===
     if not courses:
-        st.error("❌ No se cargaron cursos desde 'CLASES 2026'.")
-        st.info("Verifica:")
-        st.markdown("""
-        - Que el archivo `CLASES 2026` tenga el ID correcto en `secrets.toml`.
-        - Que esté compartido con la cuenta de servicio (email del JSON).
-        - Que cada hoja tenga en columna A:
-          ```
-          PROFESOR
-          NOMBRE DEL PROFESOR (en mayúsculas, sin tildes, sin espacios extra)
-          DIA
-          ...
-          ```
-        """)
+        st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
 
-    # Normalizar nombre del usuario en sesión (mayúsculas, sin espacios extra)
-    user_name_clean = st.session_state["user_name"].strip().upper()
-
-    # Filtrar cursos asignados al profesor (con normalización)
     cursos_filtrados = {
         k: v for k, v in courses.items()
-        if v["profesor"] == user_name_clean
+        if v["profesor"] == st.session_state["user_name"]
     }
 
-    # Mostrar diagnóstico si no hay cursos
     if not cursos_filtrados:
-        st.error(f"❌ No se encontraron cursos para **{user_name_clean}**.")
-        st.write("🔍 Profesores detectados en las hojas:")
-        for sheet, data in courses.items():
-            st.write(f"- `{data['profesor']}` en hoja `{sheet}`")
-        st.write("📌 El nombre debe coincidir EXACTAMENTE (incluyendo espacios).")
+        st.warning("No tienes cursos asignados.")
         st.stop()
 
-    # Si todo va bien, mostrar cursos
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()))
     data = cursos_filtrados[curso_seleccionado]
 
