@@ -399,6 +399,20 @@ def main_app():
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
 
+    # === DIAGNÓSTICO TEMPORAL ===
+    st.write("👤 Usuario en sesión:", st.session_state["user_name"])
+    if not courses:
+        st.error("❌ No se cargó ningún curso desde 'CLASES 2026'.")
+        st.stop()
+    st.write("📚 Cursos detectados:")
+    for sheet, data in courses.items():
+        st.write(f"- **Hoja**: `{sheet}` → Profesor: `{data['profesor']}`")
+    # ===========================
+
+
+
+
+
     cursos_filtrados = {
         k: v for k, v in courses.items()
         if v["profesor"] == st.session_state["user_name"]
