@@ -11,8 +11,8 @@ import pandas as pd
 import random
 import string
 import plotly.express as px
-from twilio.rest import Client as TwilioClient  # Para WhatsApp
-from googleapiclient.discovery import build  # Para Google Calendar
+from twilio.rest import Client as TwilioClient
+from googleapiclient.discovery import build
 
 # Configuración inicial con fondo temático
 st.set_page_config(
@@ -53,7 +53,7 @@ def get_client():
         creds = Credentials.from_service_account_info(creds_dict, scopes=[
             "https://spreadsheets.google.com/feeds",
             "https://www.googleapis.com/auth/drive",
-            "https://www.googleapis.com/auth/calendar"  # Para Google Calendar
+            "https://www.googleapis.com/auth/calendar"
         ])
         return gspread.authorize(creds)
     except (KeyError, json.JSONDecodeError) as e:
@@ -302,6 +302,7 @@ def main():
             st.session_state["2fa_user_name"] = None
             st.session_state["2fa_time"] = None
             st.session_state["2fa_attempts"] = 0
+            st.session_state["alerted_students"] = {}  # Initialize here to avoid runtime issues
         if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador", "Estudiante"], key="role_select")
             if user_type == "Profesor":
@@ -453,10 +454,13 @@ def admin_panel():
     st.subheader("📈 Porcentaje de Asistencia por Curso")
     asistencia_curso = df.groupby("Curso").apply(lambda x: (x["Asistencia"].sum() / len(x)) * 100).reset_index(name="Porcentaje")
     st.bar_chart(asistencia_curso.set_index("Curso"))
-    fig_line = px.line(df, x="Fecha", y="Asistencia", color="Estudiante", title="Tendencias de Asistencia")
-    st.plotly_chart(fig_line)
-    fig_heatmap = px.imshow(df.pivot_table(index="Fecha", columns="Estudiante", values="Asistencia"), title="Heatmap de Asistencia")
-    st.plotly_chart(fig_heatmap)
+    try:
+        fig_line = px.line(df, x="Fecha", y="Asistencia", color="Estudiante", title="Tendencias de Asistencia")
+        st.plotly_chart(fig_line)
+        fig_heatmap = px.imshow(df.pivot_table(index="Fecha", columns="Estudiante", values="Asistencia"), title="Heatmap de Asistencia")
+        st.plotly_chart(fig_heatmap)
+    except Exception as e:
+        st.warning(f"Error en visualizaciones: {e}. Verifica los datos de Fecha y Asistencia.")
     st.subheader("📋 Registro Detallado")
     st.dataframe(df)
     if st.button("📤 Descargar como CSV"):
@@ -473,18 +477,34 @@ def admin_panel():
 
 def check_consecutive_absences(df):
     if not df.empty:
-        df_sorted = df.sort_values(["Estudiante", "Fecha"])
-        df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
-        df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
-        for estudiante in df_consecutive["Estudiante"].unique():
-            absences = len(df_consecutive[df_consecutive["Estudiante"] == estudiante])
-            if absences >= 3:
-                emails, nombres_apoderados = load_emails()
-                email = emails.get(estudiante.lower().strip())
-                if email:
-                    send_email(email, "Alerta de Ausencias", f"Hola {nombres_apoderados.get(estudiante.lower().strip(), 'Apoderado')},\nTu estudiante {estudiante} ha faltado 3 o más veces consecutivas. Por favor, contáctenos.\nSaludos,\nPreuniversitario CIMMA")
-                    st.warning(f"Alerta enviada a {email} por ausencias de {estudiante}.")
-                log_action(f"Alerta Ausencias {estudiante}", st.session_state["user_name"])
+        if "alerted_students" not in st.session_state:
+            st.session_state["alerted_students"] = {}
+        
+        try:
+            df_sorted = df.sort_values(["Estudiante", "Fecha"])
+            df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
+            df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
+            
+            for estudiante in df_consecutive["Estudiante"].unique():
+                student_df = df_consecutive[df_consecutive["Estudiante"] == estudiante]
+                absences = len(student_df)
+                if absences >= 3:
+                    streak_start = pd.to_datetime(student_df["Fecha"].iloc[0], errors='coerce')
+                    streak_end = pd.to_datetime(student_df["Fecha"].iloc[-1], errors='coerce')
+                    if pd.isna(streak_start) or pd.isna(streak_end):
+                        st.warning(f"Fecha inválida para {estudiante}. Saltando alerta.")
+                        continue
+                    student_key = f"{estudiante}_{streak_start.strftime('%Y-%m-%d')}_{streak_end.strftime('%Y-%m-%d')}"
+                    if student_key not in st.session_state["alerted_students"]:
+                        emails, nombres_apoderados = load_emails()
+                        email = emails.get(estudiante.lower().strip())
+                        if email:
+                            send_email(email, "Alerta de Ausencias", f"Hola {nombres_apoderados.get(estudiante.lower().strip(), 'Apoderado')},\nTu estudiante {estudiante} ha faltado 3 o más veces consecutivas desde {streak_start.strftime('%Y-%m-%d')} hasta {streak_end.strftime('%Y-%m-%d')}. Por favor, contáctenos.\nSaludos,\nPreuniversitario CIMMA")
+                            st.warning(f"Alerta enviada a {email} por ausencias de {estudiante}.")
+                            st.session_state["alerted_students"][student_key] = True
+                            log_action(f"Alerta Ausencias {estudiante} ({streak_start.strftime('%Y-%m-%d')}-{streak_end.strftime('%Y-%m-%d')})", st.session_state["user_name"])
+        except Exception as e:
+            st.error(f"Error en check_consecutive_absences: {e}")
 
 # ==============================
 # APP PRINCIPAL (PROFESOR)
