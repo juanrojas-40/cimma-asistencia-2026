@@ -282,7 +282,7 @@ def main():
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
-        st.info("Por favor, inicia sesión desde el menú lateral izquierdo indicado con el emoji » .")
+        st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
         return
 
     if st.session_state["user_type"] == "admin":
