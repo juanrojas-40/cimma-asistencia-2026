@@ -123,7 +123,7 @@ def load_emails():
 
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
-        if not 
+        if not data:
             st.warning("⚠️ La hoja 'MAILS' está vacía.")
             return {}, {}
 
