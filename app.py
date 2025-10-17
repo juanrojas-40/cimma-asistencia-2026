@@ -119,23 +119,14 @@ def load_emails():
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
         if "MAILS" not in sheet_names:
+            st.error("❌ La hoja 'MAILS' no existe en 'Asistencia 2026'.")
             return {}, {}
 
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
-        emails = {}
-        nombres_apoderados = {}
-        for row in data:  # ← CORREGIDO: faltaba "data"
-            nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
-            nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
-            mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
-            email_to_use = mail_apoderado
-            if email_to_use and nombre_estudiante:
-                emails[nombre_estudiante] = email_to_use
-                nombres_apoderados[nombre_estudiante] = nombre_apoderado
-        return emails, nombres_apoderados
-    except:
-        return {}, {}
+        if not data:
+            st.warning("⚠️ La hoja 'MAILS' está vacía.")
+            return {}, {}
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
