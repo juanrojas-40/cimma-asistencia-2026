@@ -410,6 +410,13 @@ def admin_panel():
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("Descargar CSV", csv, "asistencia.csv", "text/csv")
 
+    if st.button("📤 Descargar como XLSX"):
+        import io
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Asistencia')
+        excel_data = output.getvalue()
+        st.download_button("Descargar XLSX", excel_data, "asistencia.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 # ==============================
 # APP PRINCIPAL (PROFESOR)
 # ==============================
