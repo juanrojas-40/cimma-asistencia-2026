@@ -159,9 +159,19 @@ def load_all_asistencia():
             if not all_values or len(all_values) < 2:
                 continue
 
-            headers = [h.strip().upper() for h in all_values[0]]
+            # Usar primera fila como encabezados
+            headers = all_values[0]
+            # Normalizar encabezados a mayúsculas y eliminar espacios
+            headers = [h.strip().upper() for h in headers]
 
-            curso_col = fecha_col = estudiante_col = asistencia_col = hora_registro_col = informacion_col = None
+            # Buscar índice de las columnas clave
+            curso_col = None
+            fecha_col = None
+            estudiante_col = None
+            asistencia_col = None
+            hora_registro_col = None
+            informacion_col = None
+
 
             for i, h in enumerate(headers):
                 if "CURSO" in h:
