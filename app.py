@@ -129,53 +129,37 @@ def load_emails():
             return {}, {}
 
 @st.cache_data(ttl=3600)
-def load_all_asistencia():
-    client = get_client()
-    asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-    all_data = []
+def load_emails():
+    try:
+        client = get_client()
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
+        if "MAILS" not in sheet_names:
+            st.error("❌ La hoja 'MAILS' no existe en 'Asistencia 2026'.")
+            return {}, {}
 
-    for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title in ["MAILS", "MEJORAS"]:
-            continue
+        mails_sheet = asistencia_sheet.worksheet("MAILS")
+        data = mails_sheet.get_all_records()
+        if not data:
+            st.warning("⚠️ La hoja 'MAILS' está vacía.")
+            return {}, {}
 
-        try:
-            all_values = worksheet.get_all_values()
-            if not all_values or len(all_values) < 2:
-                continue
+        emails = {}
+        nombres_apoderados = {}
+        for row in data:
+            nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
+            nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
+            mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
+            mail_estudiante = str(row.get("MAIL ESTUDIANTE", "")).strip()
+            email_to_use = mail_apoderado if mail_apoderado else mail_estudiante
+            if email_to_use and nombre_estudiante:
+                emails[nombre_estudiante] = email_to_use
+                nombres_apoderados[nombre_estudiante] = nombre_apoderado
+        return emails, nombres_apoderados
+    except Exception as e:
+        st.error(f"❌ Error al cargar la hoja 'MAILS': {e}")
+        return {}, {}
 
-            headers = [h.strip().upper() for h in all_values[0]]
-            curso_col = fecha_col = estudiante_col = asistencia_col = None
-
-            for i, h in enumerate(headers):
-                if "CURSO" in h: curso_col = i
-                elif "FECHA" in h: fecha_col = i
-                elif "ESTUDIANTE" in h: estudiante_col = i
-                elif "ASISTENCIA" in h: asistencia_col = i
-
-            if asistencia_col is None: continue
-
-            for row in all_values[1:]:  # ← CORREGIDO: iterar sobre all_values[1:]
-                if len(row) <= asistencia_col: continue
-                try:
-                    asistencia_val = int(row[asistencia_col])
-                except:
-                    asistencia_val = 0
-
-                curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
-                fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
-                estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
-
-                all_data.append({
-                    "Curso": curso,
-                    "Fecha": fecha,
-                    "Estudiante": estudiante,
-                    "Asistencia": asistencia_val
-                })
-        except Exception as e:
-            st.warning(f"⚠️ Error en hoja '{worksheet.title}': {str(e)[:80]}")
-            continue
-
-    return pd.DataFrame(all_data)
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN CON 2FA
