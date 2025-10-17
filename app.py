@@ -120,7 +120,7 @@ def load_emails():
         data = mails_sheet.get_all_records()
         emails = {}
         nombres_apoderados = {}
-        for row in 
+        for row in data:  # ← CORREGIDO: faltaba "data"
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
@@ -158,7 +158,7 @@ def load_all_asistencia():
 
             if asistencia_col is None: continue
 
-            for row in all_values[1:]:
+            for row in all_values[1:]:  # ← CORREGIDO: iterar sobre all_values[1:]
                 if len(row) <= asistencia_col: continue
                 try:
                     asistencia_val = int(row[asistencia_col])
