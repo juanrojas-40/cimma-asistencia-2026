@@ -129,7 +129,7 @@ def load_emails():
 
         emails = {}
         nombres_apoderados = {}
-        for row in 
+        for row in data:
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
@@ -142,7 +142,6 @@ def load_emails():
     except Exception as e:
         st.error(f"❌ Error al cargar la hoja 'MAILS': {e}")
         return {}, {}
-
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN CON 2FA
 # ==============================
