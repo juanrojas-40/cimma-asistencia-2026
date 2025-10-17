@@ -50,10 +50,10 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         return False
 
 # ==============================
-# CARGA DE DATOS (CORREGIDA)
+# CARGA DE DATOS (sin cambios)
 # ==============================
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300)
 def load_courses():
     client = get_client()
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
@@ -64,47 +64,52 @@ def load_courses():
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_lower = [s.lower() for s in colA]
+            colA_upper = [s.upper() for s in colA]
 
-            def find_next_value(key):
-                try:
-                    idx = colA_lower.index(key)
-                    for i in range(idx + 1, len(colA)):
-                        if colA[i]:
-                            return colA[i]
-                    return ""
-                except ValueError:
-                    return ""
-
-            profesor = find_next_value("profesor:")
-            dia = find_next_value("dia:")
-            horario = find_next_value("horario")
-
-            fechas = []
-            estudiantes = []
             try:
-                fecha_idx = colA_lower.index("fecha:")
-                for i in range(fecha_idx + 1, len(colA)):
-                    val = colA[i]
-                    if val and any(c.isalpha() for c in val) and not val.lower().startswith(("profesor", "dia", "horario", "fecha")):
-                        estudiantes.append(val)
-                    elif val and not any(c.isalpha() for c in val):
-                        fechas.append(val)
-            except ValueError:
-                pass
+                idx_prof = colA_upper.index("PROFESOR")
+                profesor = colA[idx_prof + 1]
+            except (ValueError, IndexError):
+                continue
+
+            try:
+                idx_dia = colA_upper.index("DIA")
+                dia = colA[idx_dia + 1]
+            except (ValueError, IndexError):
+                continue
+
+            try:
+                idx_curso = colA_upper.index("CURSO")
+                curso_id = colA[idx_curso + 1]
+                horario = colA[idx_curso + 2]
+            except (ValueError, IndexError):
+                continue
+
+            try:
+                idx_fechas = colA_upper.index("FECHAS")
+                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
+
+                fechas = [colA[i] for i in range(idx_fechas + 1, idx_estudiantes) if i < len(colA)]
+                estudiantes = [colA[i] for i in range(idx_estudiantes + 1, len(colA))]
+
+            except (ValueError, IndexError):
+                fechas = ["Sin fechas"]
+                estudiantes = []
 
             if profesor and dia and horario and estudiantes:
-                estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
                     "horario": horario,
-                    "fechas": fechas or ["Sin fechas"],
+                    "curso_id": curso_id,
+                    "fechas": fechas,
                     "estudiantes": estudiantes
                 }
+
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
+
     return courses
 
 @st.cache_data(ttl=3600)
