@@ -17,12 +17,16 @@ import string
 
 @st.cache_resource
 def get_client():
-    creds_dict = json.loads(st.secrets["google"]["credentials"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=[
-        "https://spreadsheets.google.com/feeds",
-        "https://www.googleapis.com/auth/drive"
-    ])
-    return gspread.authorize(creds)
+    try:
+        creds_dict = json.loads(st.secrets["google"]["credentials"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=[
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ])
+        return gspread.authorize(creds)
+    except (KeyError, json.JSONDecodeError) as e:
+        st.error(f"Error loading Google credentials: {e}")
+        return None
 
 def get_chile_time():
     chile_tz = pytz.timezone("America/Santiago")
@@ -46,11 +50,12 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
             server.login(sender_email, sender_password)
             server.send_message(msg)
         return True
-    except Exception as e:
+    except (KeyError, ValueError, smtplib.SMTPException) as e:
         st.warning(f"⚠️ Error al enviar correo a {to_email}: {e}")
         return False
 
 def generate_2fa_code():
+    """Generate a random 6-digit 2FA code."""
     return ''.join(random.choices(string.digits, k=6))
 
 # ==============================
@@ -60,6 +65,8 @@ def generate_2fa_code():
 @st.cache_data(ttl=3600)
 def load_courses():
     client = get_client()
+    if not client:
+        return {}
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
 
@@ -126,6 +133,8 @@ def load_courses():
 def load_emails():
     try:
         client = get_client()
+        if not client:
+            return {}, {}
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
         if "MAILS" not in sheet_names:
@@ -144,12 +153,15 @@ def load_emails():
                 emails[nombre_estudiante] = email_to_use
                 nombres_apoderados[nombre_estudiante] = nombre_apoderado
         return emails, nombres_apoderados
-    except:
+    except Exception as e:
+        st.warning(f"Error loading emails: {e}")
         return {}, {}
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
     client = get_client()
+    if not client:
+        return pd.DataFrame()
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
 
@@ -234,14 +246,18 @@ def main():
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.title("🔐 Acceso")
 
+        # Inicializar session state
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
             st.session_state["2fa_code"] = None
             st.session_state["2fa_email"] = None
             st.session_state["awaiting_2fa"] = False
+            st.session_state["2fa_user_name"] = None
+            st.session_state["2fa_time"] = None
+            st.session_state["2fa_attempts"] = 0
 
-        if st.session_state["user_type"] is None and not st.session_state.get("awaiting_2fa", False):
+        if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
 
             if user_type == "Profesor":
@@ -259,9 +275,13 @@ def main():
                 else:
                     st.error("No hay profesores configurados en Secrets.")
             else:
-                admins = st.secrets.get("administradores", {})
-                admin_emails = st.secrets.get("admin_emails", {})
-                if admins:
+                try:
+                    admins = st.secrets.get("administradores", {})
+                    admin_emails = st.secrets.get("admin_emails", {})
+                except KeyError:
+                    st.error("Configuración de administradores no encontrada en Secrets.")
+                    return
+                if admins and admin_emails:
                     nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
                     clave = st.text_input("Clave", type="password", key="admin_pass")
                     if st.button("Ingresar como Admin"):
@@ -284,24 +304,37 @@ Preuniversitario CIMMA"""
                                 st.session_state["awaiting_2fa"] = True
                                 st.session_state["2fa_user_name"] = nombre
                                 st.session_state["2fa_time"] = get_chile_time()
+                                st.session_state["2fa_attempts"] = 0
                                 st.rerun()
                             else:
                                 st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
                         else:
                             st.error("❌ Clave incorrecta")
                 else:
-                    st.error("No hay administradores configurados en Secrets.")
-        elif st.session_state.get("awaiting_2fa", False):
+                    st.error("No hay administradores o correos configurados en Secrets.")
+        elif st.session_state["awaiting_2fa"]:
             st.subheader("🔐 Verificación en dos pasos")
             st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
+            time_remaining = 600 - (get_chile_time() - st.session_state["2fa_time"]).total_seconds()
+            if time_remaining > 0:
+                st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
             code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
             if st.button("Verificar código"):
-                current_time = get_chile_time()
-                if (current_time - st.session_state["2fa_time"]).total_seconds() > 600:
+                if not code_input.isdigit() or len(code_input) != 6:
+                    st.error("El código debe ser un número de 6 dígitos")
+                elif (get_chile_time() - st.session_state["2fa_time"]).total_seconds() > 600:
                     st.error("❌ El código ha expirado. Por favor, intenta iniciar sesión de nuevo.")
                     st.session_state["awaiting_2fa"] = False
                     st.session_state["2fa_code"] = None
                     st.session_state["2fa_email"] = None
+                    st.session_state["2fa_attempts"] = 0
+                    st.rerun()
+                elif st.session_state["2fa_attempts"] >= 3:
+                    st.error("❌ Demasiados intentos fallidos. Intenta iniciar sesión de nuevo.")
+                    st.session_state["awaiting_2fa"] = False
+                    st.session_state["2fa_code"] = None
+                    st.session_state["2fa_email"] = None
+                    st.session_state["2fa_attempts"] = 0
                     st.rerun()
                 elif code_input == st.session_state["2fa_code"]:
                     st.session_state["user_type"] = "admin"
@@ -309,9 +342,12 @@ Preuniversitario CIMMA"""
                     st.session_state["awaiting_2fa"] = False
                     st.session_state["2fa_code"] = None
                     st.session_state["2fa_email"] = None
+                    st.session_state["2fa_attempts"] = 0
+                    st.session_state["2fa_time"] = None
                     st.rerun()
                 else:
-                    st.error("❌ Código incorrecto. Intenta de nuevo.")
+                    st.session_state["2fa_attempts"] += 1
+                    st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
         else:
             st.success(f"👤 {st.session_state['user_name']}")
             if st.button("Cerrar sesión"):
@@ -409,6 +445,9 @@ def main_app():
         if st.button("💾 Registrar suspensión", use_container_width=True):
             try:
                 client = get_client()
+                if not client:
+                    st.error("Error connecting to Google Sheets")
+                    return
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
                 try:
                     sheet = asistencia_sheet.worksheet(curso_seleccionado)
@@ -489,6 +528,9 @@ def main_app():
         if st.button("💾 Guardar Asistencia", key="guardar_asistencia", use_container_width=True, type="primary"):
             try:
                 client = get_client()
+                if not client:
+                    st.error("Error connecting to Google Sheets")
+                    return
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
                 try:
                     sheet = asistencia_sheet.worksheet(curso_seleccionado)
@@ -543,10 +585,13 @@ Preuniversitario CIMMA 2026"""
     if st.button("📤 Enviar sugerencia"):
         try:
             client = get_client()
+            if not client:
+                st.error("Error connecting to Google Sheets")
+                return
             sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
             try:
                 mejoras_sheet = sheet.worksheet("MEJORAS")
-            except:
+            except gspread.exceptions.WorksheetNotFound:
                 mejoras_sheet = sheet.add_worksheet("MEJORAS", 100, 3)
                 mejoras_sheet.append_row(["Fecha", "Sugerencia", "Usuario"])
             mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
