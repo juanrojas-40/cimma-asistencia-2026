@@ -57,7 +57,12 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
 @st.cache_data(ttl=3600)
 def load_courses():
     client = get_client()
-    clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
+    try:
+        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
+    except Exception as e:
+        st.error(f"❌ No se pudo abrir 'CLASES 2026'. Verifica el ID o permisos: {str(e)[:100]}")
+        return {}
+
     courses = {}
 
     for worksheet in clases_sheet.worksheets():
@@ -65,25 +70,25 @@ def load_courses():
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_upper = [s.upper() for s in colA]
+            colA_upper = [s.upper().strip() for s in colA]
 
             # Buscar índices clave
             try:
                 idx_prof = colA_upper.index("PROFESOR")
-                profesor = colA[idx_prof + 1]
+                profesor = colA[idx_prof + 1].strip().upper() if idx_prof + 1 < len(colA) else ""
             except (ValueError, IndexError):
                 continue
 
             try:
                 idx_dia = colA_upper.index("DIA")
-                dia = colA[idx_dia + 1]
+                dia = colA[idx_dia + 1].strip() if idx_dia + 1 < len(colA) else ""
             except (ValueError, IndexError):
                 continue
 
             try:
                 idx_curso = colA_upper.index("CURSO")
-                curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]
+                curso_id = colA[idx_curso + 1].strip() if idx_curso + 1 < len(colA) else ""
+                horario = colA[idx_curso + 2].strip() if idx_curso + 2 < len(colA) else ""
             except (ValueError, IndexError):
                 continue
 
@@ -96,16 +101,16 @@ def load_courses():
 
                 for i in range(idx_fechas + 1, idx_estudiantes):
                     if i < len(colA):
-                        fechas.append(colA[i])
+                        fechas.append(colA[i].strip())
 
                 for i in range(idx_estudiantes + 1, len(colA)):
                     if colA[i]:
-                        estudiantes.append(colA[i])
+                        estudiantes.append(colA[i].strip())
             except ValueError:
                 pass
 
             if profesor and dia and curso_id and horario and estudiantes:
-                estudiantes = sorted([e for e in estudiantes if e.strip()])
+                estudiantes = sorted([e for e in estudiantes if e])
                 courses[sheet_name] = {
                     "profesor": profesor,
                     "dia": dia,
@@ -143,13 +148,19 @@ def load_emails():
                 emails[nombre_estudiante] = email_to_use
                 nombres_apoderados[nombre_estudiante] = nombre_apoderado
         return emails, nombres_apoderados
-    except:
+    except Exception as e:
+        st.warning(f"⚠️ Error al cargar correos: {e}")
         return {}, {}
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
     client = get_client()
-    asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+    try:
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+    except Exception as e:
+        st.error(f"❌ No se pudo abrir 'ASISTENCIA 2026'. Verifica el ID o permisos: {str(e)[:100]}")
+        return pd.DataFrame()
+
     all_data = []
 
     for worksheet in asistencia_sheet.worksheets():
@@ -157,23 +168,13 @@ def load_all_asistencia():
             continue
 
         try:
-            # Leer todas las celdas
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 2:
                 continue
 
-            # Usar primera fila como encabezados
-            headers = all_values[0]
-            # Normalizar encabezados a mayúsculas y eliminar espacios
-            headers = [h.strip().upper() for h in headers]
+            headers = [h.strip().upper() for h in all_values[0]]
 
-            # Buscar índice de las columnas clave
-            curso_col = None
-            fecha_col = None
-            estudiante_col = None
-            asistencia_col = None
-            hora_registro_col = None
-            informacion_col = None
+            curso_col = fecha_col = estudiante_col = asistencia_col = hora_registro_col = informacion_col = None
 
             for i, h in enumerate(headers):
                 if "CURSO" in h:
@@ -189,11 +190,9 @@ def load_all_asistencia():
                 elif "INFORMACION" in h:
                     informacion_col = i
 
-            # Si no se encuentran las columnas clave, saltar
             if asistencia_col is None:
                 continue
 
-            # Procesar filas de datos
             for row in all_values[1:]:
                 if len(row) <= asistencia_col:
                     continue
@@ -203,7 +202,6 @@ def load_all_asistencia():
                 except (ValueError, TypeError):
                     asistencia_val = 0
 
-                # Obtener otros valores
                 curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
                 fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
                 estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
@@ -395,29 +393,43 @@ def main_app():
     st.subheader("Preuniversitario CIMMA 2026")
 
     courses = load_courses()
+    
+    # === DIAGNÓSTICO AUTOMÁTICO ===
     if not courses:
-        st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
+        st.error("❌ No se cargaron cursos desde 'CLASES 2026'.")
+        st.info("Verifica:")
+        st.markdown("""
+        - Que el archivo `CLASES 2026` tenga el ID correcto en `secrets.toml`.
+        - Que esté compartido con la cuenta de servicio (email del JSON).
+        - Que cada hoja tenga en columna A:
+          ```
+          PROFESOR
+          NOMBRE DEL PROFESOR (en mayúsculas, sin tildes, sin espacios extra)
+          DIA
+          ...
+          ```
+        """)
         st.stop()
 
-    # === DIAGNÓSTICO ===
-    st.write("👤 Usuario en sesión:", repr(st.session_state["user_name"]))
-    for sheet, data in courses.items():
-        st.write(f"📁 {sheet}: Profesor registrado = '{data['profesor']}' (repr: {repr(data['profesor'])})")
-    # ===================
+    # Normalizar nombre del usuario en sesión (mayúsculas, sin espacios extra)
+    user_name_clean = st.session_state["user_name"].strip().upper()
 
-
-
-
-
+    # Filtrar cursos asignados al profesor (con normalización)
     cursos_filtrados = {
         k: v for k, v in courses.items()
-        if v["profesor"] == st.session_state["user_name"]
+        if v["profesor"] == user_name_clean
     }
 
+    # Mostrar diagnóstico si no hay cursos
     if not cursos_filtrados:
-        st.warning("No tienes cursos asignados.")
+        st.error(f"❌ No se encontraron cursos para **{user_name_clean}**.")
+        st.write("🔍 Profesores detectados en las hojas:")
+        for sheet, data in courses.items():
+            st.write(f"- `{data['profesor']}` en hoja `{sheet}`")
+        st.write("📌 El nombre debe coincidir EXACTAMENTE (incluyendo espacios).")
         st.stop()
 
+    # Si todo va bien, mostrar cursos
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()))
     data = cursos_filtrados[curso_seleccionado]
 
