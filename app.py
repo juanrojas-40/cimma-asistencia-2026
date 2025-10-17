@@ -8,6 +8,8 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import pytz
 import pandas as pd
+import random
+import string
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -48,8 +50,11 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         st.warning(f"⚠️ Error al enviar correo a {to_email}: {e}")
         return False
 
+def generate_2fa_code():
+    return ''.join(random.choices(string.digits, k=6))
+
 # ==============================
-# CARGA DE DATOS (CORREGIDA PARA TU ESTRUCTURA REAL)
+# CARGA DE DATOS
 # ==============================
 
 @st.cache_data(ttl=3600)
@@ -65,7 +70,6 @@ def load_courses():
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
 
-            # Buscar índices clave
             try:
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
@@ -85,7 +89,6 @@ def load_courses():
             except (ValueError, IndexError):
                 continue
 
-            # Extraer fechas y estudiantes
             fechas = []
             estudiantes = []
             try:
@@ -155,17 +158,13 @@ def load_all_asistencia():
             continue
 
         try:
-            # Leer todas las celdas
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 2:
                 continue
 
-            # Usar primera fila como encabezados
             headers = all_values[0]
-            # Normalizar encabezados a mayúsculas y eliminar espacios
             headers = [h.strip().upper() for h in headers]
 
-            # Buscar índice de las columnas clave
             curso_col = None
             fecha_col = None
             estudiante_col = None
@@ -187,11 +186,9 @@ def load_all_asistencia():
                 elif "INFORMACION" in h:
                     informacion_col = i
 
-            # Si no se encuentran las columnas clave, saltar
             if asistencia_col is None:
                 continue
 
-            # Procesar filas de datos
             for row in all_values[1:]:
                 if len(row) <= asistencia_col:
                     continue
@@ -201,7 +198,6 @@ def load_all_asistencia():
                 except (ValueError, TypeError):
                     asistencia_val = 0
 
-                # Obtener otros valores
                 curso = row[curso_col] if curso_col is not None and curso_col < len(row) else worksheet.title
                 fecha = row[fecha_col] if fecha_col is not None and fecha_col < len(row) else ""
                 estudiante = row[estudiante_col] if estudiante_col is not None and estudiante_col < len(row) else ""
@@ -224,7 +220,7 @@ def load_all_asistencia():
     return pd.DataFrame(all_data)
 
 # ==============================
-# MENÚ LATERAL Y AUTENTICACIÓN (SEGURA)
+# MENÚ LATERAL Y AUTENTICACIÓN
 # ==============================
 
 def main():
@@ -241,8 +237,11 @@ def main():
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
+            st.session_state["2fa_code"] = None
+            st.session_state["2fa_email"] = None
+            st.session_state["awaiting_2fa"] = False
 
-        if st.session_state["user_type"] is None:
+        if st.session_state["user_type"] is None and not st.session_state.get("awaiting_2fa", False):
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
 
             if user_type == "Profesor":
@@ -261,18 +260,58 @@ def main():
                     st.error("No hay profesores configurados en Secrets.")
             else:
                 admins = st.secrets.get("administradores", {})
+                admin_emails = st.secrets.get("admin_emails", {})
                 if admins:
                     nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
                     clave = st.text_input("Clave", type="password", key="admin_pass")
                     if st.button("Ingresar como Admin"):
                         if admins.get(nombre) == clave:
-                            st.session_state["user_type"] = "admin"
-                            st.session_state["user_name"] = nombre
-                            st.rerun()
+                            # Generate and send 2FA code
+                            code = generate_2fa_code()
+                            email = admin_emails.get(nombre, "profereport@gmail.com")
+                            subject = "Código de Verificación - Preuniversitario CIMMA"
+                            body = f"""Estimado/a {nombre},
+
+Su código de verificación para acceder al sistema es: {code}
+
+Este código es válido por 10 minutos.
+
+Saludos,
+Preuniversitario CIMMA"""
+                            if send_email(email, subject, body):
+                                st.session_state["2fa_code"] = code
+                                st.session_state["2fa_email"] = email
+                                st.session_state["awaiting_2fa"] = True
+                                st.session_state["2fa_user_name"] = nombre
+                                st.session_state["2fa_time"] = get_chile_time()
+                                st.rerun()
+                            else:
+                                st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
                         else:
                             st.error("❌ Clave incorrecta")
                 else:
                     st.error("No hay administradores configurados en Secrets.")
+        elif st.session_state.get("awaiting_2fa", False):
+            st.subheader("🔐 Verificación en dos pasos")
+            st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
+            code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
+            if st.button("Verificar código"):
+                current_time = get_chile_time()
+                if (current_time - st.session_state["2fa_time"]).total_seconds() > 600:
+                    st.error("❌ El código ha expirado. Por favor, intenta iniciar sesión de nuevo.")
+                    st.session_state["awaiting_2fa"] = False
+                    st.session_state["2fa_code"] = None
+                    st.session_state["2fa_email"] = None
+                    st.rerun()
+                elif code_input == st.session_state["2fa_code"]:
+                    st.session_state["user_type"] = "admin"
+                    st.session_state["user_name"] = st.session_state["2fa_user_name"]
+                    st.session_state["awaiting_2fa"] = False
+                    st.session_state["2fa_code"] = None
+                    st.session_state["2fa_email"] = None
+                    st.rerun()
+                else:
+                    st.error("❌ Código incorrecto. Intenta de nuevo.")
         else:
             st.success(f"👤 {st.session_state['user_name']}")
             if st.button("Cerrar sesión"):
@@ -472,11 +511,6 @@ def main_app():
                     ])
                 sheet.append_rows(rows)
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
-
-                st.subheader("📊 Resumen de esta sesión")
-                for est, presente in asistencia.items():
-                    estado = "✅" if presente else "❌"
-                    st.write(f"{estado} {est}")
 
                 emails, nombres_apoderados = load_emails()
                 for estudiante, presente in asistencia.items():
