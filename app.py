@@ -248,7 +248,7 @@ def main():
     st.subheader("Preuniversitario CIMMA 2026")
 
     courses = load_courses()
-    if not 
+    if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
 
