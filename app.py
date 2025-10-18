@@ -165,11 +165,12 @@ def load_all_asistencia():
     client = get_client()
     if not client:
         return pd.DataFrame()
+    
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
 
     for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES","Respuestas de formulario 2","AUDIT"]:
+        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT"]:
             continue
 
         try:
@@ -181,11 +182,11 @@ def load_all_asistencia():
             # Salta las primeras 3 filas de metadatos
             all_values = all_values[3:]
             headers = all_values[0]
-            headers = [h.strip().upper() for h in headers if h.strip()]  # Ignore empty headers
+            headers = [h.strip().upper() for h in headers if h.strip()]
 
             # Buscar índices de columnas
-            curso_col = 0  # Columna A por defecto
-            fecha_col = 1  # Columna B por defecto
+            curso_col = 0
+            fecha_col = 1
             estudiante_col = None
             asistencia_col = None
             hora_registro_col = None
@@ -205,15 +206,20 @@ def load_all_asistencia():
                 elif "INFORMACION" in h or "MOTIVO" in h:
                     informacion_col = i
 
-            # Verificar columnas críticas
             if asistencia_col is None or estudiante_col is None:
                 st.warning(f"⚠️ Hoja '{worksheet.title}' no tiene columnas 'ASISTENCIA' o 'ESTUDIANTE'. Saltando.")
                 continue
 
-            # Procesar filas de datos
             for row in all_values[1:]:
-                # Asegurar que la fila tiene suficientes columnas
-                if len(row) <= max(curso_col, fecha_col, estudiante_col, asistencia_col, hora_registro_col or 0, informacion_col or 0):
+                max_index = max(
+                    curso_col,
+                    fecha_col,
+                    estudiante_col,
+                    asistencia_col,
+                    hora_registro_col or 0,
+                    informacion_col or 0
+                )
+                if len(row) <= max_index:
                     continue
 
                 try:
@@ -221,15 +227,15 @@ def load_all_asistencia():
                 except (ValueError, TypeError):
                     asistencia_val = 0
 
-                curso = row[curso_col] if curso_col < len(row) and row[curso_col] else worksheet.title
-                fecha = row[fecha_col] if fecha_col < len(row) and row[fecha_col] else ""
-                estudiante = row[estudiante_col] if estudiante_col < len(row) and row[estudiante_col] else ""
-                hora_registro = row[hora_registro_col] if hora_registro_col is not None and hora_registro_col < len(row) and row[hora_registro_col] else ""
-                informacion = row[informacion_col] if informacion_col is not None and informacion_col < len(row) and row[informacion_col] else ""
+                curso = row[curso_col].strip() if curso_col < len(row) and row[curso_col] else worksheet.title
+                fecha = row[fecha_col].strip() if fecha_col < len(row) and row[fecha_col] else ""
+                estudiante = row[estudiante_col].strip() if estudiante_col < len(row) and row[estudiante_col] else ""
+                hora_registro = row[hora_registro_col].strip() if (hora_registro_col is not None and hora_registro_col < len(row) and row[hora_registro_col]) else ""
+                informacion = row[informacion_col].strip() if (informacion_col is not None and informacion_col < len(row) and row[informacion_col]) else ""
 
                 all_data.append({
                     "Curso": curso,
-                    "Fecha": fecha,
+                    "Fecha": fecha,  # ← sigue siendo string por ahora
                     "Estudiante": estudiante,
                     "Asistencia": asistencia_val,
                     "Hora Registro": hora_registro,
@@ -240,7 +246,12 @@ def load_all_asistencia():
             st.warning(f"⚠️ Error al procesar hoja '{worksheet.title}': {str(e)[:80]}")
             continue
 
-    return pd.DataFrame(all_data)
+    # ✅ Convertir a DataFrame y luego transformar "Fecha" a datetime
+    df = pd.DataFrame(all_data)
+    if not df.empty:
+        # Convertir fechas de forma segura: errores → NaT
+        df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+    return df
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
