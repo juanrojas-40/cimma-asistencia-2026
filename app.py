@@ -166,24 +166,23 @@ def load_all_asistencia():
     all_data = []
 
     for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES"]:  # Agregué "PROFESORES" para saltar si no es data de asistencia
+        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES"]:
             continue
 
         try:
             all_values = worksheet.get_all_values()
-            if not all_values or len(all_values) < 5:  # Al menos 4 filas para metadatos + header
+            if not all_values or len(all_values) < 5:
+                st.warning(f"⚠️ Hoja '{worksheet.title}' vacía o con menos de 5 filas. Saltando.")
                 continue
 
-            # Salta las primeras 3 filas de metadatos (professor, dia, horario)
+            # Salta las primeras 3 filas de metadatos
             all_values = all_values[3:]
-
-            # Headers de la fila 4 (ahora all_values[0])
             headers = all_values[0]
-            headers = [h.strip().upper() for h in headers]
+            headers = [h.strip().upper() for h in headers if h.strip()]  # Ignore empty headers
 
             # Buscar índices de columnas
-            curso_col = None
-            fecha_col = None
+            curso_col = 0  # Columna A por defecto
+            fecha_col = 1  # Columna B por defecto
             estudiante_col = None
             asistencia_col = None
             hora_registro_col = None
@@ -200,35 +199,30 @@ def load_all_asistencia():
                     asistencia_col = i
                 elif "HORA REGISTRO" in h:
                     hora_registro_col = i
-                elif "INFORMACION" in h or "MOTIVO" in h:  # Por si varía (ej. "MOTIVO SUSPENSION")
+                elif "INFORMACION" in h or "MOTIVO" in h:
                     informacion_col = i
 
-            # Asignar manualmente si headers vacíos (como en columnas A y B)
-            if curso_col is None:
-                curso_col = 0  # Columna A: Curso (ej. "JR_1")
-            if fecha_col is None:
-                fecha_col = 1  # Columna B: Fecha
-
-            # Si no se encuentra "ASISTENCIA", saltar la hoja
-            if asistencia_col is None:
+            # Verificar columnas críticas
+            if asistencia_col is None or estudiante_col is None:
+                st.warning(f"⚠️ Hoja '{worksheet.title}' no tiene columnas 'ASISTENCIA' o 'ESTUDIANTE'. Saltando.")
                 continue
 
-            # Procesar filas de datos (desde all_values[1:])
+            # Procesar filas de datos
             for row in all_values[1:]:
-                if len(row) <= asistencia_col:
+                # Asegurar que la fila tiene suficientes columnas
+                if len(row) <= max(curso_col, fecha_col, estudiante_col, asistencia_col, hora_registro_col or 0, informacion_col or 0):
                     continue
 
                 try:
-                    asistencia_val = int(row[asistencia_col])
+                    asistencia_val = int(row[asistencia_col]) if row[asistencia_col] else 0
                 except (ValueError, TypeError):
                     asistencia_val = 0
 
-                # Obtener valores, usando worksheet.title como fallback para curso
                 curso = row[curso_col] if curso_col < len(row) and row[curso_col] else worksheet.title
                 fecha = row[fecha_col] if fecha_col < len(row) and row[fecha_col] else ""
                 estudiante = row[estudiante_col] if estudiante_col < len(row) and row[estudiante_col] else ""
-                hora_registro = row[hora_registro_col] if hora_registro_col < len(row) and row[hora_registro_col] else ""
-                informacion = row[informacion_col] if informacion_col < len(row) and row[informacion_col] else ""
+                hora_registro = row[hora_registro_col] if hora_registro_col is not None and hora_registro_col < len(row) and row[hora_registro_col] else ""
+                informacion = row[informacion_col] if informacion_col is not None and informacion_col < len(row) and row[informacion_col] else ""
 
                 all_data.append({
                     "Curso": curso,
