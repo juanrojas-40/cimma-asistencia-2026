@@ -461,35 +461,38 @@ def admin_panel():
         asistencia_curso = filtered_df.groupby("Curso").apply(
             lambda x: (x["Asistencia"].sum() / len(x)) * 100
         ).reset_index(name="Porcentaje")
-        ```chartjs
-        {
-            "type": "bar",
-            "data": {
-                "labels": asistencia_curso["Curso"].tolist(),
-                "datasets": [{
-                    "label": "Porcentaje de Asistencia",
-                    "data": asistencia_curso["Porcentaje"].tolist(),
-                    "backgroundColor": "#1A3B8F",
-                    "borderColor": "#6c757d",
-                    "borderWidth": 1
-                }]
-            },
-            "options": {
-                "scales": {
-                    "y": {
-                        "beginAtZero": true,
-                        "title": { "display": true, "text": "Porcentaje (%)" }
-                    },
-                    "x": {
-                        "title": { "display": true, "text": "Curso" }
-                    }
+        try:
+            ```chartjs
+            {
+                "type": "bar",
+                "data": {
+                    "labels": asistencia_curso["Curso"].tolist(),
+                    "datasets": [{
+                        "label": "Porcentaje de Asistencia",
+                        "data": asistencia_curso["Porcentaje"].tolist(),
+                        "backgroundColor": "#1A3B8F",
+                        "borderColor": "#6c757d",
+                        "borderWidth": 1
+                    }]
                 },
-                "plugins": {
-                    "legend": { "display": false }
+                "options": {
+                    "scales": {
+                        "y": {
+                            "beginAtZero": true,
+                            "title": { "display": true, "text": "Porcentaje (%)" }
+                        },
+                        "x": {
+                            "title": { "display": true, "text": "Curso" }
+                        }
+                    },
+                    "plugins": {
+                        "legend": { "display": false }
+                    }
                 }
             }
-        }
-        ```
+            ```
+        except:
+            st.bar_chart(asistencia_curso.set_index("Curso")["Porcentaje"])
     else:
         st.info(f"Mostrando datos para el curso: {curso_sel}")
 
@@ -498,34 +501,37 @@ def admin_panel():
         st.subheader("📉 Tendencia de Asistencia del Estudiante")
         trend_df = filtered_df.groupby("Fecha")["Asistencia"].mean().reset_index()
         trend_df = trend_df.sort_values("Fecha")
-        ```chartjs
-        {
-            "type": "line",
-            "data": {
-                "labels": trend_df["Fecha"].dt.strftime("%Y-%m-%d").tolist(),
-                "datasets": [{
-                    "label": "Asistencia (%)",
-                    "data": (trend_df["Asistencia"] * 100).tolist(),
-                    "borderColor": "#10B981",
-                    "backgroundColor": "rgba(16, 185, 129, 0.2)",
-                    "fill": true,
-                    "tension": 0.4
-                }]
-            },
-            "options": {
-                "scales": {
-                    "y": {
-                        "beginAtZero": true,
-                        "max": 100,
-                        "title": { "display": true, "text": "Porcentaje de Asistencia (%)" }
-                    },
-                    "x": {
-                        "title": { "display": true, "text": "Fecha" }
+        try:
+            ```chartjs
+            {
+                "type": "line",
+                "data": {
+                    "labels": trend_df["Fecha"].dt.strftime("%Y-%m-%d").tolist(),
+                    "datasets": [{
+                        "label": "Asistencia (%)",
+                        "data": (trend_df["Asistencia"] * 100).tolist(),
+                        "borderColor": "#10B981",
+                        "backgroundColor": "rgba(16, 185, 129, 0.2)",
+                        "fill": true,
+                        "tension": 0.4
+                    }]
+                },
+                "options": {
+                    "scales": {
+                        "y": {
+                            "beginAtZero": true,
+                            "max": 100,
+                            "title": { "display": true, "text": "Porcentaje de Asistencia (%)" }
+                        },
+                        "x": {
+                            "title": { "display": true, "text": "Fecha" }
+                        }
                     }
                 }
             }
-        }
-        ```
+            ```
+        except:
+            st.line_chart(trend_df.set_index("Fecha")["Asistencia"] * 100)
 
     # Registro detallado
     st.subheader("📋 Registro Detallado")
@@ -546,7 +552,6 @@ def admin_panel():
                 filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
             excel_data = output.getvalue()
             st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
 
 
 
