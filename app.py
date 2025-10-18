@@ -386,8 +386,13 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Clean and convert Fecha column to datetime
+    # Convert Fecha column to datetime, coercing invalid values to NaT
     df["Fecha"] = pd.to_datetime(df["Fecha"], errors='coerce')
+
+    # Log invalid dates for debugging
+    invalid_dates = df[df["Fecha"].isna()]["Fecha"]
+    if not invalid_dates.empty:
+        st.warning(f"Se encontraron {len(invalid_dates)} fechas inválidas en los datos. Revisar la hoja de Google Sheets.")
 
     # Filtros
     st.subheader("🔎 Filtros de Datos")
@@ -404,12 +409,14 @@ def admin_panel():
     with col3:
         # Use valid dates (non-NaT) for date range bounds
         valid_dates = df["Fecha"].dropna()
+        chile_tz = pytz.timezone("America/Santiago")
+        current_date = datetime.now(chile_tz)
         if not valid_dates.empty:
             date_min = valid_dates.min().to_pydatetime()
             date_max = valid_dates.max().to_pydatetime()
         else:
-            date_min = datetime.now(pytz.timezone("America/Santiago"))
-            date_max = date_min
+            date_min = current_date
+            date_max = current_date
         date_range = st.date_input(
             "Rango de Fechas",
             value=(date_min, date_max),
@@ -539,8 +546,6 @@ def admin_panel():
                 filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
             excel_data = output.getvalue()
             st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-
 
 
 
