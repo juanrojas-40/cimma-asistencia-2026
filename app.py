@@ -411,31 +411,31 @@ def admin_panel():
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        cursos = ["Todos"] + sorted(df["Curso"].dropna().unique().tolist())
+        # Normalizar cursos para evitar problemas de espacios
+        cursos = ["Todos"] + sorted(df["Curso"].dropna().astype(str).str.strip().unique().tolist())
         curso_sel = st.selectbox("Curso", cursos, key="curso_filter")
 
     with col2:
-        estudiantes = ["Todos"] + sorted(df["Estudiante"].dropna().unique().tolist())
+        # Normalizar estudiantes
+        estudiantes = ["Todos"] + sorted(df["Estudiante"].dropna().astype(str).str.strip().unique().tolist())
         estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
 
     with col3:
         st.write("📅 Rango de Fechas")
 
-        # Rango académico por defecto para el año 2026
-        fallback_min = datetime(2026, 4, 1).date()   # 1 de abril de 2026
-        fallback_max = datetime(2026, 12, 1).date()  # 1 de diciembre de 2026
+        # Rango académico por defecto para 2026
+        fallback_min = datetime(2026, 4, 1).date()
+        fallback_max = datetime(2026, 12, 1).date()
 
         valid_dates = df["Fecha"].dropna()
 
         if not valid_dates.empty:
             try:
-                # Convertir a objetos date y eliminar valores inválidos
                 date_series = pd.to_datetime(valid_dates, errors="coerce").dt.date
                 date_series = date_series.dropna()
                 if not date_series.empty:
                     date_min = date_series.min()
                     date_max = date_series.max()
-                    # Acotar al rango académico esperado
                     date_min = max(date_min, fallback_min)
                     date_max = min(date_max, fallback_max)
                 else:
@@ -445,7 +445,6 @@ def admin_panel():
         else:
             date_min, date_max = fallback_min, fallback_max
 
-        # Dos campos separados
         col_start, col_end = st.columns(2)
         with col_start:
             start_date = st.date_input(
@@ -464,32 +463,42 @@ def admin_panel():
                 key="end_date_filter"
             )
 
-        # Validación de orden
         if start_date > end_date:
             st.error("❌ La **Fecha Inicio** no puede ser posterior a la **Fecha Fin**.")
             return
 
-    # === APLICAR FILTROS ===
+    # === APLICAR FILTROS DE FORMA SEGURA ===
     filtered_df = df.copy()
 
+    # Filtro por curso (solo si no es "Todos")
     if curso_sel != "Todos":
-        filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
+        filtered_df = filtered_df[
+            filtered_df["Curso"].astype(str).str.strip() == curso_sel
+        ]
 
+    # Filtro por estudiante
     if estudiante_sel != "Todos":
-        filtered_df = filtered_df[filtered_df["Estudiante"] == estudiante_sel]
+        filtered_df = filtered_df[
+            filtered_df["Estudiante"].astype(str).str.strip() == estudiante_sel
+        ]
 
-    # Filtrar por rango de fechas (solo filas con fecha válida)
-    filtered_df = filtered_df.dropna(subset=["Fecha"])
-    filtered_df = filtered_df[
+    # Filtro por rango de fechas (seguro con NaT)
+    filtered_df["Fecha"] = pd.to_datetime(filtered_df["Fecha"], errors="coerce")
+    mask_fecha = (
+        filtered_df["Fecha"].notna() &
         (filtered_df["Fecha"].dt.date >= start_date) &
         (filtered_df["Fecha"].dt.date <= end_date)
-    ]
+    )
+    filtered_df = filtered_df[mask_fecha]
 
+    # === VALIDAR RESULTADO ===
     if filtered_df.empty:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
+        # Opcional: mostrar un vistazo de los datos originales para depurar
+        # st.write("Ejemplo de datos cargados:", df.head())
         return
 
-    # === RESUMEN DE ASISTENCIA ===
+    # === RESUMEN ===
     st.subheader("📈 Resumen de Asistencia")
     total_clases = len(filtered_df)
     total_asistencias = filtered_df["Asistencia"].sum()
@@ -570,7 +579,6 @@ def admin_panel():
             file_name="asistencia_filtrada.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
 
 
 
