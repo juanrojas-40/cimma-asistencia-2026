@@ -390,7 +390,6 @@ Preuniversitario CIMMA"""
 # ==============================
 # PANEL ADMINISTRATIVO
 # ==============================
-
 # ==============================
 # PANEL ADMINISTRATIVO
 # ==============================
@@ -404,7 +403,7 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Asegurar que la columna 'Fecha' sea datetime (por si acaso el caché tiene datos antiguos)
+    # Asegurar que 'Fecha' sea datetime (por si el caché tiene datos antiguos)
     df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
 
     if st.button("🧹 Limpiar caché"):
@@ -413,19 +412,21 @@ def admin_panel():
 
     st.subheader("🔎 Filtros de Datos")
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         cursos = ["Todos"] + sorted(df["Curso"].dropna().unique().tolist())
         curso_sel = st.selectbox("Curso", cursos, key="curso_filter")
-    
+
     with col2:
         estudiantes = ["Todos"] + sorted(df["Estudiante"].dropna().unique().tolist())
         estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
-    
+
     with col3:
+        # Filtrar fechas válidas
         valid_dates = df["Fecha"].dropna()
         chile_tz = pytz.timezone("America/Santiago")
         current_date = datetime.now(chile_tz).date()
+
         if not valid_dates.empty:
             date_min = valid_dates.min().date()
             date_max = valid_dates.max().date()
@@ -443,23 +444,30 @@ def admin_panel():
 
     # Aplicar filtros
     filtered_df = df.copy()
+
     if curso_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
+
     if estudiante_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Estudiante"] == estudiante_sel]
+
     if len(date_range) == 2:
         start_date, end_date = date_range
-        # Asegurar que 'Fecha' sigue siendo datetime en el df filtrado
+        # Filtrar solo filas con fecha válida dentro del rango
         filtered_df = filtered_df.dropna(subset=["Fecha"])
         filtered_df = filtered_df[
             (filtered_df["Fecha"].dt.date >= start_date) &
             (filtered_df["Fecha"].dt.date <= end_date)
         ]
+    else:
+        # Si el usuario no ha seleccionado un rango válido (solo una fecha o ninguna)
+        filtered_df = filtered_df.dropna(subset=["Fecha"])
 
     if filtered_df.empty:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
         return
 
+    # === RESUMEN ===
     st.subheader("📈 Resumen de Asistencia")
     total_clases = len(filtered_df)
     total_asistencias = filtered_df["Asistencia"].sum()
@@ -472,31 +480,36 @@ def admin_panel():
     col3.metric("Ausencias", total_ausencias)
     st.write(f"**Porcentaje de Asistencia**: {asistencia_porcentaje:.2f}%")
 
+    # === GRÁFICO POR CURSO ===
     st.subheader("📊 Porcentaje de Asistencia por Curso")
     if curso_sel == "Todos":
-        asistencia_curso = filtered_df.groupby("Curso").apply(
-            lambda x: (x["Asistencia"].sum() / len(x)) * 100
-        ).reset_index(name="Porcentaje")
-        fig = px.bar(
-            asistencia_curso,
-            x="Curso",
-            y="Porcentaje",
-            title="Porcentaje de Asistencia por Curso",
-            color_discrete_sequence=["#1A3B8F"],
-            labels={"Porcentaje": "Porcentaje (%)"}
+        asistencia_curso = (
+            filtered_df.groupby("Curso")
+            .apply(lambda x: (x["Asistencia"].sum() / len(x)) * 100)
+            .reset_index(name="Porcentaje")
         )
-        fig.update_layout(yaxis_range=[0, 100])
-        st.plotly_chart(fig, use_container_width=True)
+        if not asistencia_curso.empty:
+            fig = px.bar(
+                asistencia_curso,
+                x="Curso",
+                y="Porcentaje",
+                title="Porcentaje de Asistencia por Curso",
+                color_discrete_sequence=["#1A3B8F"],
+                labels={"Porcentaje": "Porcentaje (%)"},
+            )
+            fig.update_layout(yaxis_range=[0, 100])
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No hay datos suficientes para mostrar el gráfico por curso.")
     else:
-        st.info(f"Mostrando datos para el curso: {curso_sel}")
+        st.info(f"Mostrando datos para el curso: **{curso_sel}**")
 
+    # === TENDENCIA POR ESTUDIANTE ===
     if estudiante_sel != "Todos":
-        # Verificar que haya fechas válidas antes de graficar
-        plot_df = filtered_df.dropna(subset=["Fecha"])
+        plot_df = filtered_df.dropna(subset=["Fecha"]).sort_values("Fecha")
         if not plot_df.empty:
             st.subheader("📉 Tendencia de Asistencia del Estudiante")
             trend_df = plot_df.groupby("Fecha")["Asistencia"].mean().reset_index()
-            trend_df = trend_df.sort_values("Fecha")
             trend_df["Asistencia"] = trend_df["Asistencia"] * 100
             fig = px.line(
                 trend_df,
@@ -504,29 +517,37 @@ def admin_panel():
                 y="Asistencia",
                 title="Tendencia de Asistencia",
                 color_discrete_sequence=["#10B981"],
-                labels={"Asistencia": "Porcentaje de Asistencia (%)"}
+                labels={"Asistencia": "Porcentaje de Asistencia (%)"},
             )
             fig.update_layout(yaxis_range=[0, 100])
             st.plotly_chart(fig, use_container_width=True)
 
+    # === DATOS EN TABLA ===
     st.subheader("📋 Registro Detallado")
-    st.dataframe(filtered_df)
+    st.dataframe(filtered_df.reset_index(drop=True))
 
+    # === EXPORTACIÓN ===
     st.subheader("📥 Exportar Datos")
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("📤 Descargar como CSV"):
-            csv = filtered_df.to_csv(index=False).encode('utf-8')
-            st.download_button("Descargar CSV", csv, "asistencia_filtrada.csv", "text/csv")
-    
+        csv = filtered_df.to_csv(index=False).encode("utf-8")
+        st.download_button(
+            label="📤 Descargar como CSV",
+            data=csv,
+            file_name="asistencia_filtrada.csv",
+            mime="text/csv"
+        )
     with col2:
-        if st.button("📤 Descargar como XLSX"):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
-            excel_data = output.getvalue()
-            st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            filtered_df.to_excel(writer, index=False, sheet_name="Asistencia")
+        excel_data = output.getvalue()
+        st.download_button(
+            label="📤 Descargar como XLSX",
+            data=excel_data,
+            file_name="asistencia_filtrada.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 
 
