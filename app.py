@@ -389,12 +389,10 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Cache-clearing button
     if st.button("🧹 Limpiar caché"):
         st.cache_data.clear()
         st.rerun()
 
-    # Filtros
     st.subheader("🔎 Filtros de Datos")
     col1, col2, col3 = st.columns(3)
     
@@ -424,7 +422,6 @@ def admin_panel():
             key="date_range_filter"
         )
 
-    # Aplicar filtros
     filtered_df = df.copy()
     if curso_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
@@ -441,7 +438,6 @@ def admin_panel():
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
         return
 
-    # Resumen estadístico
     st.subheader("📈 Resumen de Asistencia")
     total_clases = len(filtered_df)
     total_asistencias = filtered_df["Asistencia"].sum()
@@ -454,7 +450,6 @@ def admin_panel():
     col3.metric("Ausencias", total_ausencias)
     st.write(f"**Porcentaje de Asistencia**: {asistencia_porcentaje:.2f}%")
 
-    # Gráfico de asistencia por curso
     st.subheader("📊 Porcentaje de Asistencia por Curso")
     if curso_sel == "Todos":
         asistencia_curso = filtered_df.groupby("Curso").apply(
@@ -473,7 +468,6 @@ def admin_panel():
     else:
         st.info(f"Mostrando datos para el curso: {curso_sel}")
 
-    # Gráfico de tendencia de asistencia
     if estudiante_sel != "Todos" and not filtered_df["Fecha"].isna().all():
         st.subheader("📉 Tendencia de Asistencia del Estudiante")
         trend_df = filtered_df.groupby("Fecha")["Asistencia"].mean().reset_index()
@@ -490,11 +484,9 @@ def admin_panel():
         fig.update_layout(yaxis_range=[0, 100])
         st.plotly_chart(fig, use_container_width=True)
 
-    # Registro detallado
     st.subheader("📋 Registro Detallado")
     st.dataframe(filtered_df)
 
-    # Botones de descarga
     st.subheader("📥 Exportar Datos")
     col1, col2 = st.columns(2)
     with col1:
@@ -509,7 +501,6 @@ def admin_panel():
                 filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
             excel_data = output.getvalue()
             st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
 # ==============================
 # APP PRINCIPAL (PROFESOR)
 # ==============================
