@@ -390,9 +390,6 @@ Preuniversitario CIMMA"""
 # ==============================
 # PANEL ADMINISTRATIVO
 # ==============================
-# ==============================
-# PANEL ADMINISTRATIVO
-# ==============================
 
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
@@ -403,7 +400,7 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Asegurar que 'Fecha' sea datetime (por si el caché tiene datos antiguos)
+    # Asegurar que 'Fecha' sea datetime
     df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
 
     if st.button("🧹 Limpiar caché"):
@@ -422,7 +419,8 @@ def admin_panel():
         estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
 
     with col3:
-        # Filtrar fechas válidas
+        st.write("📅 Rango de Fechas")
+
         valid_dates = df["Fecha"].dropna()
         chile_tz = pytz.timezone("America/Santiago")
         current_date = datetime.now(chile_tz).date()
@@ -434,13 +432,28 @@ def admin_panel():
             date_min = current_date
             date_max = current_date
 
-        date_range = st.date_input(
-            "Rango de Fechas",
-            value=(date_min, date_max),
-            min_value=date_min,
-            max_value=date_max,
-            key="date_range_filter"
-        )
+        col_start, col_end = st.columns(2)
+        with col_start:
+            start_date = st.date_input(
+                "Fecha Inicio",
+                value=date_min,
+                min_value=date_min,
+                max_value=date_max,
+                key="start_date_filter"
+            )
+        with col_end:
+            end_date = st.date_input(
+                "Fecha Fin",
+                value=date_max,
+                min_value=date_min,
+                max_value=date_max,
+                key="end_date_filter"
+            )
+
+    # Validación: inicio no puede ser mayor que fin
+    if start_date > end_date:
+        st.error("❌ La **Fecha Inicio** no puede ser posterior a la **Fecha Fin**.")
+        return
 
     # Aplicar filtros
     filtered_df = df.copy()
@@ -451,17 +464,12 @@ def admin_panel():
     if estudiante_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Estudiante"] == estudiante_sel]
 
-    if len(date_range) == 2:
-        start_date, end_date = date_range
-        # Filtrar solo filas con fecha válida dentro del rango
-        filtered_df = filtered_df.dropna(subset=["Fecha"])
-        filtered_df = filtered_df[
-            (filtered_df["Fecha"].dt.date >= start_date) &
-            (filtered_df["Fecha"].dt.date <= end_date)
-        ]
-    else:
-        # Si el usuario no ha seleccionado un rango válido (solo una fecha o ninguna)
-        filtered_df = filtered_df.dropna(subset=["Fecha"])
+    # Filtrar por rango de fechas
+    filtered_df = filtered_df.dropna(subset=["Fecha"])
+    filtered_df = filtered_df[
+        (filtered_df["Fecha"].dt.date >= start_date) &
+        (filtered_df["Fecha"].dt.date <= end_date)
+    ]
 
     if filtered_df.empty:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
@@ -548,7 +556,6 @@ def admin_panel():
             file_name="asistencia_filtrada.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-
 
 
 
