@@ -14,64 +14,32 @@ import plotly.express as px
 from twilio.rest import Client as TwilioClient
 from googleapiclient.discovery import build
 
-# Configuración inicial con fondo temático usando la imagen corregida
+# Configuración inicial con fondo temático usando la imagen adjunta (o similar)
 st.set_page_config(
     page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
     page_icon="✅",
     layout="centered",
     initial_sidebar_state="collapsed"
 )
-
 st.markdown(
     """
     <style>
-    /* Contenedor principal */
     .stApp {
-        position: relative;
-        background-color: white; /* Fondo base claro */
-    }
-
-    /* Capa de fondo con imagen y filtros */
-    .stApp::before {
-        content: "";
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
         background-image: url('https://thumbs.dreamstime.com/b/science-line-logo-scientific-research-sketch-outline-icons-chemistry-laboratory-analysis-dna-molecule-atom-symbols-biology-lab-385164964.jpg');
         background-size: cover;
-        background-position: center;
         background-repeat: no-repeat;
         background-attachment: fixed;
-        opacity: 0.12; /* Muy transparente para no distraer */
-        filter: brightness(1.15) contrast(0.9) saturate(0.6) grayscale(0.25); /* Tonalidad suave y académica */
-        z-index: -1;
+        background-position: center;
+        opacity: 0.9;  /* Ajusta la opacidad para que el texto sea legible */
     }
-
-    /* Contenido principal con fondo semi-transparente */
     .main-content {
-        background-color: rgba(255, 255, 255, 0.35);
+        background-color: rgba(255, 255, 255, 0.2);  /* Fondo semi-transparente para el contenido principal */
         padding: 20px;
         border-radius: 10px;
-        backdrop-filter: blur(4px); /* Opcional: efecto vidrioso (soporte limitado) */
     }
-
-    /* Soporte para modo oscuro */
     @media (prefers-color-scheme: dark) {
-        .stApp {
-            background-color: #121212;
-        }
-        .stApp::before {
-            opacity: 0.15;
-            filter: brightness(0.9) contrast(1.1) saturate(0.5) grayscale(0.3);
-        }
-        .main-content {
-            background-color: rgba(30, 30, 30, 0.4);
-        }
+        .stApp { background-color: #1a1a1a; }
     }
-
-    /* Estilo para botones */
     div[data-testid="stButton"] button {
         font-size: 16px !important;
         min-width: 200px !important;
@@ -518,7 +486,7 @@ def check_consecutive_absences(df):
         
         df_sorted = df.sort_values(["Estudiante", "Fecha"])
         df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
-        df_consecutive = df_sorted[(df_sorted["Asistencia"] == 0) & (df_sorted["Prev_Asistencia"] == 0)]
+        df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
         
         for estudiante in df_consecutive["Estudiante"].unique():
             student_df = df_consecutive[df_consecutive["Estudiante"] == estudiante]
