@@ -400,17 +400,12 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Asegurar que 'Fecha' sea datetime (clave para evitar errores)
+    # Asegurar que 'Fecha' sea datetime
     df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
 
     if st.button("🧹 Limpiar caché"):
         st.cache_data.clear()
         st.rerun()
-
-    # Verificar si hay fechas válidas
-    if df["Fecha"].isna().all():
-        st.error("❌ No se encontraron fechas válidas en la columna 'Fecha'. Por favor, revisa los datos en la hoja de Google Sheets.")
-        return
 
     st.subheader("🔎 Filtros de Datos")
     col1, col2, col3 = st.columns(3)
@@ -426,74 +421,61 @@ def admin_panel():
     with col3:
         st.write("📅 Rango de Fechas")
 
-        # Cálculo seguro de min y max de fechas
         valid_dates = df["Fecha"].dropna()
         chile_tz = pytz.timezone("America/Santiago")
         current_date = datetime.now(chile_tz).date()
 
-        # Establecer límites y valores predeterminados
-        if not valid_dates.empty and valid_dates.dtype == "datetime64[ns]":
+        if not valid_dates.empty:
             date_min = valid_dates.min().date()
             date_max = valid_dates.max().date()
-            default_start = max(date_min, current_date - timedelta(days=30))  # Últimos 30 días o mínimo
-            default_end = min(date_max, current_date)  # Hasta hoy o máximo
         else:
-            date_min = current_date - timedelta(days=30)
+            date_min = current_date
             date_max = current_date
-            default_start = date_min
-            default_end = date_max
-            st.warning("⚠️ No se encontraron fechas válidas. Usando rango predeterminado (últimos 30 días).")
 
-        # Dos campos separados con validación dinámica
         col_start, col_end = st.columns(2)
         with col_start:
             start_date = st.date_input(
                 "Fecha Inicio",
-                value=default_start,
+                value=date_min,
                 min_value=date_min,
                 max_value=date_max,
-                key="start_date_filter",
-                help="Selecciona la fecha de inicio del rango. No puede ser posterior a la Fecha Fin."
+                key="start_date_filter"
             )
         with col_end:
             end_date = st.date_input(
                 "Fecha Fin",
-                value=default_end,
+                value=date_max,
                 min_value=date_min,
                 max_value=date_max,
-                key="end_date_filter",
-                help="Selecciona la fecha de fin del rango. No puede ser anterior a la Fecha Inicio."
+                key="end_date_filter"
             )
 
-        # Validación de rango con retroalimentación inmediata
-        if start_date > end_date:
-            st.error("❌ La **Fecha Inicio** no puede ser posterior a la **Fecha Fin**. Por favor, ajusta las fechas.")
-            return
-        elif start_date < date_min or end_date > date_max:
-            st.error(f"❌ Las fechas deben estar entre {date_min} y {date_max}.")
-            return
-
-        # Mostrar el rango seleccionado para confirmación
-        st.info(f"Rango seleccionado: **{start_date}** al **{end_date}**")
+    # Validación: inicio no puede ser mayor que fin
+    if start_date > end_date:
+        st.error("❌ La **Fecha Inicio** no puede ser posterior a la **Fecha Fin**.")
+        return
 
     # Aplicar filtros
     filtered_df = df.copy()
+
     if curso_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
+
     if estudiante_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Estudiante"] == estudiante_sel]
-    if not filtered_df.empty:
-        filtered_df = filtered_df.dropna(subset=["Fecha"])
-        filtered_df = filtered_df[
-            (filtered_df["Fecha"].dt.date >= start_date) &
-            (filtered_df["Fecha"].dt.date <= end_date)
-        ]
+
+    # Filtrar por rango de fechas
+    filtered_df = filtered_df.dropna(subset=["Fecha"])
+    filtered_df = filtered_df[
+        (filtered_df["Fecha"].dt.date >= start_date) &
+        (filtered_df["Fecha"].dt.date <= end_date)
+    ]
 
     if filtered_df.empty:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
         return
 
-    # Resumen de Asistencia
+    # === RESUMEN ===
     st.subheader("📈 Resumen de Asistencia")
     total_clases = len(filtered_df)
     total_asistencias = filtered_df["Asistencia"].sum()
@@ -506,7 +488,7 @@ def admin_panel():
     col3.metric("Ausencias", total_ausencias)
     st.write(f"**Porcentaje de Asistencia**: {asistencia_porcentaje:.2f}%")
 
-    # Gráfico por Curso
+    # === GRÁFICO POR CURSO ===
     st.subheader("📊 Porcentaje de Asistencia por Curso")
     if curso_sel == "Todos":
         asistencia_curso = (
@@ -530,7 +512,7 @@ def admin_panel():
     else:
         st.info(f"Mostrando datos para el curso: **{curso_sel}**")
 
-    # Tendencia por Estudiante
+    # === TENDENCIA POR ESTUDIANTE ===
     if estudiante_sel != "Todos":
         plot_df = filtered_df.dropna(subset=["Fecha"]).sort_values("Fecha")
         if not plot_df.empty:
@@ -548,11 +530,11 @@ def admin_panel():
             fig.update_layout(yaxis_range=[0, 100])
             st.plotly_chart(fig, use_container_width=True)
 
-    # Registro Detallado
+    # === DATOS EN TABLA ===
     st.subheader("📋 Registro Detallado")
     st.dataframe(filtered_df.reset_index(drop=True))
 
-    # Exportación
+    # === EXPORTACIÓN ===
     st.subheader("📥 Exportar Datos")
     col1, col2 = st.columns(2)
     with col1:
@@ -574,6 +556,7 @@ def admin_panel():
             file_name="asistencia_filtrada.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
+
 
 
 
