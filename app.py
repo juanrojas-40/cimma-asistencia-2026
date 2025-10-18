@@ -10,44 +10,6 @@ import pytz
 import pandas as pd
 import random
 import string
-import plotly.express as px
-from twilio.rest import Client as TwilioClient
-from googleapiclient.discovery import build
-
-# Configuración inicial con fondo temático usando la imagen adjunta (o similar)
-st.set_page_config(
-    page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
-    page_icon="✅",
-    layout="centered",
-    initial_sidebar_state="collapsed"
-)
-st.markdown(
-    """
-    <style>
-    .stApp {
-        background-image: url('https://thumbs.dreamstime.com/b/science-line-logo-scientific-research-sketch-outline-icons-chemistry-laboratory-analysis-dna-molecule-atom-symbols-biology-lab-385164964.jpg');
-        background-size: cover;
-        background-repeat: no-repeat;
-        background-attachment: fixed;
-        background-position: center;
-        opacity: 0.9;  /* Ajusta la opacidad para que el texto sea legible */
-    }
-    .main-content {
-        background-color: rgba(255, 255, 255, 0.2);  /* Fondo semi-transparente para el contenido principal */
-        padding: 20px;
-        border-radius: 10px;
-    }
-    @media (prefers-color-scheme: dark) {
-        .stApp { background-color: #1a1a1a; }
-    }
-    div[data-testid="stButton"] button {
-        font-size: 16px !important;
-        min-width: 200px !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -59,8 +21,7 @@ def get_client():
         creds_dict = json.loads(st.secrets["google"]["credentials"])
         creds = Credentials.from_service_account_info(creds_dict, scopes=[
             "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive",
-            "https://www.googleapis.com/auth/calendar"
+            "https://www.googleapis.com/auth/drive"
         ])
         return gspread.authorize(creds)
     except (KeyError, json.JSONDecodeError) as e:
@@ -93,46 +54,9 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         st.warning(f"⚠️ Error al enviar correo a {to_email}: {e}")
         return False
 
-def send_whatsapp_notification(to_phone: str, message: str) -> bool:
-    try:
-        twilio_client = TwilioClient(st.secrets["TWILIO"]["account_sid"], st.secrets["TWILIO"]["auth_token"])
-        twilio_client.messages.create(
-            body=message,
-            from_=st.secrets["TWILIO"]["from_number"],
-            to=f"+{to_phone}"
-        )
-        return True
-    except Exception as e:
-        st.warning(f"⚠️ Error al enviar WhatsApp a {to_phone}: {e}")
-        return False
-
 def generate_2fa_code():
     """Generate a random 6-digit 2FA code."""
     return ''.join(random.choices(string.digits, k=6))
-
-def sync_to_calendar(event_data):
-    try:
-        creds = Credentials.from_service_account_info(json.loads(st.secrets["google"]["credentials"]), scopes=["https://www.googleapis.com/auth/calendar"])
-        service = build("calendar", "v3", credentials=creds)
-        event = {
-            "summary": f"Clase - {event_data['curso_id']}",
-            "start": {"date": event_data["fecha"]},
-            "end": {"date": event_data["fecha"]}
-        }
-        service.events().insert(calendarId="primary", body=event).execute()
-        st.success("Sincronizado con Google Calendar!")
-    except Exception as e:
-        st.error(f"Error al sincronizar con calendario: {e}. Asegúrate de que la API de Google Calendar esté habilitada en tu proyecto.")
-
-def log_action(action: str, user: str):
-    client = get_client()
-    if client:
-        try:
-            sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"]).worksheet("AUDIT")
-        except gspread.exceptions.WorksheetNotFound:
-            sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"]).add_worksheet("AUDIT", 100, 3)
-            sheet.append_row(["Fecha", "Usuario", "Acción"])
-        sheet.append_row([get_chile_time().strftime("%Y-%m-%d %H:%M"), user, action])
 
 # ==============================
 # CARGA DE DATOS
@@ -145,41 +69,49 @@ def load_courses():
         return {}
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
+
     for worksheet in clases_sheet.worksheets():
         sheet_name = worksheet.title
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
+
             try:
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
             except (ValueError, IndexError):
                 continue
+
             try:
                 idx_dia = colA_upper.index("DIA")
                 dia = colA[idx_dia + 1]
             except (ValueError, IndexError):
                 continue
+
             try:
                 idx_curso = colA_upper.index("CURSO")
                 curso_id = colA[idx_curso + 1]
                 horario = colA[idx_curso + 2]
             except (ValueError, IndexError):
                 continue
+
             fechas = []
             estudiantes = []
             try:
                 idx_fechas = colA_upper.index("FECHAS")
                 idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
+
                 for i in range(idx_fechas + 1, idx_estudiantes):
                     if i < len(colA):
                         fechas.append(colA[i])
+
                 for i in range(idx_estudiantes + 1, len(colA)):
                     if colA[i]:
                         estudiantes.append(colA[i])
             except ValueError:
                 pass
+
             if profesor and dia and curso_id and horario and estudiantes:
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
@@ -190,9 +122,11 @@ def load_courses():
                     "fechas": fechas or ["Sin fechas"],
                     "estudiantes": estudiantes
                 }
+
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
+
     return courses
 
 @st.cache_data(ttl=3600)
@@ -205,6 +139,7 @@ def load_emails():
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
         if "MAILS" not in sheet_names:
             return {}, {}
+
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
         emails = {}
@@ -229,22 +164,31 @@ def load_all_asistencia():
         return pd.DataFrame()
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
+
     for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES", "AUDIT"]:
+        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES"]:  # Agregué "PROFESORES" para saltar si no es data de asistencia
             continue
+
         try:
             all_values = worksheet.get_all_values()
-            if not all_values or len(all_values) < 5:
+            if not all_values or len(all_values) < 5:  # Al menos 4 filas para metadatos + header
                 continue
+
+            # Salta las primeras 3 filas de metadatos (professor, dia, horario)
             all_values = all_values[3:]
+
+            # Headers de la fila 4 (ahora all_values[0])
             headers = all_values[0]
             headers = [h.strip().upper() for h in headers]
+
+            # Buscar índices de columnas
             curso_col = None
             fecha_col = None
             estudiante_col = None
             asistencia_col = None
             hora_registro_col = None
             informacion_col = None
+
             for i, h in enumerate(headers):
                 if "CURSO" in h:
                     curso_col = i
@@ -256,26 +200,36 @@ def load_all_asistencia():
                     asistencia_col = i
                 elif "HORA REGISTRO" in h:
                     hora_registro_col = i
-                elif "INFORMACION" in h or "MOTIVO" in h:
+                elif "INFORMACION" in h or "MOTIVO" in h:  # Por si varía (ej. "MOTIVO SUSPENSION")
                     informacion_col = i
+
+            # Asignar manualmente si headers vacíos (como en columnas A y B)
             if curso_col is None:
-                curso_col = 0
+                curso_col = 0  # Columna A: Curso (ej. "JR_1")
             if fecha_col is None:
-                fecha_col = 1
+                fecha_col = 1  # Columna B: Fecha
+
+            # Si no se encuentra "ASISTENCIA", saltar la hoja
             if asistencia_col is None:
                 continue
+
+            # Procesar filas de datos (desde all_values[1:])
             for row in all_values[1:]:
                 if len(row) <= asistencia_col:
                     continue
+
                 try:
                     asistencia_val = int(row[asistencia_col])
                 except (ValueError, TypeError):
                     asistencia_val = 0
+
+                # Obtener valores, usando worksheet.title como fallback para curso
                 curso = row[curso_col] if curso_col < len(row) and row[curso_col] else worksheet.title
                 fecha = row[fecha_col] if fecha_col < len(row) and row[fecha_col] else ""
                 estudiante = row[estudiante_col] if estudiante_col < len(row) and row[estudiante_col] else ""
                 hora_registro = row[hora_registro_col] if hora_registro_col < len(row) and row[hora_registro_col] else ""
                 informacion = row[informacion_col] if informacion_col < len(row) and row[informacion_col] else ""
+
                 all_data.append({
                     "Curso": curso,
                     "Fecha": fecha,
@@ -284,9 +238,11 @@ def load_all_asistencia():
                     "Hora Registro": hora_registro,
                     "Información": informacion
                 })
+
         except Exception as e:
             st.warning(f"⚠️ Error al procesar hoja '{worksheet.title}': {str(e)[:80]}")
             continue
+
     return pd.DataFrame(all_data)
 
 # ==============================
@@ -294,12 +250,17 @@ def load_all_asistencia():
 # ==============================
 
 def main():
-    theme = st.sidebar.radio("Modo", ["Claro", "Oscuro"], key="theme")
-    if theme == "Oscuro":
-        st.markdown('<style>body {background-color: #1a1a1a; color: white;}</style>', unsafe_allow_html=True)
+    st.set_page_config(
+        page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
+        page_icon="✅",
+        layout="centered"
+    )
+
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.title("🔐 Acceso")
+
+        # Inicializar session state
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
@@ -309,9 +270,10 @@ def main():
             st.session_state["2fa_user_name"] = None
             st.session_state["2fa_time"] = None
             st.session_state["2fa_attempts"] = 0
-            st.session_state["alerted_students"] = {}  # Initialize here to avoid runtime issues
+
         if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
-            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador", "Estudiante"], key="role_select")
+            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
+
             if user_type == "Profesor":
                 profesores = st.secrets.get("profesores", {})
                 if profesores:
@@ -321,13 +283,12 @@ def main():
                         if profesores.get(nombre) == clave:
                             st.session_state["user_type"] = "profesor"
                             st.session_state["user_name"] = nombre
-                            log_action("Login Profesor", nombre)
                             st.rerun()
                         else:
                             st.error("❌ Clave incorrecta")
                 else:
                     st.error("No hay profesores configurados en Secrets.")
-            elif user_type == "Administrador":
+            else:
                 try:
                     admins = st.secrets.get("administradores", {})
                     admin_emails = st.secrets.get("admin_emails", {})
@@ -339,12 +300,16 @@ def main():
                     clave = st.text_input("Clave", type="password", key="admin_pass")
                     if st.button("Ingresar como Admin"):
                         if admins.get(nombre) == clave:
+                            # Generate and send 2FA code
                             code = generate_2fa_code()
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
                             body = f"""Estimado/a {nombre},
+
 Su código de verificación para acceder al sistema es: {code}
+
 Este código es válido por 10 minutos.
+
 Saludos,
 Preuniversitario CIMMA"""
                             if send_email(email, subject, body):
@@ -354,7 +319,6 @@ Preuniversitario CIMMA"""
                                 st.session_state["2fa_user_name"] = nombre
                                 st.session_state["2fa_time"] = get_chile_time()
                                 st.session_state["2fa_attempts"] = 0
-                                log_action("2FA Enviado", nombre)
                                 st.rerun()
                             else:
                                 st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
@@ -362,21 +326,6 @@ Preuniversitario CIMMA"""
                             st.error("❌ Clave incorrecta")
                 else:
                     st.error("No hay administradores o correos configurados en Secrets.")
-            else:  # Estudiante
-                estudiantes = st.secrets.get("estudiantes", {})
-                if estudiantes:
-                    nombre = st.selectbox("Nombre", list(estudiantes.keys()), key="est_select")
-                    clave = st.text_input("Clave", type="password", key="est_pass")
-                    if st.button("Ingresar como Estudiante"):
-                        if estudiantes.get(nombre) == clave:
-                            st.session_state["user_type"] = "estudiante"
-                            st.session_state["user_name"] = nombre
-                            log_action("Login Estudiante", nombre)
-                            st.rerun()
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay estudiantes configurados en Secrets.")
         elif st.session_state["awaiting_2fa"]:
             st.subheader("🔐 Verificación en dos pasos")
             st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
@@ -393,7 +342,6 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_code"] = None
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
-                    log_action("2FA Expirado", st.session_state["2fa_user_name"])
                     st.rerun()
                 elif st.session_state["2fa_attempts"] >= 3:
                     st.error("❌ Demasiados intentos fallidos. Intenta iniciar sesión de nuevo.")
@@ -401,7 +349,6 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_code"] = None
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
-                    log_action("2FA Fallido", st.session_state["2fa_user_name"])
                     st.rerun()
                 elif code_input == st.session_state["2fa_code"]:
                     st.session_state["user_type"] = "admin"
@@ -411,7 +358,6 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
                     st.session_state["2fa_time"] = None
-                    log_action("Login Admin", st.session_state["user_name"])
                     st.rerun()
                 else:
                     st.session_state["2fa_attempts"] += 1
@@ -419,20 +365,17 @@ Preuniversitario CIMMA"""
         else:
             st.success(f"👤 {st.session_state['user_name']}")
             if st.button("Cerrar sesión"):
-                log_action("Logout", st.session_state["user_name"])
                 st.session_state.clear()
                 st.rerun()
 
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
-        st.info("Por favor, inicia sesión desde el menú lateral izquierdo.")
+        st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
         return
 
     if st.session_state["user_type"] == "admin":
         admin_panel()
-    elif st.session_state["user_type"] == "estudiante":
-        student_portal()
     else:
         main_app()
 
@@ -443,33 +386,30 @@ Preuniversitario CIMMA"""
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
-    if st.secrets.get("super_admin_password") and st.text_input("Contraseña de Admin Superior", type="password", key="super_admin_pass") != st.secrets["super_admin_password"]:
-        st.warning("Acceso restringido. Ingresa la contraseña de Admin Superior.")
-        return
+
     df = load_all_asistencia()
     if df.empty:
         st.warning("No hay datos de asistencia aún.")
         return
+
     cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
     curso_sel = st.selectbox("Curso", cursos)
-    asignaturas = ["Todas"] + sorted([c.split("_")[0] for c in df["Curso"].unique() if "_" in c])
-    asignatura_sel = st.selectbox("Asignatura", asignaturas)
     if curso_sel != "Todos":
         df = df[df["Curso"] == curso_sel]
-    if asignatura_sel != "Todas":
-        df = df[df["Curso"].str.contains(asignatura_sel)]
+
     st.subheader("📈 Porcentaje de Asistencia por Curso")
-    asistencia_curso = df.groupby("Curso").apply(lambda x: (x["Asistencia"].sum() / len(x)) * 100).reset_index(name="Porcentaje")
+    asistencia_curso = df.groupby("Curso").apply(
+        lambda x: (x["Asistencia"].sum() / len(x)) * 100
+    ).reset_index(name="Porcentaje")
     st.bar_chart(asistencia_curso.set_index("Curso"))
-    fig_line = px.line(df, x="Fecha", y="Asistencia", color="Estudiante", title="Tendencias de Asistencia")
-    st.plotly_chart(fig_line)
-    fig_heatmap = px.imshow(df.pivot_table(index="Fecha", columns="Estudiante", values="Asistencia"), title="Heatmap de Asistencia")
-    st.plotly_chart(fig_heatmap)
+
     st.subheader("📋 Registro Detallado")
     st.dataframe(df)
+
     if st.button("📤 Descargar como CSV"):
         csv = df.to_csv(index=False).encode('utf-8')
         st.download_button("Descargar CSV", csv, "asistencia.csv", "text/csv")
+
     if st.button("📤 Descargar como XLSX"):
         import io
         output = io.BytesIO()
@@ -477,33 +417,6 @@ def admin_panel():
             df.to_excel(writer, index=False, sheet_name='Asistencia')
         excel_data = output.getvalue()
         st.download_button("Descargar XLSX", excel_data, "asistencia.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    check_consecutive_absences(df)
-
-def check_consecutive_absences(df):
-    if not df.empty:
-        if "alerted_students" not in st.session_state:
-            st.session_state["alerted_students"] = {}
-        
-        df_sorted = df.sort_values(["Estudiante", "Fecha"])
-        df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
-        df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
-        
-        for estudiante in df_consecutive["Estudiante"].unique():
-            student_df = df_consecutive[df_consecutive["Estudiante"] == estudiante]
-            absences = len(student_df)
-            if absences >= 3:
-                streak_start = student_df["Fecha"].iloc[0]
-                streak_end = student_df["Fecha"].iloc[-1]
-                student_key = f"{estudiante}_{streak_start}_{streak_end}"
-                if student_key not in st.session_state["alerted_students"]:
-                    emails, nombres_apoderados = load_emails()
-                    email = emails.get(estudiante.lower().strip())
-                    if email:
-                        send_email(email, "Alerta de Ausencias", f"Hola {nombres_apoderados.get(estudiante.lower().strip(), 'Apoderado')},\nTu estudiante {estudiante} ha faltado 3 o más veces consecutivas desde {streak_start} hasta {streak_end}. Por favor, contáctenos.\nSaludos,\nPreuniversitario CIMMA")
-                        st.warning(f"Alerta enviada a {email} por ausencias de {estudiante}.")
-                        st.session_state["alerted_students"][student_key] = True
-                        log_action(f"Alerta Ausencias {estudiante} ({streak_start}-{streak_end})", st.session_state["user_name"])
-
 # ==============================
 # APP PRINCIPAL (PROFESOR)
 # ==============================
@@ -511,31 +424,38 @@ def check_consecutive_absences(df):
 def main_app():
     st.title("📱 Registro de Asistencia")
     st.subheader("Preuniversitario CIMMA 2026")
+
     courses = load_courses()
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
+
     cursos_filtrados = {
         k: v for k, v in courses.items()
         if v["profesor"] == st.session_state["user_name"]
     }
+
     if not cursos_filtrados:
         st.warning("No tienes cursos asignados.")
         st.stop()
+
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()))
     data = cursos_filtrados[curso_seleccionado]
+
     st.markdown(f"**🧑‍🏫 Profesor(a):** {data['profesor']}")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"**📅 Día:** {data['dia']}")
     with col2:
         st.markdown(f"**⏰ Horario:** {data['horario']}")
+
     clase_realizada = st.radio(
         "✅ ¿Se realizó la clase?",
         ("Sí", "No"),
         index=0,
         help="Selecciona 'No' en caso de feriado, suspensión o imprevisto."
     )
+
     if clase_realizada == "No":
         motivo = st.text_area(
             "📝 Motivo de la no realización",
@@ -699,28 +619,6 @@ Preuniversitario CIMMA 2026"""
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
-
-# ==============================
-# PORTAL ESTUDIANTIL
-# ==============================
-
-def student_portal():
-    st.title("🎯 Portal Estudiantil")
-    st.subheader(f"Bienvenido, {st.session_state['user_name']}")
-    df = load_all_asistencia()
-    if df.empty:
-        st.warning("No hay datos de asistencia aún.")
-        return
-    student_df = df[df["Estudiante"] == st.session_state["user_name"]]
-    if not student_df.empty:
-        asistencia_pct = (student_df["Asistencia"].sum() / len(student_df)) * 100
-        st.metric("Porcentaje de Asistencia", f"{asistencia_pct:.1f}%")
-        if asistencia_pct >= 95:
-            st.success("🏅 ¡Has ganado el badge 'Asistencia Perfecta'!")
-        else:
-            st.info("Objetivo: Alcanza 95% para un badge!")
-    else:
-        st.info("No hay registros de asistencia para ti aún.")
 
 if __name__ == "__main__":
     main()
