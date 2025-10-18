@@ -386,31 +386,96 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
-    curso_sel = st.selectbox("Curso", cursos)
+    # Filtros
+    st.subheader("🔎 Filtros de Datos")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
+        curso_sel = st.selectbox("Curso", cursos, key="curso_filter")
+    
+    with col2:
+        estudiantes = ["Todos"] + sorted(df["Estudiante"].unique().tolist())
+        estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
+    
+    with col3:
+        date_min = pd.to_datetime(df["Fecha"].min()) if not df["Fecha"].empty else datetime.now()
+        date_max = pd.to_datetime(df["Fecha"].max()) if not df["Fecha"].empty else datetime.now()
+        date_range = st.date_input(
+            "Rango de Fechas",
+            value=(date_min, date_max),
+            min_value=date_min,
+            max_value=date_max,
+            key="date_range_filter"
+        )
+
+    # Aplicar filtros
+    filtered_df = df.copy()
     if curso_sel != "Todos":
-        df = df[df["Curso"] == curso_sel]
+        filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
+    if estudiante_sel != "Todos":
+        filtered_df = filtered_df[filtered_df["Estudiante"] == estudiante_sel]
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        filtered_df = filtered_df[
+            (pd.to_datetime(filtered_df["Fecha"]) >= pd.to_datetime(start_date)) &
+            (pd.to_datetime(filtered_df["Fecha"]) <= pd.to_datetime(end_date))
+        ]
 
-    st.subheader("📈 Porcentaje de Asistencia por Curso")
-    asistencia_curso = df.groupby("Curso").apply(
-        lambda x: (x["Asistencia"].sum() / len(x)) * 100
-    ).reset_index(name="Porcentaje")
-    st.bar_chart(asistencia_curso.set_index("Curso"))
+    if filtered_df.empty:
+        st.warning("No hay datos que coincidan con los filtros seleccionados.")
+        return
 
+    # Resumen estadístico
+    st.subheader("📈 Resumen de Asistencia")
+    total_clases = len(filtered_df)
+    total_asistencias = filtered_df["Asistencia"].sum()
+    total_ausencias = total_clases - total_asistencias
+    asistencia_porcentaje = (total_asistencias / total_clases * 100) if total_clases > 0 else 0
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Clases", total_clases)
+    col2.metric("Asistencias", total_asistencias)
+    col3.metric("Ausencias", total_ausencias)
+    st.write(f"**Porcentaje de Asistencia**: {asistencia_porcentaje:.2f}%")
+
+    # Gráfico de asistencia por curso
+    st.subheader("📊 Porcentaje de Asistencia por Curso")
+    if curso_sel == "Todos":
+        asistencia_curso = filtered_df.groupby("Curso").apply(
+            lambda x: (x["Asistencia"].sum() / len(x)) * 100
+        ).reset_index(name="Porcentaje")
+        st.bar_chart(asistencia_curso.set_index("Curso"))
+    else:
+        st.info(f"Mostrando datos para el curso: {curso_sel}")
+
+    # Gráfico de tendencia de asistencia
+    if estudiante_sel != "Todos":
+        st.subheader("📉 Tendencia de Asistencia del Estudiante")
+        trend_df = filtered_df.groupby("Fecha")["Asistencia"].mean().reset_index()
+        trend_df["Fecha"] = pd.to_datetime(trend_df["Fecha"])
+        trend_df = trend_df.sort_values("Fecha")
+        st.line_chart(trend_df.set_index("Fecha")["Asistencia"] * 100, use_container_width=True)
+
+    # Registro detallado
     st.subheader("📋 Registro Detallado")
-    st.dataframe(df)
+    st.dataframe(filtered_df)
 
-    if st.button("📤 Descargar como CSV"):
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("Descargar CSV", csv, "asistencia.csv", "text/csv")
-
-    if st.button("📤 Descargar como XLSX"):
-        import io
-        output = io.BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            df.to_excel(writer, index=False, sheet_name='Asistencia')
-        excel_data = output.getvalue()
-        st.download_button("Descargar XLSX", excel_data, "asistencia.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    # Botones de descarga
+    st.subheader("📥 Exportar Datos")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("📤 Descargar como CSV"):
+            csv = filtered_df.to_csv(index=False).encode('utf-8')
+            st.download_button("Descargar CSV", csv, "asistencia_filtrada.csv", "text/csv")
+    
+    with col2:
+        if st.button("📤 Descargar como XLSX"):
+            output = io.BytesIO()
+            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
+            excel_data = output.getvalue()
+            st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 # ==============================
 # APP PRINCIPAL (PROFESOR)
 # ==============================
