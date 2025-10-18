@@ -470,7 +470,7 @@ def admin_panel():
     # === APLICAR FILTROS DE FORMA SEGURA ===
     filtered_df = df.copy()
 
-    # Filtro por curso (solo si no es "Todos")
+    # Filtro por curso
     if curso_sel != "Todos":
         filtered_df = filtered_df[
             filtered_df["Curso"].astype(str).str.strip() == curso_sel
@@ -482,20 +482,27 @@ def admin_panel():
             filtered_df["Estudiante"].astype(str).str.strip() == estudiante_sel
         ]
 
-    # Filtro por rango de fechas (seguro con NaT)
+    # === FILTRO DE FECHAS SEGURO (SIN .dt.date) ===
     filtered_df["Fecha"] = pd.to_datetime(filtered_df["Fecha"], errors="coerce")
+
+    # Eliminar zona horaria si existe (clave para evitar TypeError)
+    if not filtered_df.empty and filtered_df["Fecha"].dt.tz is not None:
+        filtered_df["Fecha"] = filtered_df["Fecha"].dt.tz_localize(None)
+
+    # Convertir las fechas seleccionadas a datetime (sin hora)
+    start_dt = pd.Timestamp(start_date)
+    end_dt = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # Incluir todo el día final
+
     mask_fecha = (
         filtered_df["Fecha"].notna() &
-        (filtered_df["Fecha"].dt.date >= start_date) &
-        (filtered_df["Fecha"].dt.date <= end_date)
+        (filtered_df["Fecha"] >= start_dt) &
+        (filtered_df["Fecha"] <= end_dt)
     )
     filtered_df = filtered_df[mask_fecha]
 
     # === VALIDAR RESULTADO ===
     if filtered_df.empty:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
-        # Opcional: mostrar un vistazo de los datos originales para depurar
-        # st.write("Ejemplo de datos cargados:", df.head())
         return
 
     # === RESUMEN ===
