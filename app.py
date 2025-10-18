@@ -166,7 +166,7 @@ def load_all_asistencia():
     all_data = []
 
     for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES"]:
+        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES","Respuestas de formulario 2","AUDIT"]:
             continue
 
         try:
