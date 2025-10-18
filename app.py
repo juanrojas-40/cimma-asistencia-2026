@@ -421,23 +421,40 @@ def admin_panel():
     with col3:
         st.write("📅 Rango de Fechas")
 
-        # --- Cálculo seguro de min y max de fechas ---
+        # --- Obtener fechas válidas ---
         valid_dates = df["Fecha"].dropna()
         chile_tz = pytz.timezone("America/Santiago")
         current_date = datetime.now(chile_tz).date()
 
+        # --- Calcular min y max de forma segura ---
+        date_min = current_date
+        date_max = current_date
+
         if not valid_dates.empty:
-            # Convertir a objetos date y eliminar NaT
-            dates_as_date = valid_dates.dt.date.dropna()
-            if not dates_as_date.empty:
-                date_min = dates_as_date.min()
-                date_max = dates_as_date.max()
-            else:
+            try:
+                # Convertir a date y eliminar NaT
+                dates_as_date = valid_dates.dt.date.dropna()
+                if not dates_as_date.empty:
+                    date_min = dates_as_date.min()
+                    date_max = dates_as_date.max()
+                    # Asegurar que date_min ≤ date_max
+                    if date_min > date_max:
+                        date_min, date_max = date_max, date_min
+            except Exception as e:
+                st.warning(f"⚠️ Error al calcular rangos de fecha: {e}")
+                # Fallback: usar fecha actual
                 date_min = current_date
                 date_max = current_date
-        else:
+
+        # --- Validar que min y max sean válidos ---
+        if not isinstance(date_min, datetime.date):
             date_min = current_date
+        if not isinstance(date_max, datetime.date):
             date_max = current_date
+
+        # --- Si min > max, ajustar ---
+        if date_min > date_max:
+            date_min, date_max = date_max, date_min
 
         # --- Dos campos separados ---
         col_start, col_end = st.columns(2)
@@ -458,7 +475,7 @@ def admin_panel():
                 key="end_date_filter"
             )
 
-        # --- Validación de rango ---
+        # --- Validación final ---
         if start_date > end_date:
             st.error("❌ La **Fecha Inicio** no puede ser posterior a la **Fecha Fin**.")
             return
