@@ -380,6 +380,10 @@ Preuniversitario CIMMA"""
 # PANEL ADMINISTRATIVO
 # ==============================
 
+# ==============================
+# PANEL ADMINISTRATIVO
+# ==============================
+
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
@@ -389,6 +393,9 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
+    # Asegurar que la columna 'Fecha' sea datetime (por si acaso el caché tiene datos antiguos)
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+
     if st.button("🧹 Limpiar caché"):
         st.cache_data.clear()
         st.rerun()
@@ -397,11 +404,11 @@ def admin_panel():
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
+        cursos = ["Todos"] + sorted(df["Curso"].dropna().unique().tolist())
         curso_sel = st.selectbox("Curso", cursos, key="curso_filter")
     
     with col2:
-        estudiantes = ["Todos"] + sorted(df["Estudiante"].unique().tolist())
+        estudiantes = ["Todos"] + sorted(df["Estudiante"].dropna().unique().tolist())
         estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
     
     with col3:
@@ -414,6 +421,7 @@ def admin_panel():
         else:
             date_min = current_date
             date_max = current_date
+
         date_range = st.date_input(
             "Rango de Fechas",
             value=(date_min, date_max),
@@ -422,6 +430,7 @@ def admin_panel():
             key="date_range_filter"
         )
 
+    # Aplicar filtros
     filtered_df = df.copy()
     if curso_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
@@ -429,6 +438,8 @@ def admin_panel():
         filtered_df = filtered_df[filtered_df["Estudiante"] == estudiante_sel]
     if len(date_range) == 2:
         start_date, end_date = date_range
+        # Asegurar que 'Fecha' sigue siendo datetime en el df filtrado
+        filtered_df = filtered_df.dropna(subset=["Fecha"])
         filtered_df = filtered_df[
             (filtered_df["Fecha"].dt.date >= start_date) &
             (filtered_df["Fecha"].dt.date <= end_date)
@@ -468,21 +479,24 @@ def admin_panel():
     else:
         st.info(f"Mostrando datos para el curso: {curso_sel}")
 
-    if estudiante_sel != "Todos" and not filtered_df["Fecha"].isna().all():
-        st.subheader("📉 Tendencia de Asistencia del Estudiante")
-        trend_df = filtered_df.groupby("Fecha")["Asistencia"].mean().reset_index()
-        trend_df = trend_df.sort_values("Fecha")
-        trend_df["Asistencia"] = trend_df["Asistencia"] * 100
-        fig = px.line(
-            trend_df,
-            x="Fecha",
-            y="Asistencia",
-            title="Tendencia de Asistencia",
-            color_discrete_sequence=["#10B981"],
-            labels={"Asistencia": "Porcentaje de Asistencia (%)"}
-        )
-        fig.update_layout(yaxis_range=[0, 100])
-        st.plotly_chart(fig, use_container_width=True)
+    if estudiante_sel != "Todos":
+        # Verificar que haya fechas válidas antes de graficar
+        plot_df = filtered_df.dropna(subset=["Fecha"])
+        if not plot_df.empty:
+            st.subheader("📉 Tendencia de Asistencia del Estudiante")
+            trend_df = plot_df.groupby("Fecha")["Asistencia"].mean().reset_index()
+            trend_df = trend_df.sort_values("Fecha")
+            trend_df["Asistencia"] = trend_df["Asistencia"] * 100
+            fig = px.line(
+                trend_df,
+                x="Fecha",
+                y="Asistencia",
+                title="Tendencia de Asistencia",
+                color_discrete_sequence=["#10B981"],
+                labels={"Asistencia": "Porcentaje de Asistencia (%)"}
+            )
+            fig.update_layout(yaxis_range=[0, 100])
+            st.plotly_chart(fig, use_container_width=True)
 
     st.subheader("📋 Registro Detallado")
     st.dataframe(filtered_df)
@@ -501,6 +515,13 @@ def admin_panel():
                 filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
             excel_data = output.getvalue()
             st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+
+
+
+
+
 # ==============================
 # APP PRINCIPAL (PROFESOR)
 # ==============================
