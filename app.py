@@ -10,6 +10,9 @@ import pytz
 import pandas as pd
 import random
 import string
+import io
+
+import plotly.express as px
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -386,13 +389,10 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Convert Fecha column to datetime, coercing invalid values to NaT
-    df["Fecha"] = pd.to_datetime(df["Fecha"], errors='coerce')
-
-    # Log invalid dates for debugging
-    invalid_dates = df[df["Fecha"].isna()]["Fecha"]
-    if not invalid_dates.empty:
-        st.warning(f"Se encontraron {len(invalid_dates)} fechas inválidas en los datos. Revisar la hoja de Google Sheets.")
+    # Cache-clearing button
+    if st.button("🧹 Limpiar caché"):
+        st.cache_data.clear()
+        st.rerun()
 
     # Filtros
     st.subheader("🔎 Filtros de Datos")
@@ -407,13 +407,12 @@ def admin_panel():
         estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
     
     with col3:
-        # Use valid dates (non-NaT) for date range bounds
         valid_dates = df["Fecha"].dropna()
         chile_tz = pytz.timezone("America/Santiago")
-        current_date = datetime.now(chile_tz)
+        current_date = datetime.now(chile_tz).date()
         if not valid_dates.empty:
-            date_min = valid_dates.min().to_pydatetime()
-            date_max = valid_dates.max().to_pydatetime()
+            date_min = valid_dates.min().date()
+            date_max = valid_dates.max().date()
         else:
             date_min = current_date
             date_max = current_date
@@ -434,8 +433,8 @@ def admin_panel():
     if len(date_range) == 2:
         start_date, end_date = date_range
         filtered_df = filtered_df[
-            (filtered_df["Fecha"] >= pd.to_datetime(start_date)) &
-            (filtered_df["Fecha"] <= pd.to_datetime(end_date))
+            (filtered_df["Fecha"].dt.date >= start_date) &
+            (filtered_df["Fecha"].dt.date <= end_date)
         ]
 
     if filtered_df.empty:
@@ -461,38 +460,16 @@ def admin_panel():
         asistencia_curso = filtered_df.groupby("Curso").apply(
             lambda x: (x["Asistencia"].sum() / len(x)) * 100
         ).reset_index(name="Porcentaje")
-        try:
-            ```chartjs
-            {
-                "type": "bar",
-                "data": {
-                    "labels": asistencia_curso["Curso"].tolist(),
-                    "datasets": [{
-                        "label": "Porcentaje de Asistencia",
-                        "data": asistencia_curso["Porcentaje"].tolist(),
-                        "backgroundColor": "#1A3B8F",
-                        "borderColor": "#6c757d",
-                        "borderWidth": 1
-                    }]
-                },
-                "options": {
-                    "scales": {
-                        "y": {
-                            "beginAtZero": true,
-                            "title": { "display": true, "text": "Porcentaje (%)" }
-                        },
-                        "x": {
-                            "title": { "display": true, "text": "Curso" }
-                        }
-                    },
-                    "plugins": {
-                        "legend": { "display": false }
-                    }
-                }
-            }
-            ```
-        except:
-            st.bar_chart(asistencia_curso.set_index("Curso")["Porcentaje"])
+        fig = px.bar(
+            asistencia_curso,
+            x="Curso",
+            y="Porcentaje",
+            title="Porcentaje de Asistencia por Curso",
+            color_discrete_sequence=["#1A3B8F"],
+            labels={"Porcentaje": "Porcentaje (%)"}
+        )
+        fig.update_layout(yaxis_range=[0, 100])
+        st.plotly_chart(fig, use_container_width=True)
     else:
         st.info(f"Mostrando datos para el curso: {curso_sel}")
 
@@ -501,37 +478,17 @@ def admin_panel():
         st.subheader("📉 Tendencia de Asistencia del Estudiante")
         trend_df = filtered_df.groupby("Fecha")["Asistencia"].mean().reset_index()
         trend_df = trend_df.sort_values("Fecha")
-        try:
-            ```chartjs
-            {
-                "type": "line",
-                "data": {
-                    "labels": trend_df["Fecha"].dt.strftime("%Y-%m-%d").tolist(),
-                    "datasets": [{
-                        "label": "Asistencia (%)",
-                        "data": (trend_df["Asistencia"] * 100).tolist(),
-                        "borderColor": "#10B981",
-                        "backgroundColor": "rgba(16, 185, 129, 0.2)",
-                        "fill": true,
-                        "tension": 0.4
-                    }]
-                },
-                "options": {
-                    "scales": {
-                        "y": {
-                            "beginAtZero": true,
-                            "max": 100,
-                            "title": { "display": true, "text": "Porcentaje de Asistencia (%)" }
-                        },
-                        "x": {
-                            "title": { "display": true, "text": "Fecha" }
-                        }
-                    }
-                }
-            }
-            ```
-        except:
-            st.line_chart(trend_df.set_index("Fecha")["Asistencia"] * 100)
+        trend_df["Asistencia"] = trend_df["Asistencia"] * 100
+        fig = px.line(
+            trend_df,
+            x="Fecha",
+            y="Asistencia",
+            title="Tendencia de Asistencia",
+            color_discrete_sequence=["#10B981"],
+            labels={"Asistencia": "Porcentaje de Asistencia (%)"}
+        )
+        fig.update_layout(yaxis_range=[0, 100])
+        st.plotly_chart(fig, use_container_width=True)
 
     # Registro detallado
     st.subheader("📋 Registro Detallado")
@@ -552,8 +509,6 @@ def admin_panel():
                 filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
             excel_data = output.getvalue()
             st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-
 
 # ==============================
 # APP PRINCIPAL (PROFESOR)
