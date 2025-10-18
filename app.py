@@ -14,7 +14,7 @@ import plotly.express as px
 from twilio.rest import Client as TwilioClient
 from googleapiclient.discovery import build
 
-# Configuración inicial con fondo temático usando la imagen adjunta (o similar)
+# Configuración inicial con fondo temático usando la imagen corregida
 st.set_page_config(
     page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
     page_icon="✅",
@@ -63,7 +63,7 @@ st.markdown(
             background-color: #121212;
         }
         .stApp::before {
-            opacity: 0.15; /* Ligeramente más visible en modo oscuro si se desea */
+            opacity: 0.15;
             filter: brightness(0.9) contrast(1.1) saturate(0.5) grayscale(0.3);
         }
         .main-content {
@@ -80,6 +80,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
 # ==============================
@@ -517,7 +518,7 @@ def check_consecutive_absences(df):
         
         df_sorted = df.sort_values(["Estudiante", "Fecha"])
         df_sorted["Prev_Asistencia"] = df_sorted.groupby("Estudiante")["Asistencia"].shift(1)
-        df_consecutive = df_sorted[df_sorted["Asistencia"] == 0 & (df_sorted["Prev_Asistencia"] == 0)]
+        df_consecutive = df_sorted[(df_sorted["Asistencia"] == 0) & (df_sorted["Prev_Asistencia"] == 0)]
         
         for estudiante in df_consecutive["Estudiante"].unique():
             student_df = df_consecutive[df_consecutive["Estudiante"] == estudiante]
