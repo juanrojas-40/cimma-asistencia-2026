@@ -400,202 +400,31 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # --- Asegurar que 'Fecha' sea datetime (con manejo de errores) ---
-    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
-    # Si hay fechas con zona horaria, eliminarla
-    if df["Fecha"].dt.tz is not None:
-        df["Fecha"] = df["Fecha"].dt.tz_localize(None)
-
-    if st.button("🧹 Limpiar caché"):
-        st.cache_data.clear()
-        st.rerun()
-
-    st.subheader("🔎 Filtros de Datos")
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        # Normalizar cursos (eliminar espacios, convertir a string)
-        cursos = ["Todos"] + sorted(
-            df["Curso"].dropna().astype(str).str.strip().unique().tolist()
-        )
-        curso_sel = st.selectbox("Curso", cursos, key="curso_filter")
-
-    with col2:
-        # Normalizar estudiantes
-        estudiantes = ["Todos"] + sorted(
-            df["Estudiante"].dropna().astype(str).str.strip().unique().tolist()
-        )
-        estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
-
-    with col3:
-        st.write("📅 Rango de Fechas")
-
-        # Rango académico por defecto para 2026
-        fallback_min = datetime(2026, 4, 1).date()
-        fallback_max = datetime(2026, 12, 1).date()
-
-        valid_dates = df["Fecha"].dropna()
-
-        if not valid_dates.empty:
-            try:
-                date_series = pd.to_datetime(valid_dates, errors="coerce").dt.date
-                date_series = date_series.dropna()
-                if not date_series.empty:
-                    date_min = date_series.min()
-                    date_max = date_series.max()
-                    date_min = max(date_min, fallback_min)
-                    date_max = min(date_max, fallback_max)
-                else:
-                    date_min, date_max = fallback_min, fallback_max
-            except Exception:
-                date_min, date_max = fallback_min, fallback_max
-        else:
-            date_min, date_max = fallback_min, fallback_max
-
-        col_start, col_end = st.columns(2)
-        with col_start:
-            start_date = st.date_input(
-                "Fecha Inicio",
-                value=date_min,
-                min_value=date_min,
-                max_value=date_max,
-                key="start_date_filter"
-            )
-        with col_end:
-            end_date = st.date_input(
-                "Fecha Fin",
-                value=date_max,
-                min_value=date_min,
-                max_value=date_max,
-                key="end_date_filter"
-            )
-
-        if start_date > end_date:
-            st.error("❌ La **Fecha Inicio** no puede ser posterior a la **Fecha Fin**.")
-            return
-
-    # === APLICAR FILTROS DE FORMA SEGURA ===
-    filtered_df = df.copy()
-
-    # Filtro por curso
+    cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
+    curso_sel = st.selectbox("Curso", cursos)
     if curso_sel != "Todos":
-        filtered_df = filtered_df[
-            filtered_df["Curso"].astype(str).str.strip() == curso_sel
-        ]
+        df = df[df["Curso"] == curso_sel]
 
-    # Filtro por estudiante
-    if estudiante_sel != "Todos":
-        filtered_df = filtered_df[
-            filtered_df["Estudiante"].astype(str).str.strip() == estudiante_sel
-        ]
+    st.subheader("📈 Porcentaje de Asistencia por Curso")
+    asistencia_curso = df.groupby("Curso").apply(
+        lambda x: (x["Asistencia"].sum() / len(x)) * 100
+    ).reset_index(name="Porcentaje")
+    st.bar_chart(asistencia_curso.set_index("Curso"))
 
-    # === FILTRO DE FECHAS SEGURO ===
-    # Convertir las fechas seleccionadas a datetime (sin hora)
-    start_dt = pd.Timestamp(start_date)
-    end_dt = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # Incluir todo el día final
-
-    # Asegurar que Fecha sea datetime (por si acaso)
-    filtered_df["Fecha"] = pd.to_datetime(filtered_df["Fecha"], errors="coerce")
-    if filtered_df["Fecha"].dt.tz is not None:
-        filtered_df["Fecha"] = filtered_df["Fecha"].dt.tz_localize(None)
-
-    mask_fecha = (
-        filtered_df["Fecha"].notna() &
-        (filtered_df["Fecha"] >= start_dt) &
-        (filtered_df["Fecha"] <= end_dt)
-    )
-    filtered_df = filtered_df[mask_fecha]
-
-    # === VALIDAR RESULTADO ===
-    if filtered_df.empty:
-        st.warning("No hay datos que coincidan con los filtros seleccionados.")
-        # Opcional: mostrar un vistazo de los datos originales para depurar
-        # st.write("📌 Datos cargados (primeras 5 filas):")
-        # st.dataframe(df.head())
-        return
-
-    # === RESUMEN ===
-    st.subheader("📈 Resumen de Asistencia")
-    total_clases = len(filtered_df)
-    total_asistencias = filtered_df["Asistencia"].sum()
-    total_ausencias = total_clases - total_asistencias
-    asistencia_porcentaje = (total_asistencias / total_clases * 100) if total_clases > 0 else 0
-
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Total Clases", total_clases)
-    col2.metric("Asistencias", total_asistencias)
-    col3.metric("Ausencias", total_ausencias)
-    st.write(f"**Porcentaje de Asistencia**: {asistencia_porcentaje:.2f}%")
-
-    # === GRÁFICO POR CURSO ===
-    st.subheader("📊 Porcentaje de Asistencia por Curso")
-    if curso_sel == "Todos":
-        asistencia_curso = (
-            filtered_df.groupby("Curso")
-            .apply(lambda x: (x["Asistencia"].sum() / len(x)) * 100)
-            .reset_index(name="Porcentaje")
-        )
-        if not asistencia_curso.empty:
-            fig = px.bar(
-                asistencia_curso,
-                x="Curso",
-                y="Porcentaje",
-                title="Porcentaje de Asistencia por Curso",
-                color_discrete_sequence=["#1A3B8F"],
-                labels={"Porcentaje": "Porcentaje (%)"},
-            )
-            fig.update_layout(yaxis_range=[0, 100])
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("No hay datos suficientes para mostrar el gráfico por curso.")
-    else:
-        st.info(f"Mostrando datos para el curso: **{curso_sel}**")
-
-    # === TENDENCIA POR ESTUDIANTE ===
-    if estudiante_sel != "Todos":
-        plot_df = filtered_df.dropna(subset=["Fecha"]).sort_values("Fecha")
-        if not plot_df.empty:
-            st.subheader("📉 Tendencia de Asistencia del Estudiante")
-            trend_df = plot_df.groupby("Fecha")["Asistencia"].mean().reset_index()
-            trend_df["Asistencia"] = trend_df["Asistencia"] * 100
-            fig = px.line(
-                trend_df,
-                x="Fecha",
-                y="Asistencia",
-                title="Tendencia de Asistencia",
-                color_discrete_sequence=["#10B981"],
-                labels={"Asistencia": "Porcentaje de Asistencia (%)"},
-            )
-            fig.update_layout(yaxis_range=[0, 100])
-            st.plotly_chart(fig, use_container_width=True)
-
-    # === REGISTRO DETALLADO ===
     st.subheader("📋 Registro Detallado")
-    st.dataframe(filtered_df.reset_index(drop=True))
+    st.dataframe(df)
 
-    # === EXPORTACIÓN ===
-    st.subheader("📥 Exportar Datos")
-    col1, col2 = st.columns(2)
-    with col1:
-        csv = filtered_df.to_csv(index=False).encode("utf-8")
-        st.download_button(
-            label="📤 Descargar como CSV",
-            data=csv,
-            file_name="asistencia_filtrada.csv",
-            mime="text/csv"
-        )
-    with col2:
+    if st.button("📤 Descargar como CSV"):
+        csv = df.to_csv(index=False).encode('utf-8')
+        st.download_button("Descargar CSV", csv, "asistencia.csv", "text/csv")
+
+    if st.button("📤 Descargar como XLSX"):
+        import io
         output = io.BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-            filtered_df.to_excel(writer, index=False, sheet_name="Asistencia")
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            df.to_excel(writer, index=False, sheet_name='Asistencia')
         excel_data = output.getvalue()
-        st.download_button(
-            label="📤 Descargar como XLSX",
-            data=excel_data,
-            file_name="asistencia_filtrada.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
+        st.download_button("Descargar XLSX", excel_data, "asistencia.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 
 
