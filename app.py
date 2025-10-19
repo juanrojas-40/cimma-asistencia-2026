@@ -807,16 +807,16 @@ def admin_panel():
 
 Este es un resumen automático de asistencia para el/la estudiante {estudiante}.
 
-📊 **RESUMEN GENERAL:**
+📊 RESUMEN GENERAL:
 • Total de clases registradas: {total_clases}
 • Asistencias: {asistencias}
 • Ausencias: {ausencias}
 • Porcentaje de asistencia: {porcentaje_asistencia:.1f}%
 
-📚 **DETALLE POR CURSO:**
+📚 DETALLE POR CURSO:
 {resumen_cursos}
 
-📅 **Período analizado:** {fecha_inicio} - {fecha_fin}
+📅 Período analizado: {fecha_inicio} - {fecha_fin}
 
 Para consultas específicas, por favor contacte a la administración.
 
