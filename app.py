@@ -15,7 +15,6 @@ from datetime import date
 import socket
 from email.utils import formatdate
 import traceback
-
 import plotly.express as px
 
 # ==============================
@@ -46,11 +45,6 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         sender_email = st.secrets["EMAIL"]["sender_email"]
         sender_password = st.secrets["EMAIL"]["sender_password"]
 
-        st.write(f"🔧 Configurando email para: {to_email}")
-        st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
-        st.write(f"👤 Remitente: {sender_email}")
-
-        # Crear mensaje
         msg = MIMEMultipart()
         msg["From"] = sender_email
         msg["To"] = to_email
@@ -58,116 +52,41 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         msg["Date"] = formatdate(localtime=True)
         msg.attach(MIMEText(body, "plain"))
 
-        st.write("📤 Conectando al servidor SMTP...")
-        
-        # Aumentar timeout y agregar más debugging
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-        
         try:
-            st.write("📨 Información del servidor:")
-            st.write(server.ehlo())
-            
-            st.write("🔐 Iniciando TLS...")
             server.starttls()
-            
-            st.write("🔄 EHLO después de TLS:")
-            st.write(server.ehlo())
-            
-            st.write("🔑 Iniciando sesión...")
             server.login(sender_email, sender_password)
-            st.success("✅ Login exitoso")
-            
-            st.write("🚀 Enviando mensaje...")
             server.send_message(msg)
-            st.success(f"✅ Mensaje aceptado por el servidor para: {to_email}")
-            
             return True
-            
-        except smtplib.SMTPException as e:
-            st.error(f"❌ Error SMTP: {e}")
-            # Intentar obtener más información del error
-            if hasattr(e, 'smtp_code'):
-                st.write(f"Código SMTP: {e.smtp_code}")
-            if hasattr(e, 'smtp_error'):
-                st.write(f"Error SMTP: {e.smtp_error}")
-            return False
-            
         finally:
-            try:
-                server.quit()
-                st.write("🔌 Conexión cerrada")
-            except:
-                pass
-                
-    except socket.gaierror as e:
-        st.error(f"❌ Error de conexión/DNS: {e}")
-        return False
-    except socket.timeout as e:
-        st.error(f"❌ Timeout de conexión: {e}")
-        return False
+            server.quit()
     except Exception as e:
-        st.error(f"❌ Error inesperado: {str(e)}")
-        import traceback
-        st.write("📋 Traceback completo:")
-        st.code(traceback.format_exc())
+        st.error(f"❌ Error sending email: {str(e)}")
         return False
 
 def generate_2fa_code():
-    """Generate a random 6-digit 2FA code."""
     return ''.join(random.choices(string.digits, k=6))
 
-
-
-
-
-
-
-
-
 def probar_configuracion_email():
-    """Función para probar la configuración de email"""
     st.subheader("🧪 Probar Configuración de Email")
-    
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
         smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
         sender_email = st.secrets["EMAIL"]["sender_email"]
-        sender_password = st.secrets["EMAIL"]["sender_password"]
-        
         st.success("✅ Secrets de email cargados correctamente")
-        st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
-        st.write(f"👤 Remitente: {sender_email}")
-        
-        # Email de prueba
         test_email = st.text_input("Email para prueba:", "test@example.com")
-        
         if st.button("🧪 Probar Envío de Email"):
-            st.info("Enviando email de prueba...")
-            
             subject_test = "📧 Prueba de Email - Preuniversitario CIMMA"
             body_test = f"""Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
-
 Si recibes este email, la configuración SMTP está funcionando correctamente.
-
 Saludos,
 Sistema de Asistencia Preuniversitario CIMMA"""
-            
-            resultado = send_email(test_email, subject_test, body_test)
-            
-            if resultado:
+            if send_email(test_email, subject_test, body_test):
                 st.success("🎉 ¡Email de prueba enviado exitosamente!")
-                st.info("💡 Si no recibes el email, revisa:")
-                st.write("1. 📧 Carpeta de spam/no deseado")
-                st.write("2. 🔄 Espera unos minutos (puede haber delay)")
-                st.write("3. 📱 Verifica que el email esté correcto")
             else:
                 st.error("❌ Falló el envío del email de prueba")
-                
     except Exception as e:
         st.error(f"❌ Error en la configuración: {e}")
-
-
-
 
 # ==============================
 # CARGA DE DATOS
@@ -180,49 +99,29 @@ def load_courses():
         return {}
     clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
     courses = {}
-
     for worksheet in clases_sheet.worksheets():
         sheet_name = worksheet.title
         try:
             colA_raw = worksheet.col_values(1)
             colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
             colA_upper = [s.upper() for s in colA]
-
-            try:
-                idx_prof = colA_upper.index("PROFESOR")
-                profesor = colA[idx_prof + 1]
-            except (ValueError, IndexError):
-                continue
-
-            try:
-                idx_dia = colA_upper.index("DIA")
-                dia = colA[idx_dia + 1]
-            except (ValueError, IndexError):
-                continue
-
-            try:
-                idx_curso = colA_upper.index("CURSO")
-                curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]
-            except (ValueError, IndexError):
-                continue
-
+            idx_prof = colA_upper.index("PROFESOR")
+            profesor = colA[idx_prof + 1]
+            idx_dia = colA_upper.index("DIA")
+            dia = colA[idx_dia + 1]
+            idx_curso = colA_upper.index("CURSO")
+            curso_id = colA[idx_curso + 1]
+            horario = colA[idx_curso + 2]
             fechas = []
             estudiantes = []
-            try:
-                idx_fechas = colA_upper.index("FECHAS")
-                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
-
-                for i in range(idx_fechas + 1, idx_estudiantes):
-                    if i < len(colA):
-                        fechas.append(colA[i])
-
-                for i in range(idx_estudiantes + 1, len(colA)):
-                    if colA[i]:
-                        estudiantes.append(colA[i])
-            except ValueError:
-                pass
-
+            idx_fechas = colA_upper.index("FECHAS")
+            idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
+            for i in range(idx_fechas + 1, idx_estudiantes):
+                if i < len(colA):
+                    fechas.append(colA[i])
+            for i in range(idx_estudiantes + 1, len(colA)):
+                if colA[i]:
+                    estudiantes.append(colA[i])
             if profesor and dia and curso_id and horario and estudiantes:
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
@@ -233,106 +132,64 @@ def load_courses():
                     "fechas": fechas or ["Sin fechas"],
                     "estudiantes": estudiantes
                 }
-
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
             continue
-
     return courses
-
-
-
-# ==============================
-# CARGA DE DATOS - emails
-# ==============================
 
 @st.cache_data(ttl=3600)
 def load_emails():
     try:
         client = get_client()
         if not client:
-            st.warning("❌ No se pudo conectar a Google Sheets")
             return {}, {}
-        
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
-        
         if "MAILS" not in sheet_names:
-            st.warning("❌ No se encontró la hoja 'MAILS'")
             return {}, {}
-
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
-        
         if not data:
-            st.warning("❌ La hoja 'MAILS' está vacía")
             return {}, {}
-            
         emails = {}
         nombres_apoderados = {}
-        
-        st.info(f"📋 Procesando {len(data)} registros de la hoja MAILS")
-        
-        for i, row in enumerate(data):
+        for row in data:
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
-            
             if not nombre_estudiante:
                 continue
-                
             if mail_apoderado:
                 emails[nombre_estudiante] = mail_apoderado
                 nombres_apoderados[nombre_estudiante] = nombre_apoderado
-                st.write(f"✅ Registro {i+1}: {nombre_estudiante} → {mail_apoderado}")
-            else:
-                st.write(f"⚠️ Registro {i+1}: {nombre_estudiante} - SIN EMAIL")
-        
-        st.success(f"✅ Se cargaron {len(emails)} emails válidos")
         return emails, nombres_apoderados
-        
     except Exception as e:
         st.error(f"❌ Error cargando emails: {e}")
         return {}, {}
-
-
-
-
-
-
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
     client = get_client()
     if not client:
         return pd.DataFrame()
-    
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
-
     for worksheet in asistencia_sheet.worksheets():
         if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT"]:
             continue
-
         try:
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 5:
-                st.warning(f"⚠️ Hoja '{worksheet.title}' vacía o con menos de 5 filas. Saltando.")
                 continue
-
-            # Salta las primeras 3 filas de metadatos
             all_values = all_values[3:]
             headers = all_values[0]
             headers = [h.strip().upper() for h in headers if h.strip()]
-
-            # Buscar índices de columnas
             curso_col = 0
             fecha_col = 1
             estudiante_col = None
             asistencia_col = None
             hora_registro_col = None
             informacion_col = None
-
             for i, h in enumerate(headers):
                 if "CURSO" in h:
                     curso_col = i
@@ -346,11 +203,8 @@ def load_all_asistencia():
                     hora_registro_col = i
                 elif "INFORMACION" in h or "MOTIVO" in h:
                     informacion_col = i
-
             if asistencia_col is None or estudiante_col is None:
-                st.warning(f"⚠️ Hoja '{worksheet.title}' no tiene columnas 'ASISTENCIA' o 'ESTUDIANTE'. Saltando.")
                 continue
-
             for row in all_values[1:]:
                 max_index = max(
                     curso_col,
@@ -362,18 +216,15 @@ def load_all_asistencia():
                 )
                 if len(row) <= max_index:
                     continue
-
                 try:
                     asistencia_val = int(row[asistencia_col]) if row[asistencia_col] else 0
                 except (ValueError, TypeError):
                     asistencia_val = 0
-
                 curso = row[curso_col].strip() if curso_col < len(row) and row[curso_col] else worksheet.title
                 fecha_str = row[fecha_col].strip() if fecha_col < len(row) and row[fecha_col] else ""
                 estudiante = row[estudiante_col].strip() if estudiante_col < len(row) and row[estudiante_col] else ""
                 hora_registro = row[hora_registro_col].strip() if (hora_registro_col is not None and hora_registro_col < len(row) and row[hora_registro_col]) else ""
                 informacion = row[informacion_col].strip() if (informacion_col is not None and informacion_col < len(row) and row[informacion_col]) else ""
-
                 all_data.append({
                     "Curso": curso,
                     "Fecha": fecha_str,
@@ -382,15 +233,11 @@ def load_all_asistencia():
                     "Hora Registro": hora_registro,
                     "Información": informacion
                 })
-
         except Exception as e:
             st.warning(f"⚠️ Error al procesar hoja '{worksheet.title}': {str(e)[:80]}")
             continue
-
-    # ✅ Convertir a DataFrame y luego transformar "Fecha" a datetime
     df = pd.DataFrame(all_data)
     if not df.empty:
-        # Diccionario completo de meses en español
         meses_espanol = {
             'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
             'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
@@ -398,64 +245,30 @@ def load_all_asistencia():
             'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
             'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
         }
-
         def convertir_fecha_manual(fecha_str):
             if not fecha_str or pd.isna(fecha_str) or fecha_str.strip() == "":
                 return pd.NaT
-            
             fecha_str = str(fecha_str).strip().lower()
-            
             try:
-                # Caso 1: Formato "6 de abril de 2026"
                 if ' de ' in fecha_str:
                     partes = fecha_str.split(' de ')
                     if len(partes) == 3:
-                        dia = partes[0].strip().zfill(2)  # Asegurar 2 dígitos
+                        dia = partes[0].strip().zfill(2)
                         mes_str = partes[1].strip()
                         año = partes[2].strip()
-                        
-                        # Buscar el mes en el diccionario
                         for mes_es, mes_num in meses_espanol.items():
                             if mes_es in mes_str:
                                 fecha_iso = f"{año}-{mes_num}-{dia}"
                                 return pd.to_datetime(fecha_iso, format='%Y-%m-%d', errors='coerce')
-                
-                # Caso 2: Formato "6/4/2026" o "06/04/2026"
                 elif '/' in fecha_str:
                     return pd.to_datetime(fecha_str, format='%d/%m/%Y', errors='coerce')
-                
-                # Caso 3: Formato "2026-04-06" (ISO)
                 elif '-' in fecha_str and len(fecha_str) == 10:
                     return pd.to_datetime(fecha_str, format='%Y-%m-%d', errors='coerce')
-                
-                # Caso 4: Intentar cualquier otro formato con pandas
                 return pd.to_datetime(fecha_str, errors='coerce')
-                
             except Exception:
                 return pd.NaT
-
-        # Aplicar la conversión
         df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
-        
-        # Verificar resultados
-        fechas_convertidas = df["Fecha"].notna().sum()
-        fechas_totales = len(df)
-        
-        st.success(f"✅ {fechas_convertidas} de {fechas_totales} fechas convertidas exitosamente")
-        
-        if df["Fecha"].isna().any():
-            fechas_problematicas = df[df["Fecha"].isna()]["Fecha"].unique()
-            st.warning(f"⚠️ {df['Fecha'].isna().sum()} fechas no pudieron ser convertidas")
-            
-            # Mostrar ejemplos de fechas problemáticas para debugging
-            fechas_originales_problematicas = df[df["Fecha"].isna()]["Fecha_Original"].unique() if "Fecha_Original" in df.columns else df[df["Fecha"].isna()]["Fecha"].unique()
-            st.info(f"📋 Ejemplos de fechas problemáticas: {list(fechas_originales_problematicas[:5])}")
-    
     return df
-
-
-
-
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
@@ -467,12 +280,9 @@ def main():
         page_icon="✅",
         layout="centered"
     )
-
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.title("🔐 Acceso")
-
-        # Inicializar session state
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
@@ -482,10 +292,8 @@ def main():
             st.session_state["2fa_user_name"] = None
             st.session_state["2fa_time"] = None
             st.session_state["2fa_attempts"] = 0
-
         if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
-
             if user_type == "Profesor":
                 profesores = st.secrets.get("profesores", {})
                 if profesores:
@@ -512,16 +320,12 @@ def main():
                     clave = st.text_input("Clave", type="password", key="admin_pass")
                     if st.button("Ingresar como Admin"):
                         if admins.get(nombre) == clave:
-                            # Generate and send 2FA code
                             code = generate_2fa_code()
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
                             body = f"""Estimado/a {nombre},
-
 Su código de verificación para acceder al sistema es: {code}
-
 Este código es válido por 10 minutos.
-
 Saludos,
 Preuniversitario CIMMA"""
                             if send_email(email, subject, body):
@@ -579,165 +383,80 @@ Preuniversitario CIMMA"""
             if st.button("Cerrar sesión"):
                 st.session_state.clear()
                 st.rerun()
-
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
         st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
         return
-
     if st.session_state["user_type"] == "admin":
         admin_panel()
     else:
         main_app()
 
-
-
-
-
-
-
 # ==============================
 # FUNCIÓN PARA ENVIAR RESUMEN DE ASISTENCIA
 # ==============================
 
-def enviar_resumen_asistencia(datos_filtrados):
+def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=None):
     """Envía un resumen de asistencia a los apoderados de los estudiantes filtrados"""
-    
-    # Diagnóstico de configuración de email
     st.info("🔍 Verificando configuración de email...")
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
         smtp_port = st.secrets["EMAIL"]["smtp_port"]
         sender_email = st.secrets["EMAIL"]["sender_email"]
-        # No mostrar la contraseña por seguridad
-        
         st.success("✅ Configuración de EMAIL encontrada en secrets")
-        st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
-        st.write(f"👤 Remitente: {sender_email}")
-        
     except KeyError as e:
         st.error(f"❌ Configuración de EMAIL incompleta en secrets: {e}")
-        st.info("💡 Verifica que tengas estas variables en tus secrets:")
-        st.code("""
-EMAIL:
-  smtp_server: "smtp.gmail.com"
-  smtp_port: 587
-  sender_email: "tu_email@gmail.com"
-  sender_password: "tu_contraseña"
-        """)
         return
-    except Exception as e:
-        st.error(f"❌ Error verificando configuración: {e}")
-        return
-    
-    # Agregar opción para probar configuración
     with st.expander("🧪 Probar Configuración de Email"):
         probar_configuracion_email()
-
-
-    st.info("🔄 Cargando información de apoderados...")
-    
-    # Limpiar cache para forzar recarga
     st.cache_data.clear()
-    
-    # Cargar emails y nombres de apoderados
     emails, nombres_apoderados = load_emails()
-    
     if not emails:
         st.error("❌ No se encontraron emails de apoderados en la hoja 'MAILS'")
-        st.info("""
-        💡 **Verifica lo siguiente:**
-        1. La hoja se llama exactamente **MAILS** (en mayúsculas)
-        2. Tiene las columnas: **NOMBRE ESTUDIANTE**, **NOMBRE APODERADO**, **MAIL APODERADO**
-        3. Los nombres de estudiantes coinciden exactamente con los registros de asistencia
-        4. Los emails están completos y en formato válido
-        """)
         return
-    
-    st.success(f"✅ Se cargaron {len(emails)} emails de apoderados")
-    
-    # Obtener estudiantes únicos de los datos filtrados
     estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
-    st.info(f"📊 Se encontraron {len(estudiantes_filtrados)} estudiantes en los datos filtrados")
-    
-    # Mostrar algunos estudiantes para debugging
-    with st.expander("🔍 Estudiantes en datos filtrados (primeros 10)"):
-        for estudiante in estudiantes_filtrados[:10]:
-            st.write(f"- {estudiante}")
-    
-    # Contar emails que se enviarán
     emails_a_enviar = 0
     estudiantes_con_email = []
     estudiantes_sin_email = []
-    
     for estudiante in estudiantes_filtrados:
         nombre_lower = estudiante.strip().lower()
         if nombre_lower in emails:
-            emails_a_enviar += 1
-            estudiantes_con_email.append(estudiante)
+            datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
+            total_clases = len(datos_estudiante)
+            asistencias = datos_estudiante['Asistencia'].sum()
+            porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
+            if min_porcentaje is None or porcentaje_asistencia <= min_porcentaje:
+                emails_a_enviar += 1
+                estudiantes_con_email.append((estudiante, porcentaje_asistencia))
+            else:
+                estudiantes_sin_email.append(estudiante)
         else:
             estudiantes_sin_email.append(estudiante)
-    
-    # Mostrar estudiantes sin email para debugging
-    if estudiantes_sin_email:
-        with st.expander("⚠️ Estudiantes sin email registrado (primeros 10)"):
-            st.write("Los siguientes estudiantes no tienen email registrado en la hoja MAILS:")
-            for est in estudiantes_sin_email[:10]:
-                nombre_lower = est.strip().lower()
-                st.write(f"- '{est}' (buscado como: '{nombre_lower}')")
-            if len(estudiantes_sin_email) > 10:
-                st.write(f"... y {len(estudiantes_sin_email) - 10} más")
-    
     if emails_a_enviar == 0:
-        st.error("❌ No se encontraron emails para los estudiantes filtrados")
-        st.info("""
-        💡 **Posibles soluciones:**
-        1. Verifica que los nombres en la hoja MAILS coincidan **exactamente** con los nombres en los registros de asistencia
-        2. Los nombres se comparan en minúsculas y sin espacios extras
-        3. Ejemplo: Si en asistencia está 'Juan Pérez', en MAILS debe estar 'juan pérez' (minúsculas)
-        """)
+        st.error("❌ No se encontraron emails para los estudiantes filtrados o no cumplen con el criterio de porcentaje")
         return
-    
-    # Mostrar confirmación con más detalles
     st.success(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
-    
     with st.expander("👀 Ver estudiantes que recibirán el resumen"):
-        for estudiante in estudiantes_con_email:
+        for estudiante, porcentaje in estudiantes_con_email:
             nombre_lower = estudiante.strip().lower()
             email = emails.get(nombre_lower, "No encontrado")
             apoderado = nombres_apoderados.get(nombre_lower, "No especificado")
-            st.write(f"- **{estudiante}** → {apoderado} ({email})")
-    
-    # Usar un key único para el botón de confirmación
+            st.write(f"- **{estudiante}** (Asistencia: {porcentaje:.1f}%) → {apoderado} ({email})")
     if st.button("✅ Confirmar envío de resúmenes", key="confirmar_envio_resumen"):
         st.info("🚀 Iniciando envío de resúmenes...")
         progress_bar = st.progress(0)
         resultados = []
         emails_enviados = 0
-        
-        for i, estudiante in enumerate(estudiantes_con_email):
+        for i, (estudiante, porcentaje_asistencia) in enumerate(estudiantes_con_email):
             nombre_lower = estudiante.strip().lower()
             correo_destino = emails.get(nombre_lower)
-            nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado/a")
-            
-            if not correo_destino:
-                st.warning(f"⚠️ No se encontró email para {estudiante}")
-                continue
-            
-            # Filtrar datos del estudiante específico
+            nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
             datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
-            
-            # Calcular estadísticas del estudiante
             total_clases = len(datos_estudiante)
             asistencias = datos_estudiante['Asistencia'].sum()
             ausencias = total_clases - asistencias
-            porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
-            
-            # Obtener cursos únicos del estudiante
             cursos_estudiante = datos_estudiante['Curso'].unique()
-            
-            # Crear resumen por curso
             resumen_cursos = []
             for curso in cursos_estudiante:
                 datos_curso = datos_estudiante[datos_estudiante['Curso'] == curso]
@@ -745,84 +464,50 @@ EMAIL:
                 asistencias_curso = datos_curso['Asistencia'].sum()
                 porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
                 resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
-            
-            # Crear el cuerpo del email
             subject = f"Resumen de Asistencia - {estudiante}"
-            body = f"""Hola {nombre_apoderado},
-
-Este es un resumen automático de asistencia para el/la estudiante {estudiante}.
-
-📊 **RESUMEN GENERAL:**
-• Total de clases registradas: {total_clases}
-• Asistencias: {asistencias}
-• Ausencias: {ausencias}
-• Porcentaje de asistencia: {porcentaje_asistencia:.1f}%
-
-📚 **DETALLE POR CURSO:**
-""" + "\n".join(resumen_cursos) + f"""
-
-📅 **Período analizado:** {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}
-
-Para consultas específicas, por favor contacte a la administración.
-
-Saludos cordiales,
-Preuniversitario CIMMA 2026"""
-            
-            # Enviar email con diagnóstico detallado
-            st.write(f"📤 Enviando resumen para {estudiante}...")
-            st.write(f"📍 Destinatario: {correo_destino}")
-            st.write(f"👤 Apoderado: {nombre_apoderado}")
-
-            # Mostrar preview del email (solo subject y primeras líneas)
+            body = email_template.format(
+                nombre_apoderado=nombre_apoderado,
+                estudiante=estudiante,
+                total_clases=total_clases,
+                asistencias=asistencias,
+                ausencias=ausencias,
+                porcentaje_asistencia=porcentaje_asistencia,
+                resumen_cursos="\n".join(resumen_cursos),
+                fecha_inicio=st.session_state.fecha_inicio.strftime('%d/%m/%Y'),
+                fecha_fin=st.session_state.fecha_fin.strftime('%d/%m/%Y')
+            )
             with st.expander(f"📝 Preview email para {estudiante}"):
                 st.write(f"**Asunto:** {subject}")
-                st.write(f"**Cuerpo (primeras líneas):**")
-                st.text(body[:200] + "..." if len(body) > 200 else body)
-
+                st.write(f"**Cuerpo:**")
+                st.text(body)
             exito = send_email(correo_destino, subject, body)
-            
             if exito:
                 emails_enviados += 1
                 st.success(f"✅ Email enviado a {nombre_apoderado} ({correo_destino})")
             else:
                 st.error(f"❌ Error al enviar email a {correo_destino}")
-            
             resultados.append({
                 'estudiante': estudiante,
                 'apoderado': nombre_apoderado,
                 'email': correo_destino,
                 'exito': exito
             })
-            
-            # Actualizar progreso
             progress_bar.progress((i + 1) / len(estudiantes_con_email))
-        
-        # Mostrar resultados finales
         st.success(f"✅ Proceso de envío completado: {emails_enviados}/{len(estudiantes_con_email)} emails enviados exitosamente")
-        
         with st.expander("📋 Ver detalles completos del envío"):
             exitosos = sum(1 for r in resultados if r['exito'])
             fallidos = len(resultados) - exitosos
-            
             st.write(f"**Resultados:** {exitosos} exitosos, {fallidos} fallidos")
-            
             if exitosos > 0:
                 st.subheader("✅ Emails enviados exitosamente:")
                 for resultado in resultados:
                     if resultado['exito']:
                         st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
-            
             if fallidos > 0:
                 st.subheader("❌ Emails con error:")
                 for resultado in resultados:
                     if not resultado['exito']:
                         st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
-
-
-
-
-
-
 
 # ==============================
 # PANEL ADMINISTRATIVO
@@ -831,26 +516,18 @@ Preuniversitario CIMMA 2026"""
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
-
-    # Cargar datos
     df = load_all_asistencia()
-    
     if df.empty:
         st.warning("No hay datos de asistencia aún.")
         return
- 
-    # Diccionario de meses en español
     meses_espanol = {
         'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
         'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
     }
-    
     def convertir_fecha_espanol(fecha_texto):
         if pd.isna(fecha_texto) or fecha_texto == '':
             return pd.NaT
-        
         try:
-            # Ejemplo: "6 de abril de 2026"
             partes = fecha_texto.lower().split(' de ')
             if len(partes) == 3:
                 dia = int(partes[0].strip())
@@ -859,193 +536,125 @@ def admin_panel():
                 return datetime(año, mes, dia)
         except Exception as e:
             st.warning(f"Error convirtiendo fecha: {fecha_texto} - {e}")
-        
         return pd.NaT
-    
-    # Aplicar conversión si la columna Fecha existe y es texto
     if 'Fecha' in df.columns and df['Fecha'].dtype == 'object':
         df['Fecha'] = df['Fecha'].apply(convertir_fecha_espanol)
         st.success(f"✅ Fechas convertidas: {df['Fecha'].notna().sum()} fechas válidas")
-        
-        # Mostrar resultado de la conversión
-        with st.expander("🔍 Resultado de conversión de fechas"):
-            fechas_convertidas = df[df['Fecha'].notna()]['Fecha']
-            if not fechas_convertidas.empty:
-                st.write("**Fechas convertidas correctamente:**")
-                st.write(f"- Rango: {fechas_convertidas.min().strftime('%d/%m/%Y')} a {fechas_convertidas.max().strftime('%d/%m/%Y')}")
-                st.write("**Ejemplos de fechas convertidas:**")
-                st.write(fechas_convertidas.head(10))
-            else:
-                st.warning("⚠️ No se pudieron convertir las fechas")
-
-    # Filtros en sidebar
     st.sidebar.header("📊 Información de Datos")
     st.sidebar.write(f"**Total de registros:** {len(df)}")
-    
     if not df.empty:
         st.sidebar.write(f"**Cursos encontrados:** {len(df['Curso'].unique())}")
         st.sidebar.write(f"**Estudiantes únicos:** {len(df['Estudiante'].unique())}")
-        
-        # Información sobre fechas después de la conversión
         if 'Fecha' in df.columns and df['Fecha'].notna().any():
             fechas_validas = df[df['Fecha'].notna()]['Fecha']
             st.sidebar.write(f"**Rango de fechas:**")
             st.sidebar.write(f"{fechas_validas.min().strftime('%d/%m/%Y')} - {fechas_validas.max().strftime('%d/%m/%Y')}")
         else:
             st.sidebar.write("**❌ No hay fechas válidas**")
-
-    # Filtros en sidebar
     st.sidebar.header("🔍 Filtros")
-    
-    # CORRECCIÓN: Inicializar session_state para los filtros
     if 'curso_seleccionado' not in st.session_state:
         st.session_state.curso_seleccionado = "Todos"
     if 'estudiante_seleccionado' not in st.session_state:
         st.session_state.estudiante_seleccionado = "Todos"
-    
-    # Fechas - usar el rango real de los datos después de la conversión
     if 'Fecha' in df.columns and df['Fecha'].notna().any():
         fecha_min = df['Fecha'].min().date()
         fecha_max = df['Fecha'].max().date()
     else:
         fecha_min = datetime(2026, 4, 1).date()
         fecha_max = datetime(2026, 12, 1).date()
-    
     if 'fecha_inicio' not in st.session_state:
         st.session_state.fecha_inicio = fecha_min
     if 'fecha_fin' not in st.session_state:
         st.session_state.fecha_fin = fecha_max
-
-    # CORRECCIÓN: Siempre mostrar los selectboxes, pero controlar sus valores con session_state
-    # Lista de cursos
     cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
     curso_seleccionado = st.sidebar.selectbox(
-        "Seleccionar Curso", 
-        cursos, 
+        "Seleccionar Curso",
+        cursos,
         index=cursos.index(st.session_state.curso_seleccionado) if st.session_state.curso_seleccionado in cursos else 0
     )
-    
-    # Actualizar session_state con la selección actual
     st.session_state.curso_seleccionado = curso_seleccionado
-    
-    # Lista de estudiantes (filtrada por curso si se selecciona uno)
     if curso_seleccionado != "Todos":
         estudiantes_curso = df[df['Curso'] == curso_seleccionado]['Estudiante'].unique()
         estudiantes = ["Todos"] + sorted(estudiantes_curso.tolist())
     else:
         estudiantes = ["Todos"] + sorted(df['Estudiante'].unique().tolist())
-    
     estudiante_seleccionado = st.sidebar.selectbox(
-        "Seleccionar Estudiante", 
-        estudiantes, 
+        "Seleccionar Estudiante",
+        estudiantes,
         index=estudiantes.index(st.session_state.estudiante_seleccionado) if st.session_state.estudiante_seleccionado in estudiantes else 0
     )
-    
-    # Actualizar session_state con la selección actual
     st.session_state.estudiante_seleccionado = estudiante_seleccionado
-    
     col1, col2 = st.sidebar.columns(2)
     with col1:
         fecha_inicio = st.date_input(
-            "Desde", 
-            value=st.session_state.fecha_inicio, 
-            min_value=fecha_min, 
+            "Desde",
+            value=st.session_state.fecha_inicio,
+            min_value=fecha_min,
             max_value=fecha_max
         )
         st.session_state.fecha_inicio = fecha_inicio
-        
     with col2:
         fecha_fin = st.date_input(
-            "Hasta", 
-            value=st.session_state.fecha_fin, 
-            min_value=fecha_min, 
+            "Hasta",
+            value=st.session_state.fecha_fin,
+            min_value=fecha_min,
             max_value=fecha_max
         )
         st.session_state.fecha_fin = fecha_fin
-
-    # CORRECCIÓN: Botón para limpiar filtros - resetear session_state
     if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True):
         st.session_state.curso_seleccionado = "Todos"
         st.session_state.estudiante_seleccionado = "Todos"
         st.session_state.fecha_inicio = fecha_min
         st.session_state.fecha_fin = fecha_max
         st.rerun()
-
-    # Aplicar filtros progresivamente
     datos_filtrados = df.copy()
     filtros_aplicados = []
-    
-    # Filtrar por curso
     if st.session_state.curso_seleccionado != "Todos":
         datos_filtrados = datos_filtrados[datos_filtrados['Curso'] == st.session_state.curso_seleccionado]
         filtros_aplicados.append(f"📚 Curso: {st.session_state.curso_seleccionado}")
-    
-    # Filtrar por estudiante
     if st.session_state.estudiante_seleccionado != "Todos":
         datos_filtrados = datos_filtrados[datos_filtrados['Estudiante'] == st.session_state.estudiante_seleccionado]
         filtros_aplicados.append(f"👤 Estudiante: {st.session_state.estudiante_seleccionado}")
-    
-    # Filtrar por fecha (solo si hay fechas válidas)
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any():
         datos_filtrados = datos_filtrados[
-            (datos_filtrados['Fecha'].dt.date >= st.session_state.fecha_inicio) & 
+            (datos_filtrados['Fecha'].dt.date >= st.session_state.fecha_inicio) &
             (datos_filtrados['Fecha'].dt.date <= st.session_state.fecha_fin)
         ]
         filtros_aplicados.append(f"📅 Período: {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}")
-
-    # MOSTRAR RESULTADOS
     st.header("📈 Resultados del Análisis")
-    
     if datos_filtrados.empty:
         st.error("🚫 No se encontraron datos con los filtros seleccionados")
-        
-        # Diagnóstico detallado
         with st.expander("🔍 Diagnóstico - ¿Por qué no hay datos?"):
             st.write("### Datos originales disponibles:")
             st.write(f"- **Total de registros:** {len(df)}")
             st.write(f"- **Cursos:** {', '.join(sorted(df['Curso'].unique()))}")
             st.write(f"- **Estudiantes:** {len(df['Estudiante'].unique())} estudiantes")
-            
             if df['Fecha'].notna().any():
                 fechas = df[df['Fecha'].notna()]['Fecha']
                 st.write(f"- **Rango de fechas real:** {fechas.min().strftime('%d/%m/%Y')} - {fechas.max().strftime('%d/%m/%Y')}")
             else:
                 st.write("- **❌ No hay fechas válidas en los datos**")
-            
             st.write("### Filtros aplicados:")
             for filtro in filtros_aplicados:
                 st.write(f"- {filtro}")
-            
             st.write("### 💡 Sugerencias:")
             st.write("1. **Verifica las fechas** - Asegúrate de que el rango incluía datos existentes")
             st.write("2. **Prueba con 'Todos'** - Selecciona 'Todos' en curso o estudiante")
             st.write("3. **Revisa los datos** - Los filtros pueden estar muy restrictivos")
-        
-        # Mostrar muestra de datos originales
         st.info("### 📋 Muestra de datos disponibles (sin filtros):")
         muestra_df = df.head(10).copy()
         if 'Fecha' in muestra_df.columns:
-            # CORRECCIÓN: Formato de fecha sin hora
             muestra_df['Fecha'] = muestra_df['Fecha'].dt.strftime('%d/%m/%Y')
         st.dataframe(muestra_df, use_container_width=True)
-        
         return
-
-    # Si hay datos, mostrar métricas y análisis
     st.success(f"✅ Encontrados {len(datos_filtrados)} registros")
-    
-    # Mostrar filtros aplicados
     if filtros_aplicados:
         st.info(" | ".join(filtros_aplicados))
-
-    # MÉTRICAS PRINCIPALES
     st.subheader("📊 Métricas de Asistencia")
-    
     total_registros = len(datos_filtrados)
     total_asistencias = datos_filtrados['Asistencia'].sum()
     total_ausencias = total_registros - total_asistencias
     porcentaje_asistencia = (total_asistencias / total_registros * 100) if total_registros > 0 else 0
-
     col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.metric("Total Registros", total_registros)
@@ -1055,45 +664,30 @@ def admin_panel():
         st.metric("Ausencias", total_ausencias)
     with col4:
         st.metric("% Asistencia", f"{porcentaje_asistencia:.1f}%")
-
-    # GRÁFICOS
     st.subheader("📈 Análisis Visual")
-    
-    # Gráfico 1: Asistencia por curso (solo si hay múltiples cursos)
     if len(datos_filtrados['Curso'].unique()) > 1:
         try:
             asistencia_por_curso = datos_filtrados.groupby('Curso')['Asistencia'].agg(['sum', 'count']).reset_index()
             asistencia_por_curso['Porcentaje'] = (asistencia_por_curso['sum'] / asistencia_por_curso['count'] * 100)
-            
-            fig1 = px.bar(asistencia_por_curso, x='Curso', y='Porcentaje', 
+            fig1 = px.bar(asistencia_por_curso, x='Curso', y='Porcentaje',
                          title='Porcentaje de Asistencia por Curso',
                          color='Porcentaje',
                          color_continuous_scale='Blues',
                          hover_data=['sum', 'count'],
                          text='Porcentaje')
-
-            # AGREGAR ESTAS LÍNEAS PARA FORMATEAR EL TEXTO
-            fig1.update_traces(texttemplate='%{text:.1f}%', 
-                            textposition='inside',  # 'inside', 'outside', 'auto', etc.
-                            textfont_size=16)           
-
-            fig1.update_layout(uniformtext_minsize=8, 
-                            uniformtext_mode='hide')
-
+            fig1.update_traces(texttemplate='%{text:.1f}%', textposition='inside', textfont_size=16)
+            fig1.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
             st.plotly_chart(fig1, use_container_width=True)
         except Exception as e:
             st.error(f"Error en gráfico de cursos: {e}")
     else:
         curso_actual = datos_filtrados['Curso'].iloc[0] if len(datos_filtrados) > 0 else "N/A"
         st.info(f"📚 Mostrando datos del curso: **{curso_actual}**")
-
-    # Gráfico 2: Asistencia por estudiante (solo si hay múltiples estudiantes)
     if len(datos_filtrados['Estudiante'].unique()) > 1:
         try:
             asistencia_por_estudiante = datos_filtrados.groupby('Estudiante')['Asistencia'].agg(['sum', 'count']).reset_index()
             asistencia_por_estudiante['Porcentaje'] = (asistencia_por_estudiante['sum'] / asistencia_por_estudiante['count'] * 100)
             asistencia_por_estudiante = asistencia_por_estudiante.sort_values('Porcentaje', ascending=False)
-            
             fig2 = px.bar(asistencia_por_estudiante, x='Estudiante', y='Porcentaje',
                          title='Asistencia por Estudiante',
                          color='Porcentaje',
@@ -1107,15 +701,11 @@ def admin_panel():
         if len(datos_filtrados) > 0:
             estudiante_actual = datos_filtrados['Estudiante'].iloc[0]
             st.info(f"👤 Mostrando datos del estudiante: **{estudiante_actual}**")
-
-    # Gráfico 3: Tendencia temporal (solo si hay fechas válidas)
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any() and len(datos_filtrados) > 1:
         try:
-            # Agrupar por fecha y calcular asistencia diaria
             asistencia_diaria = datos_filtrados.groupby(datos_filtrados['Fecha'].dt.date)['Asistencia'].agg(['sum', 'count']).reset_index()
             asistencia_diaria['Porcentaje'] = (asistencia_diaria['sum'] / asistencia_diaria['count'] * 100)
             asistencia_diaria['Fecha'] = pd.to_datetime(asistencia_diaria['Fecha'])
-            
             fig3 = px.line(asistencia_diaria, x='Fecha', y='Porcentaje',
                           title='Tendencia de Asistencia Diaria',
                           markers=True,
@@ -1124,60 +714,72 @@ def admin_panel():
             st.plotly_chart(fig3, use_container_width=True)
         except Exception as e:
             st.error(f"Error en gráfico de tendencia: {e}")
-
-    # TABLA DE DATOS DETALLADOS
     st.subheader("📋 Datos Detallados")
-    
-    # Preparar datos para mostrar
     datos_mostrar = datos_filtrados.copy()
-    
-    # CORRECCIÓN: Formatear fechas para mostrar SIN HORA
     if 'Fecha' in datos_mostrar.columns:
-        # Crear columna formateada solo con fecha (sin hora)
         datos_mostrar['Fecha_Formateada'] = datos_mostrar['Fecha'].apply(
-            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'Sin fecha'  # Solo fecha, sin hora
+            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'Sin fecha'
         )
     else:
         datos_mostrar['Fecha_Formateada'] = 'Columna no disponible'
-    
-    # Seleccionar columnas para mostrar
     columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Asistencia']
-    
-    # Agregar columnas adicionales si existen
     columnas_extra = ['Hora Registro', 'Información']
     for col in columnas_extra:
         if col in datos_mostrar.columns:
             columnas_a_mostrar.append(col)
-    
-    # Filtrar solo las columnas que existen
     columnas_finales = [col for col in columnas_a_mostrar if col in datos_mostrar.columns]
-    
-    # Mostrar tabla con nombres de columnas amigables
     nombres_amigables = {
         'Fecha_Formateada': 'Fecha',
         'Hora Registro': 'Hora',
         'Información': 'Información'
     }
-    
     datos_tabla = datos_mostrar[columnas_finales].rename(columns=nombres_amigables)
-    
     st.dataframe(datos_tabla, use_container_width=True, height=400)
     st.caption(f"Mostrando {len(datos_tabla)} registros")
+    # ENHANCED EMAIL SECTION
+    st.subheader("📧 Enviar Notificaciones a Apoderados")
+    with st.expander("Configurar y Enviar Emails"):
+        email_template = st.text_area(
+            "Plantilla de Email",
+            value="""Hola {nombre_apoderado},
 
-    # OPCIONES DE EXPORTACIÓN
+Este es un resumen automático de asistencia para el/la estudiante {estudiante}.
+
+📊 **RESUMEN GENERAL:**
+• Total de clases registradas: {total_clases}
+• Asistencias: {asistencias}
+• Ausencias: {ausencias}
+• Porcentaje de asistencia: {porcentaje_asistencia:.1f}%
+
+📚 **DETALLE POR CURSO:**
+{resumen_cursos}
+
+📅 **Período analizado:** {fecha_inicio} - {fecha_fin}
+
+Para consultas específicas, por favor contacte a la administración.
+
+Saludos cordiales,
+Preuniversitario CIMMA 2026""",
+            height=300
+        )
+        min_porcentaje = st.slider(
+            "Porcentaje mínimo de asistencia para enviar notificación",
+            min_value=0.0,
+            max_value=100.0,
+            value=80.0,
+            step=5.0,
+            help="Solo se enviarán emails a estudiantes con asistencia menor o igual a este porcentaje"
+        )
+        if st.button("📧 Preparar Envío de Emails", use_container_width=True):
+            enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje)
     st.subheader("📤 Exportar Datos")
-    
-    col1, col2, col3 = st.columns(3)  # Cambiar a 3 columnas para agregar el nuevo botón
-    
+    col1, col2 = st.columns(2)
     with col1:
-        # Preparar CSV
         csv_df = datos_filtrados.copy()
         if 'Fecha' in csv_df.columns:
-            # En el CSV también usar solo fecha sin hora
             csv_df['Fecha'] = csv_df['Fecha'].apply(
-                lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ''  # Solo fecha en CSV también
+                lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ''
             )
-        
         csv = csv_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             "💾 Descargar CSV",
@@ -1186,20 +788,15 @@ def admin_panel():
             "text/csv",
             use_container_width=True
         )
-    
     with col2:
-        # Preparar Excel
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             excel_df = datos_filtrados.copy()
             if 'Fecha' in excel_df.columns:
-                # En Excel también usar solo fecha sin hora
                 excel_df['Fecha'] = excel_df['Fecha'].apply(
                     lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ''
                 )
             excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
-            
-            # Agregar hoja de resumen
             resumen_data = {
                 'Métrica': ['Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia', 'Período'],
                 'Valor': [
@@ -1211,7 +808,6 @@ def admin_panel():
                 ]
             }
             pd.DataFrame(resumen_data).to_excel(writer, index=False, sheet_name='Resumen')
-            
         excel_data = output.getvalue()
         st.download_button(
             "📊 Descargar Excel",
@@ -1220,50 +816,15 @@ def admin_panel():
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-    
-    with col3:
-        # NUEVO: Botón para enviar resumen por email
-        if st.button("📧 Enviar Resumen por Email", use_container_width=True):
-            enviar_resumen_asistencia(datos_filtrados)
-
-    # BOTONES DE CONTROL
     st.markdown("---")
     col1, col2 = st.columns(2)
-    
     with col1:
         if st.button("🔄 Recargar Datos", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
-    
     with col2:
         if st.button("📊 Ver Todos los Datos", use_container_width=True):
             st.rerun()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 # ==============================
 # APP PRINCIPAL (PROFESOR)
@@ -1272,45 +833,37 @@ def admin_panel():
 def main_app():
     st.title("📱 Registro de Asistencia")
     st.subheader("Preuniversitario CIMMA 2026")
-
     courses = load_courses()
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
-
     cursos_filtrados = {
         k: v for k, v in courses.items()
         if v["profesor"] == st.session_state["user_name"]
     }
-
     if not cursos_filtrados:
         st.warning("No tienes cursos asignados.")
         st.stop()
-
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()))
     data = cursos_filtrados[curso_seleccionado]
-
     st.markdown(f"**🧑‍🏫 Profesor(a):** {data['profesor']}")
     col1, col2 = st.columns(2)
     with col1:
         st.markdown(f"**📅 Día:** {data['dia']}")
     with col2:
         st.markdown(f"**⏰ Horario:** {data['horario']}")
-
     clase_realizada = st.radio(
         "✅ ¿Se realizó la clase?",
         ("Sí", "No"),
         index=0,
         help="Selecciona 'No' en caso de feriado, suspensión o imprevisto."
     )
-
     if clase_realizada == "No":
         motivo = st.text_area(
             "📝 Motivo de la no realización",
             placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc."
         )
         fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", data["fechas"])
-        
         if st.button("💾 Registrar suspensión", use_container_width=True):
             try:
                 client = get_client()
@@ -1323,7 +876,6 @@ def main_app():
                 except gspread.exceptions.WorksheetNotFound:
                     sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
                     sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
-
                 chile_time = get_chile_time()
                 log = f"{chile_time.strftime('%Y-%m-%d')}: Clase no realizada. Motivo registrado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
                 sheet.append_row([
@@ -1338,16 +890,12 @@ def main_app():
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
-
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
     st.header("👥 Estudiantes")
-
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
         st.session_state[estado_key] = {est: True for est in data["estudiantes"]}
-
     asistencia_estado = st.session_state[estado_key]
-
     st.markdown("""
     <style>
     div[data-testid="stButton"] button[kind="secondary"]:not([key="guardar_asistencia"]) {
@@ -1373,11 +921,9 @@ def main_app():
     }
     </style>
     """, unsafe_allow_html=True)
-
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
         estado_actual = asistencia_estado[est]
-
         if estado_actual:
             if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
                 asistencia_estado[est] = False
@@ -1386,11 +932,8 @@ def main_app():
             if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
                 asistencia_estado[est] = True
                 st.rerun()
-
     asistencia = asistencia_estado
-
     st.warning("📧 Al guardar, se enviará un reporte automático a los apoderados.")
-
     st.markdown("<hr>", unsafe_allow_html=True)
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -1406,10 +949,8 @@ def main_app():
                 except gspread.exceptions.WorksheetNotFound:
                     sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
                     sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
-
                 chile_time = get_chile_time()
                 log_base = f"{chile_time.strftime('%Y-%m-%d')}: Mail de asistencia enviado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
-
                 rows = []
                 for estudiante, presente in asistencia.items():
                     rows.append([
@@ -1422,7 +963,6 @@ def main_app():
                     ])
                 sheet.append_rows(rows)
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
-
                 emails, nombres_apoderados = load_emails()
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
@@ -1430,24 +970,18 @@ def main_app():
                     nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
                     if not correo_destino:
                         continue
-
                     estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
                     subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
                     body = f"""Hola {nombre_apoderado},
-
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
-
 📅 Fecha: {fecha_seleccionada}
 👨‍🎓 Estudiante: {estudiante}
 📌 Estado: {estado}
-
 Saludos cordiales,
 Preuniversitario CIMMA 2026"""
                     send_email(correo_destino, subject, body)
-
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
-
     st.divider()
     st.caption("💡 ¿Tienes ideas para mejorar esta plataforma?")
     mejora = st.text_area("Sugerencia:", placeholder="Ej: Agregar notificación por WhatsApp...")
@@ -1463,7 +997,7 @@ Preuniversitario CIMMA 2026"""
             except gspread.exceptions.WorksheetNotFound:
                 mejoras_sheet = sheet.add_worksheet("MEJORAS", 100, 3)
                 mejoras_sheet.append_row(["Fecha", "Sugerencia", "Usuario"])
-            mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
+            mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%Y %H:%M"), mejora, st.session_state["user_name"]])
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
