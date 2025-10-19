@@ -11,6 +11,7 @@ import pandas as pd
 import random
 import string
 import io
+from datetime import date
 
 import plotly.express as px
 
@@ -391,7 +392,6 @@ Preuniversitario CIMMA"""
 # PANEL ADMINISTRATIVO
 # ==============================
 
-
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
@@ -406,6 +406,16 @@ def admin_panel():
     curso_to_prof = {k: v['profesor'] for k, v in courses.items()}
     df['Profesor'] = df['Curso'].map(curso_to_prof)
     df['Asignatura'] = df['Curso']  # Asumiendo que 'Curso' representa la asignatura
+
+    # Asegurar que la columna Fecha esté en formato datetime y con timezone
+    if not df.empty and 'Fecha' in df.columns:
+        if df['Fecha'].dtype != 'datetime64[ns]':
+            df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
+        
+        # Si no tiene timezone, agregar Chile
+        if df['Fecha'].dt.tz is None:
+            chile_tz = pytz.timezone("America/Santiago")
+            df['Fecha'] = df['Fecha'].dt.tz_localize(chile_tz, ambiguous='NaT', nonexistent='NaT')
 
     # Filtros en sidebar
     with st.sidebar:
@@ -423,7 +433,6 @@ def admin_panel():
         # RANGO DE FECHAS DINÁMICO
         st.subheader("📅 Rango de Fechas")
         
-        chile_tz = pytz.timezone("America/Santiago")
         current_year = datetime.now().year
         
         # Fechas límite del sistema (1 de abril a 1 de diciembre)
@@ -466,10 +475,18 @@ def admin_panel():
         if start_date > end_date:
             st.error("❌ La fecha de inicio no puede ser mayor que la fecha de término")
             st.session_state['apply_filters'] = False
+            start_date, end_date = end_date, start_date  # Intercambiar para evitar errores
+
+        # Convertir a timestamp CON LA MISMA TIMEZONE que los datos
+        chile_tz = pytz.timezone("America/Santiago")
         
-        # Convertir a timestamp con timezone
-        start_datetime = pd.Timestamp(start_date).tz_localize(chile_tz).replace(hour=0, minute=0, second=0)
-        end_datetime = pd.Timestamp(end_date).tz_localize(chile_tz).replace(hour=23, minute=59, second=59)
+        # Crear datetime objects con timezone
+        start_datetime = chile_tz.localize(
+            datetime.combine(start_date, time.min)
+        )
+        end_datetime = chile_tz.localize(
+            datetime.combine(end_date, time.max)
+        )
 
         # Botón para aplicar filtros
         if st.button("Aplicar Filtros", use_container_width=True):
@@ -483,6 +500,7 @@ def admin_panel():
     # Aplicar filtros solo al presionar el botón
     filtered_df = df.copy()
     if 'apply_filters' in st.session_state and st.session_state['apply_filters']:
+        # Aplicar filtros de selección
         if curso_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
         if est_sel != "Todos":
@@ -490,12 +508,25 @@ def admin_panel():
         if prof_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
         
-        # Filtrar por rango de fechas completo
-        filtered_df = filtered_df[
-            (filtered_df["Fecha"] >= start_datetime) & 
-            (filtered_df["Fecha"] <= end_datetime) & 
-            (filtered_df["Fecha"].notna())
-        ]
+        # Filtrar por rango de fechas - MANERA SEGURA
+        try:
+            # Primero eliminar valores NaT
+            filtered_df = filtered_df[filtered_df["Fecha"].notna()]
+            
+            # Luego aplicar filtro de fechas
+            mask = (
+                (filtered_df["Fecha"] >= start_datetime) & 
+                (filtered_df["Fecha"] <= end_datetime)
+            )
+            filtered_df = filtered_df[mask]
+            
+        except TypeError as e:
+            st.error(f"Error en filtro de fechas: {e}")
+            # Fallback: convertir a date para comparación simple
+            filtered_df = filtered_df[
+                (filtered_df["Fecha"].dt.date >= start_date) & 
+                (filtered_df["Fecha"].dt.date <= end_date)
+            ]
 
     # Mostrar información del rango de fechas aplicado
     if 'apply_filters' in st.session_state and st.session_state['apply_filters'] and not filtered_df.empty:
@@ -602,9 +633,13 @@ def admin_panel():
     st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha")
     if not filtered_df.empty:
         try:
-            pivot_table = filtered_df.pivot_table(
+            # Usar fecha sin timezone para el pivot
+            pivot_df = filtered_df.copy()
+            pivot_df['Fecha_Date'] = pivot_df['Fecha'].dt.date
+            
+            pivot_table = pivot_df.pivot_table(
                 index="Estudiante", 
-                columns=filtered_df["Fecha"].dt.date, 
+                columns="Fecha_Date", 
                 values="Asistencia", 
                 aggfunc="mean",
                 fill_value=0
@@ -617,7 +652,7 @@ def admin_panel():
             )
             st.plotly_chart(fig_heatmap)
         except Exception as e:
-            st.warning("No se pudo generar el mapa de calor con los datos filtrados")
+            st.warning(f"No se pudo generar el mapa de calor: {e}")
 
     # Tabla detallada interactiva
     st.subheader("📋 Registro Detallado")
@@ -631,7 +666,10 @@ def admin_panel():
     st.subheader("📤 Exportar Datos")
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
-        csv = filtered_df.to_csv(index=False).encode('utf-8')
+        # Preparar CSV sin problemas de timezone
+        csv_df = filtered_df.copy()
+        csv_df['Fecha'] = csv_df['Fecha'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        csv = csv_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             "📥 Descargar como CSV", 
             csv, 
@@ -642,7 +680,10 @@ def admin_panel():
     with col_dl2:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
+            # Preparar datos para Excel
+            excel_df = filtered_df.copy()
+            excel_df['Fecha'] = excel_df['Fecha'].dt.tz_localize(None)  # Remover timezone para Excel
+            excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
             
             # Agregar hoja con resumen
             summary_data = {
@@ -706,12 +747,8 @@ def admin_panel():
         # Estadísticas adicionales
         st.write(f"**📊 Estadísticas del período seleccionado:**")
         st.write(f"• Período analizado: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
-        st.write(f"• Total de registros: {total_registros}")
+        st.write(f"• Total de registros: {total_regords}")
         st.write(f"• Ratio asistencia/ausencia: {total_asistencias}:{total_ausencias}")
-
-
-
-
 
 
 
