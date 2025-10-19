@@ -44,14 +44,13 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
         sender_email = st.secrets["EMAIL"]["sender_email"]
         sender_password = st.secrets["EMAIL"]["sender_password"]
-
         msg = MIMEMultipart()
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
         msg["Date"] = formatdate(localtime=True)
-        msg.attach(MIMEText(body, "plain"))
-
+        # --- ✅ CAMBIO CRÍTICO: enviar como HTML ---
+        msg.attach(MIMEText(body, "html"))
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
         try:
             server.starttls()
@@ -577,7 +576,6 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
 
 
 
-
 # ==============================
 # PANEL ADMINISTRATIVO
 # ==============================
@@ -831,16 +829,8 @@ Saludos cordiales,
 Preuniversitario CIMMA 2026""",
             height=300
         )
-        min_porcentaje = st.slider(
-            "Porcentaje mínimo de asistencia para enviar notificación",
-            min_value=0.0,
-            max_value=100.0,
-            value=80.0,
-            step=5.0,
-            help="Solo se enviarán emails a estudiantes con asistencia menor o igual a este porcentaje"
-        )
         if st.button("📧 Preparar Envío de Emails", use_container_width=True):
-            enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje)
+            enviar_resumen_asistencia(datos_filtrados, email_template, None)
     st.subheader("📤 Exportar Datos")
     col1, col2 = st.columns(2)
     with col1:
