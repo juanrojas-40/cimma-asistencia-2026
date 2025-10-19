@@ -43,19 +43,32 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         sender_email = st.secrets["EMAIL"]["sender_email"]
         sender_password = st.secrets["EMAIL"]["sender_password"]
 
+        st.write(f"🔧 Configurando email para: {to_email}")
+        st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
+        st.write(f"👤 Remitente: {sender_email}")
+
         msg = MIMEMultipart()
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
         msg.attach(MIMEText(body, "plain"))
 
+        st.write(f"📤 Conectando al servidor SMTP...")
         with smtplib.SMTP(smtp_server, smtp_port) as server:
+            st.write("🔐 Iniciando TLS...")
             server.starttls()
+            
+            st.write("🔑 Iniciando sesión...")
             server.login(sender_email, sender_password)
+            
+            st.write("🚀 Enviando mensaje...")
             server.send_message(msg)
+            
+        st.success(f"✅ Email enviado exitosamente a {to_email}")
         return True
-    except (KeyError, ValueError, smtplib.SMTPException) as e:
-        st.warning(f"⚠️ Error al enviar correo a {to_email}: {e}")
+        
+    except Exception as e:
+        st.error(f"❌ Error detallado al enviar correo a {to_email}: {str(e)}")
         return False
 
 def generate_2fa_code():
@@ -497,6 +510,33 @@ Preuniversitario CIMMA"""
 def enviar_resumen_asistencia(datos_filtrados):
     """Envía un resumen de asistencia a los apoderados de los estudiantes filtrados"""
     
+    # Diagnóstico de configuración de email
+    st.info("🔍 Verificando configuración de email...")
+    try:
+        smtp_server = st.secrets["EMAIL"]["smtp_server"]
+        smtp_port = st.secrets["EMAIL"]["smtp_port"]
+        sender_email = st.secrets["EMAIL"]["sender_email"]
+        # No mostrar la contraseña por seguridad
+        
+        st.success("✅ Configuración de EMAIL encontrada en secrets")
+        st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
+        st.write(f"👤 Remitente: {sender_email}")
+        
+    except KeyError as e:
+        st.error(f"❌ Configuración de EMAIL incompleta en secrets: {e}")
+        st.info("💡 Verifica que tengas estas variables en tus secrets:")
+        st.code("""
+EMAIL:
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  sender_email: "tu_email@gmail.com"
+  sender_password: "tu_contraseña"
+        """)
+        return
+    except Exception as e:
+        st.error(f"❌ Error verificando configuración: {e}")
+        return
+    
     st.info("🔄 Cargando información de apoderados...")
     
     # Limpiar cache para forzar recarga
@@ -629,8 +669,17 @@ Para consultas específicas, por favor contacte a la administración.
 Saludos cordiales,
 Preuniversitario CIMMA 2026"""
             
-            # Enviar email
+            # Enviar email con diagnóstico detallado
             st.write(f"📤 Enviando resumen para {estudiante}...")
+            st.write(f"📍 Destinatario: {correo_destino}")
+            st.write(f"👤 Apoderado: {nombre_apoderado}")
+
+            # Mostrar preview del email (solo subject y primeras líneas)
+            with st.expander(f"📝 Preview email para {estudiante}"):
+                st.write(f"**Asunto:** {subject}")
+                st.write(f"**Cuerpo (primeras líneas):**")
+                st.text(body[:200] + "..." if len(body) > 200 else body)
+
             exito = send_email(correo_destino, subject, body)
             
             if exito:
@@ -669,8 +718,6 @@ Preuniversitario CIMMA 2026"""
                 for resultado in resultados:
                     if not resultado['exito']:
                         st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
-
-
 
 
 
