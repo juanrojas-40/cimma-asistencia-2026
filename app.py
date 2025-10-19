@@ -420,12 +420,10 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        # Fechas específicas para 2026 con conversión adecuada a datetime64[ns]
+        # Solo fecha de término para 2026
         chile_tz = pytz.timezone("America/Santiago")
-        start_date = st.date_input("Fecha de inicio", datetime(2026, 1, 1).date())
         end_date = st.date_input("Fecha de término", datetime(2026, 12, 31).date())
-        start_datetime = pd.Timestamp(datetime.combine(start_date, datetime.min.time()).replace(tzinfo=chile_tz))
-        end_datetime = pd.Timestamp(datetime.combine(end_date, datetime.max.time()).replace(tzinfo=chile_tz))
+        end_datetime = pd.Timestamp(end_date).tz_localize(chile_tz).replace(hour=23, minute=59, second=59)
 
         # Botón para aplicar filtros
         if st.button("Aplicar Filtros", width='stretch'):
@@ -442,8 +440,8 @@ def admin_panel():
             filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
         if prof_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
+        # Filtrar solo por fecha de término (hasta el final del día)
         filtered_df = filtered_df[
-            (filtered_df["Fecha"] >= start_datetime) & 
             (filtered_df["Fecha"] <= end_datetime) & 
             (filtered_df["Fecha"].notna())
         ]
@@ -452,27 +450,28 @@ def admin_panel():
         st.info("No hay datos que coincidan con los filtros seleccionados.")
         return
 
-    # Métricas clave
+    # Métricas clave basadas en asistencia
     col1, col2, col3 = st.columns(3)
     total_registros = len(filtered_df)
     total_asistencias = filtered_df["Asistencia"].sum()
+    total_ausencias = total_registros - total_asistencias
     porc_asistencia = (total_asistencias / total_registros * 100) if total_registros > 0 else 0
     with col1:
-        st.metric("Porcentaje de Asistencia General", f"{porc_asistencia:.2f}%")
+        st.metric("Porcentaje de Asistencia", f"{porc_asistencia:.2f}%")
     with col2:
-        st.metric("Total Registros", total_registros)
-    with col3:
         st.metric("Total Asistencias", total_asistencias)
+    with col3:
+        st.metric("Total Ausencias", total_ausencias)
 
     # Gráficos avanzados
     st.subheader("📈 Análisis por Curso/Asignatura")
-    asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['mean', 'count'])
-    asist_curso['Porcentaje'] = asist_curso['mean'] * 100
+    asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
+    asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
     fig_curso = px.bar(
         asist_curso.reset_index(), 
         x="Curso", 
         y="Porcentaje",
-        hover_data=['count'], 
+        hover_data=['sum', 'count'], 
         title="Porcentaje de Asistencia por Curso/Asignatura",
         color="Porcentaje", 
         color_continuous_scale="Blues"
@@ -480,14 +479,14 @@ def admin_panel():
     st.plotly_chart(fig_curso)
 
     st.subheader("👤 Análisis por Alumno")
-    asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['mean', 'count'])
-    asist_est['Porcentaje'] = asist_est['mean'] * 100
+    asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
+    asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
     asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
     fig_est = px.bar(
         asist_est_sorted, 
         x="Estudiante", 
         y="Porcentaje",
-        hover_data=['count'], 
+        hover_data=['sum', 'count'], 
         title="Porcentaje de Asistencia por Alumno (Ordenado)",
         color="Porcentaje", 
         color_continuous_scale="Greens"
@@ -495,8 +494,8 @@ def admin_panel():
     st.plotly_chart(fig_est)
 
     st.subheader("🧑‍🏫 Análisis por Profesor")
-    asist_prof = filtered_df.groupby("Profesor")["Asistencia"].agg(['mean', 'count'])
-    asist_prof['Porcentaje'] = asist_prof['mean'] * 100
+    asist_prof = filtered_df.groupby("Profesor")["Asistencia"].agg(['sum', 'count'])
+    asist_prof['Porcentaje'] = (asist_prof['sum'] / asist_prof['count'] * 100)
     fig_prof = px.pie(
         asist_prof.reset_index(), 
         values="Porcentaje", 
@@ -506,15 +505,15 @@ def admin_panel():
     )
     st.plotly_chart(fig_prof)
 
-    st.subheader("📅 Tendencia de Asistencia por Rango de Fechas")
-    asist_time = filtered_df.groupby("Fecha")["Asistencia"].agg(['mean', 'count'])
-    asist_time['Porcentaje'] = asist_time['mean'] * 100
+    st.subheader("📅 Tendencia de Asistencia hasta Fecha de Término")
+    asist_time = filtered_df.groupby(filtered_df["Fecha"].dt.date)["Asistencia"].agg(['sum', 'count'])
+    asist_time['Porcentaje'] = (asist_time['sum'] / asist_time['count'] * 100)
     fig_time = px.line(
         asist_time.reset_index(), 
         x="Fecha", 
         y="Porcentaje",
-        hover_data=['count'], 
-        title="Tendencia de Asistencia a lo Largo del Tiempo",
+        hover_data=['sum', 'count'], 
+        title="Tendencia de Asistencia hasta la Fecha de Término",
         markers=True
     )
     st.plotly_chart(fig_time)
@@ -523,7 +522,7 @@ def admin_panel():
     st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha")
     pivot_table = filtered_df.pivot_table(
         index="Estudiante", 
-        columns="Fecha", 
+        columns=filtered_df["Fecha"].dt.date, 
         values="Asistencia", 
         aggfunc="mean"
     )
@@ -567,7 +566,7 @@ def admin_panel():
         st.write(f"**Mejor Alumno:** {top_est} con {top_porc:.2f}% de asistencia.")
         st.write(f"**Alumno con Menor Asistencia:** {low_est} con {low_porc:.2f}% de asistencia.")
         avg_asist = filtered_df["Asistencia"].mean() * 100
-        st.write(f"**Asistencia Promedio en el Rango:** {avg_asist:.2f}%")
+        st.write(f"**Asistencia Promedio hasta la Fecha:** {avg_asist:.2f}%")
         if avg_asist < 70:
             st.warning("⚠️ La asistencia promedio es baja. Considerar acciones correctivas.")
 
