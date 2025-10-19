@@ -624,6 +624,19 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
 # ==============================
 
 def admin_panel():
+    # Verificar que los secrets de email existan
+    try:
+        required_keys = ['smtp_server', 'smtp_port', 'sender_email', 'sender_password']
+        for key in required_keys:
+            if key not in st.secrets["EMAIL"]:
+                st.error(f"❌ Missing EMAIL secret: {key}")
+                return
+        st.success("✅ Todos los secrets de email están configurados")
+    except KeyError as e:
+        st.error(f"❌ Error en configuración de secrets: {e}")
+        return
+
+
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
     df = load_all_asistencia()
