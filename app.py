@@ -396,6 +396,13 @@ def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
 
+    # Botón para limpiar caché
+    col_cache, col_space = st.columns([1, 5])
+    with col_cache:
+        if st.button("🔄 Limpiar Caché", help="Actualizar datos y limpiar caché"):
+            st.cache_data.clear()
+            st.rerun()
+
     df = load_all_asistencia()
     if df.empty:
         st.warning("No hay datos de asistencia aún.")
@@ -405,52 +412,72 @@ def admin_panel():
     courses = load_courses()
     curso_to_prof = {k: v['profesor'] for k, v in courses.items()}
     df['Profesor'] = df['Curso'].map(curso_to_prof)
-    df['Asignatura'] = df['Curso']  # Asumiendo que 'Curso' representa la asignatura
+    df['Asignatura'] = df['Curso']
 
-    # Asegurar que la columna Fecha esté en formato datetime y con timezone
+    # Asegurar que la columna Fecha esté en formato datetime CORREGIDO
     if not df.empty and 'Fecha' in df.columns:
         if df['Fecha'].dtype != 'datetime64[ns]':
             df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
         
-        # Si no tiene timezone, agregar Chile
+        # Verificar si ya tiene timezone
         if df['Fecha'].dt.tz is None:
             chile_tz = pytz.timezone("America/Santiago")
-            df['Fecha'] = df['Fecha'].dt.tz_localize(chile_tz, ambiguous='NaT', nonexistent='NaT')
+            # Usar apply para manejar mejor los valores NaT
+            df['Fecha'] = df['Fecha'].apply(
+                lambda x: chile_tz.localize(x) if pd.notna(x) else x
+            )
+
+    # DEBUG: Mostrar información de los datos cargados
+    with st.sidebar:
+        st.header("ℹ️ Información de Datos")
+        st.write(f"Total registros: {len(df)}")
+        if not df.empty:
+            st.write(f"Cursos: {len(df['Curso'].unique())}")
+            st.write(f"Estudiantes: {len(df['Estudiante'].unique())}")
+            if df['Fecha'].notna().any():
+                valid_dates = df[df['Fecha'].notna()]['Fecha']
+                st.write(f"Rango fechas: {valid_dates.min().strftime('%d/%m/%Y')} - {valid_dates.max().strftime('%d/%m/%Y')}")
+
+        # Botón para limpiar filtros en sidebar
+        if st.button("🧹 Limpiar Filtros", use_container_width=True):
+            st.session_state.clear()
+            st.rerun()
 
     # Filtros en sidebar
     with st.sidebar:
         st.header("🔍 Filtros")
 
-        cursos = ["Todos"] + sorted(df["Curso"].unique())
-        curso_sel = st.selectbox("Curso/Asignatura", cursos)
+        # Obtener opciones únicas
+        cursos_opciones = ["Todos"] + sorted(df["Curso"].unique().tolist())
+        estudiantes_opciones = ["Todos"] + sorted(df["Estudiante"].unique().tolist())
+        profesores_opciones = ["Todos"] + sorted(df["Profesor"].dropna().unique().tolist())
 
-        estudiantes = ["Todos"] + sorted(df["Estudiante"].unique())
-        est_sel = st.selectbox("Alumno", estudiantes)
-
-        profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
-        prof_sel = st.selectbox("Profesor", profesores)
+        curso_sel = st.selectbox("Curso/Asignatura", cursos_opciones)
+        est_sel = st.selectbox("Alumno", estudiantes_opciones)
+        prof_sel = st.selectbox("Profesor", profesores_opciones)
 
         # RANGO DE FECHAS DINÁMICO - AÑO 2026
         st.subheader("📅 Rango de Fechas 2026")
         
-        # Fechas límite del sistema para 2026 (1 de abril a 1 de diciembre)
-        system_start = datetime(2026, 4, 1).date()  # 1 de abril 2026
-        system_end = datetime(2026, 12, 1).date()   # 1 de diciembre 2026
+        # Fechas límite del sistema para 2026
+        system_start = datetime(2026, 4, 1).date()
+        system_end = datetime(2026, 12, 1).date()
         
-        # Obtener el rango real de fechas disponibles en los datos (excluyendo NaT)
+        # Determinar fechas por defecto basadas en datos disponibles
         if not df.empty and df["Fecha"].notna().any():
             valid_dates = df[df["Fecha"].notna()]["Fecha"]
             min_date_data = valid_dates.min().date()
             max_date_data = valid_dates.max().date()
             
-            # Usar el rango más restrictivo entre datos disponibles y sistema
+            # Ajustar al rango del sistema
             actual_min_date = max(system_start, min_date_data)
             actual_max_date = min(system_end, max_date_data)
         else:
+            # Si no hay datos, usar el rango completo del sistema
             actual_min_date = system_start
             actual_max_date = system_end
-        
-        # Selectores de fecha con límites dinámicos para 2026
+
+        # Selectores de fecha
         col_fecha1, col_fecha2 = st.columns(2)
         with col_fecha1:
             start_date = st.date_input(
@@ -458,7 +485,7 @@ def admin_panel():
                 value=actual_min_date,
                 min_value=system_start,
                 max_value=system_end,
-                key="start_date"
+                key="start_date_admin"
             )
         
         with col_fecha2:
@@ -467,38 +494,25 @@ def admin_panel():
                 value=actual_max_date,
                 min_value=system_start,
                 max_value=system_end,
-                key="end_date"
+                key="end_date_admin"
             )
         
-        # Validar que la fecha de inicio no sea mayor que la de término
+        # Validación de fechas
         if start_date > end_date:
             st.error("❌ La fecha de inicio no puede ser mayor que la fecha de término")
-            st.session_state['apply_filters'] = False
-            start_date, end_date = end_date, start_date  # Intercambiar para evitar errores
-
-        # Convertir a timestamp CON LA MISMA TIMEZONE que los datos
-        chile_tz = pytz.timezone("America/Santiago")
-        
-        # Crear datetime objects con timezone para 2026
-        start_datetime = chile_tz.localize(
-            datetime(2026, start_date.month, start_date.day, 0, 0, 0)
-        )
-        end_datetime = chile_tz.localize(
-            datetime(2026, end_date.month, end_date.day, 23, 59, 59)
-        )
+            # Corregir automáticamente
+            start_date, end_date = end_date, start_date
 
         # Botón para aplicar filtros
-        if st.button("Aplicar Filtros", use_container_width=True):
-            st.session_state['apply_filters'] = True
-        else:
-            st.session_state['apply_filters'] = st.session_state.get('apply_filters', False)
+        apply_filters = st.button("Aplicar Filtros", use_container_width=True, type="primary")
 
-        # Mostrar información del rango disponible para 2026
         st.caption(f"📅 Período académico 2026: {system_start.strftime('%d/%m/%Y')} - {system_end.strftime('%d/%m/%Y')}")
 
-    # Aplicar filtros solo al presionar el botón
+    # Aplicar filtros
     filtered_df = df.copy()
-    if 'apply_filters' in st.session_state and st.session_state['apply_filters']:
+    
+    # Siempre mostrar datos, pero aplicar filtros solo si se presiona el botón
+    if apply_filters:
         # Aplicar filtros de selección
         if curso_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
@@ -507,53 +521,66 @@ def admin_panel():
         if prof_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
         
-        # Filtrar por rango de fechas - MANERA SEGURA
+        # Filtrar por rango de fechas
         try:
             # Primero eliminar valores NaT
             filtered_df = filtered_df[filtered_df["Fecha"].notna()]
             
-            # Luego aplicar filtro de fechas para 2026
-            mask = (
-                (filtered_df["Fecha"] >= start_datetime) & 
-                (filtered_df["Fecha"] <= end_datetime)
-            )
-            filtered_df = filtered_df[mask]
-            
-        except TypeError as e:
+            if not filtered_df.empty:
+                # Convertir fechas seleccionadas a datetime con timezone
+                chile_tz = pytz.timezone("America/Santiago")
+                start_datetime = chile_tz.localize(datetime.combine(start_date, time(0, 0, 0)))
+                end_datetime = chile_tz.localize(datetime.combine(end_date, time(23, 59, 59)))
+                
+                # Aplicar filtro de fechas
+                mask = (
+                    (filtered_df["Fecha"] >= start_datetime) & 
+                    (filtered_df["Fecha"] <= end_datetime)
+                )
+                filtered_df = filtered_df[mask]
+                
+        except Exception as e:
             st.error(f"Error en filtro de fechas: {e}")
-            # Fallback: convertir a date para comparación simple
+            # Fallback: usar comparación por fecha
             filtered_df = filtered_df[
                 (filtered_df["Fecha"].dt.date >= start_date) & 
                 (filtered_df["Fecha"].dt.date <= end_date)
             ]
 
-    # Mostrar información del rango de fechas aplicado
-    if 'apply_filters' in st.session_state and st.session_state['apply_filters'] and not filtered_df.empty:
-        st.success(f"📊 **Rango de fechas 2026 aplicado:** {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
-        
-        # Calcular días del período seleccionado
-        dias_periodo = (end_date - start_date).days + 1
-        st.caption(f"Período de {dias_periodo} día{'s' if dias_periodo > 1 else ''}")
+        # Mostrar información del filtro aplicado
+        if not filtered_df.empty:
+            st.success(f"✅ Filtros aplicados: {len(filtered_df)} registros encontrados")
+            st.info(f"📊 Rango de fechas: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
 
+    # Si no hay datos después de filtrar, mostrar información útil
     if filtered_df.empty:
-        st.info("No hay datos que coincidan con los filtros seleccionados.")
+        st.warning("🚫 No hay datos que coincidan con los filtros seleccionados.")
         
-        # Mostrar sugerencia si no hay datos pero hay datos en el rango completo - FORMA SEGURA
-        if not df.empty:
-            # Obtener fechas válidas (excluyendo NaT)
-            valid_dates = df[df["Fecha"].notna()]["Fecha"]
-            if not valid_dates.empty:
-                min_date = valid_dates.min().strftime('%d/%m/%Y')
-                max_date = valid_dates.max().strftime('%d/%m/%Y')
-                date_range_info = f"Rango completo de datos: {min_date} - {max_date}"
-            else:
-                date_range_info = "No hay fechas válidas en los datos"
-                
-            st.caption(f"ℹ️ {date_range_info}")
-            st.caption("💡 Prueba ajustar las fechas o filtros para ver datos")
+        # Mostrar sugerencias específicas
+        col_sug1, col_sug2 = st.columns(2)
+        with col_sug1:
+            st.write("**💡 Sugerencias:**")
+            st.write("• Verifica que las fechas estén dentro del rango de datos")
+            st.write("• Prueba con menos filtros simultáneos")
+            st.write("• Revisa que los cursos/alumnos seleccionados tengan datos")
+            st.write("• Usa el botón 'Limpiar Filtros' para empezar de nuevo")
+        
+        with col_sug2:
+            st.write("**📊 Datos disponibles:**")
+            if not df.empty:
+                st.write(f"• Total registros: {len(df)}")
+                if df['Fecha'].notna().any():
+                    valid_dates = df[df['Fecha'].notna()]['Fecha']
+                    st.write(f"• Rango fechas: {valid_dates.min().strftime('%d/%m/%Y')} - {valid_dates.max().strftime('%d/%m/%Y')}")
+                st.write(f"• Cursos: {len(df['Curso'].unique())}")
+                st.write(f"• Estudiantes: {len(df['Estudiante'].unique())}")
+        
         return
 
-    # Métricas clave basadas en asistencia - TOTALMENTE DINÁMICAS
+    # MOSTRAR DATOS FILTRADOS - SI LLEGAMOS AQUÍ, HAY DATOS
+    st.success(f"✅ Mostrando {len(filtered_df)} registros filtrados")
+
+    # Métricas clave
     col1, col2, col3, col4 = st.columns(4)
     
     total_registros = len(filtered_df)
@@ -561,8 +588,12 @@ def admin_panel():
     total_ausencias = total_registros - total_asistencias
     porc_asistencia = (total_asistencias / total_registros * 100) if total_registros > 0 else 0
     
-    # Calcular días únicos con clases en el período seleccionado (excluyendo NaT)
-    dias_con_clases = filtered_df[filtered_df["Fecha"].notna()]["Fecha"].dt.date.nunique()
+    # Calcular días con clases
+    if filtered_df["Fecha"].notna().any():
+        dias_con_clases = filtered_df[filtered_df["Fecha"].notna()]["Fecha"].dt.date.nunique()
+    else:
+        dias_con_clases = 0
+        
     total_dias_periodo = (end_date - start_date).days + 1
     
     with col1:
@@ -574,130 +605,110 @@ def admin_panel():
     with col4:
         st.metric("Días con clases", f"{dias_con_clases}/{total_dias_periodo}")
 
-    # Gráficos avanzados con títulos dinámicos para 2026
+    # Gráficos (solo si hay datos)
     st.subheader("📈 Análisis por Curso/Asignatura")
     if not filtered_df.empty:
-        asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
-        asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
-        fig_curso = px.bar(
-            asist_curso.reset_index(), 
-            x="Curso", 
-            y="Porcentaje",
-            hover_data=['sum', 'count'], 
-            title=f"Asistencia por Curso/Asignatura 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-            color="Porcentaje", 
-            color_continuous_scale="Blues"
-        )
-        st.plotly_chart(fig_curso)
+        try:
+            asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
+            asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
+            fig_curso = px.bar(
+                asist_curso.reset_index(), 
+                x="Curso", 
+                y="Porcentaje",
+                hover_data=['sum', 'count'], 
+                title=f"Asistencia por Curso/Asignatura 2026",
+                color="Porcentaje", 
+                color_continuous_scale="Blues"
+            )
+            st.plotly_chart(fig_curso)
+        except Exception as e:
+            st.error(f"Error en gráfico de cursos: {e}")
 
     st.subheader("👤 Análisis por Alumno")
     if not filtered_df.empty:
-        asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
-        asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
-        asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
-        fig_est = px.bar(
-            asist_est_sorted, 
-            x="Estudiante", 
-            y="Porcentaje",
-            hover_data=['sum', 'count'], 
-            title=f"Asistencia por Alumno 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-            color="Porcentaje", 
-            color_continuous_scale="Greens"
-        )
-        fig_est.update_layout(xaxis_tickangle=-45)
-        st.plotly_chart(fig_est)
-
-    st.subheader("🧑‍🏫 Análisis por Profesor")
-    if not filtered_df.empty:
-        asist_prof = filtered_df.groupby("Profesor")["Asistencia"].agg(['sum', 'count'])
-        asist_prof['Porcentaje'] = (asist_prof['sum'] / asist_prof['count'] * 100)
-        fig_prof = px.pie(
-            asist_prof.reset_index(), 
-            values="Porcentaje", 
-            names="Profesor",
-            title=f"Distribución de Asistencia por Profesor 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-            color_discrete_sequence=px.colors.qualitative.Pastel
-        )
-        st.plotly_chart(fig_prof)
-
-    st.subheader("📅 Tendencia de Asistencia Diaria 2026")
-    if not filtered_df.empty:
-        # Filtrar solo fechas válidas para el gráfico
-        valid_date_df = filtered_df[filtered_df["Fecha"].notna()]
-        if not valid_date_df.empty:
-            asist_time = valid_date_df.groupby(valid_date_df["Fecha"].dt.date)["Asistencia"].agg(['sum', 'count'])
-            asist_time['Porcentaje'] = (asist_time['sum'] / asist_time['count'] * 100)
-            fig_time = px.line(
-                asist_time.reset_index(), 
-                x="Fecha", 
+        try:
+            asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
+            asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
+            asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
+            fig_est = px.bar(
+                asist_est_sorted, 
+                x="Estudiante", 
                 y="Porcentaje",
                 hover_data=['sum', 'count'], 
-                title=f"Tendencia de Asistencia Diaria 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-                markers=True
+                title=f"Asistencia por Alumno 2026",
+                color="Porcentaje", 
+                color_continuous_scale="Greens"
             )
-            fig_time.update_layout(xaxis_title="Fecha", yaxis_title="Porcentaje de Asistencia (%)")
-            st.plotly_chart(fig_time)
-        else:
-            st.info("No hay fechas válidas para mostrar la tendencia")
-
-    # Mapa de calor para 2026
-    st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha 2026")
-    if not filtered_df.empty:
-        try:
-            # Usar fecha sin timezone para el pivot, excluyendo NaT
-            pivot_df = filtered_df[filtered_df["Fecha"].notna()].copy()
-            if not pivot_df.empty:
-                pivot_df['Fecha_Date'] = pivot_df['Fecha'].dt.date
-                
-                pivot_table = pivot_df.pivot_table(
-                    index="Estudiante", 
-                    columns="Fecha_Date", 
-                    values="Asistencia", 
-                    aggfunc="mean",
-                    fill_value=0
-                )
-                fig_heatmap = px.imshow(
-                    pivot_table, 
-                    color_continuous_scale="RdYlGn",
-                    title=f"Mapa de Calor de Asistencia 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-                    aspect="auto"
-                )
-                st.plotly_chart(fig_heatmap)
-            else:
-                st.info("No hay fechas válidas para generar el mapa de calor")
+            fig_est.update_layout(xaxis_tickangle=-45)
+            st.plotly_chart(fig_est)
         except Exception as e:
-            st.warning(f"No se pudo generar el mapa de calor: {e}")
+            st.error(f"Error en gráfico de alumnos: {e}")
 
-    # Tabla detallada interactiva - MANEJO SEGURO DE FECHAS
+    # Tabla detallada - CORREGIDO el problema de fechas
     st.subheader("📋 Registro Detallado 2026")
+    
+    # Crear DataFrame para mostrar con formato mejorado
     display_df = filtered_df.copy()
     
-    # Función segura para formatear fechas
+    # Función MEJORADA para formatear fechas
     def safe_date_format(x):
         if pd.isna(x):
             return "Sin fecha"
         try:
-            return x.strftime("%Y-%m-%d %H:%M")
-        except (AttributeError, ValueError):
-            return "Fecha inválida"
+            # Si es un Timestamp con timezone, convertirlo a string
+            if hasattr(x, 'strftime'):
+                return x.strftime("%Y-%m-%d %H:%M")
+            else:
+                return str(x)
+        except (AttributeError, ValueError, TypeError) as e:
+            return f"Fecha inválida: {str(e)}"
     
-    display_df["Fecha"] = display_df["Fecha"].apply(safe_date_format)
-    st.dataframe(display_df, use_container_width=True)
+    # Aplicar formato seguro a las fechas
+    display_df["Fecha_Formateada"] = display_df["Fecha"].apply(safe_date_format)
+    
+    # DEBUG: Mostrar información sobre las fechas
+    with st.expander("🔍 Información de depuración de fechas"):
+        st.write("**Tipos de datos en columna Fecha:**")
+        st.write(f"Tipo de columna: {display_df['Fecha'].dtype}")
+        st.write("Primeros 5 valores originales:")
+        st.write(display_df['Fecha'].head())
+        st.write("Primeros 5 valores formateados:")
+        st.write(display_df['Fecha_Formateada'].head())
+        
+        # Contar valores nulos
+        nulos = display_df['Fecha'].isna().sum()
+        st.write(f"Valores nulos/NaT en Fecha: {nulos}")
+        
+        # Mostrar ejemplos de fechas problemáticas
+        if nulos > 0:
+            st.write("Registros con fechas nulas:")
+            st.write(display_df[display_df['Fecha'].isna()][['Estudiante', 'Curso', 'Asistencia']].head())
+    
+    # Mostrar tabla con columnas relevantes
+    columnas_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Profesor', 'Asistencia']
+    # Verificar qué columnas existen
+    columnas_existentes = [col for col in columnas_mostrar if col in display_df.columns]
+    
+    st.dataframe(display_df[columnas_existentes].rename(
+        columns={'Fecha_Formateada': 'Fecha'}
+    ), use_container_width=True)
 
-    # Opciones de descarga para datos 2026
+    # Opciones de descarga
     st.subheader("📤 Exportar Datos 2026")
     col_dl1, col_dl2 = st.columns(2)
+    
     with col_dl1:
-        # Preparar CSV sin problemas de timezone
         csv_df = filtered_df.copy()
         
-        # Función segura para formatear fechas en CSV
         def safe_csv_date(x):
             if pd.isna(x):
                 return ""
             try:
-                return x.strftime('%Y-%m-%d %H:%M:%S')
-            except (AttributeError, ValueError):
+                if hasattr(x, 'strftime'):
+                    return x.strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    return str(x)
+            except (AttributeError, ValueError, TypeError):
                 return ""
         
         csv_df['Fecha'] = csv_df['Fecha'].apply(safe_csv_date)
@@ -705,22 +716,32 @@ def admin_panel():
         st.download_button(
             "📥 Descargar como CSV", 
             csv, 
-            f"asistencia_2026_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv", 
+            "asistencia_filtrada_2026.csv", 
             "text/csv",
-            use_container_width=True
+            use_container_width=True,
+            help="Descargar datos en formato CSV"
         )
+    
     with col_dl2:
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-            # Preparar datos para Excel
             excel_df = filtered_df.copy()
-            # Remover timezone para Excel y manejar NaT
-            excel_df['Fecha'] = excel_df['Fecha'].apply(
-                lambda x: x.tz_localize(None) if pd.notna(x) else pd.NaT
-            )
+            
+            # Manejar fechas para Excel de forma segura
+            def safe_excel_date(x):
+                if pd.isna(x):
+                    return pd.NaT
+                try:
+                    # Si tiene timezone, removerla
+                    if hasattr(x, 'tz') and x.tz is not None:
+                        return x.tz_localize(None)
+                    return x
+                except (AttributeError, ValueError, TypeError):
+                    return pd.NaT
+            
+            excel_df['Fecha'] = excel_df['Fecha'].apply(safe_excel_date)
             excel_df.to_excel(writer, index=False, sheet_name='Asistencia_2026')
             
-            # Agregar hoja con resumen
             summary_data = {
                 'Métrica': ['Período 2026', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
                 'Valor': [
@@ -737,56 +758,32 @@ def admin_panel():
         st.download_button(
             "📥 Descargar como Excel", 
             excel_data, 
-            f"asistencia_2026_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx", 
+            "asistencia_filtrada_2026.xlsx", 
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+            use_container_width=True,
+            help="Descargar datos en formato Excel con resumen"
         )
 
-    # Insights adicionales DINÁMICOS para 2026
-    st.subheader("🔍 Insights Avanzados 2026")
-    if not filtered_df.empty:
-        # Mejor y peor alumno
-        top_est = asist_est_sorted.iloc[0]["Estudiante"] if not asist_est_sorted.empty else "N/A"
-        top_porc = asist_est_sorted.iloc[0]["Porcentaje"] if not asist_est_sorted.empty else 0
-        low_est = asist_est_sorted.iloc[-1]["Estudiante"] if not asist_est_sorted.empty else "N/A"
-        low_porc = asist_est_sorted.iloc[-1]["Porcentaje"] if not asist_est_sorted.empty else 0
-        
-        # Curso con mejor asistencia
-        mejor_curso = asist_curso.loc[asist_curso['Porcentaje'].idxmax()] if not asist_curso.empty else None
-        peor_curso = asist_curso.loc[asist_curso['Porcentaje'].idxmin()] if not asist_curso.empty else None
-        
-        col_insight1, col_insight2 = st.columns(2)
-        
-        with col_insight1:
-            st.write("**👥 Rendimiento por Alumno 2026:**")
-            st.write(f"• **Mejor alumno:** {top_est} ({top_porc:.1f}%)")
-            st.write(f"• **Alumno con menor asistencia:** {low_est} ({low_porc:.1f}%)")
-            st.write(f"• **Asistencia promedio:** {porc_asistencia:.1f}%")
-            
-        with col_insight2:
-            st.write("**📚 Rendimiento por Curso 2026:**")
-            if mejor_curso is not None:
-                st.write(f"• **Mejor curso:** {mejor_curso.name} ({mejor_curso['Porcentaje']:.1f}%)")
-            if peor_curso is not None:
-                st.write(f"• **Curso con menor asistencia:** {peor_curso.name} ({peor_curso['Porcentaje']:.1f}%)")
-            st.write(f"• **Días con clases:** {dias_con_clases}")
-        
-        # Alertas basadas en el porcentaje dinámico
-        if porc_asistencia < 70:
-            st.error("⚠️ **Alerta 2026:** La asistencia promedio es menor al 70%. Considerar acciones correctivas.")
-        elif porc_asistencia < 80:
-            st.warning("📋 **Atención 2026:** La asistencia promedio está entre 70-80%. Monitorear situación.")
-        else:
-            st.success("✅ **Excelente 2026:** La asistencia promedio es mayor al 80%.")
-
-        # Estadísticas adicionales para 2026
-        st.write(f"**📊 Estadísticas del período 2026:**")
-        st.write(f"• Período analizado: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
-        st.write(f"• Total de registros: {total_registros}")
-        st.write(f"• Ratio asistencia/ausencia: {total_asistencias}:{total_ausencias}")
-
-
-
+    # Botón adicional para limpiar todo
+    st.markdown("---")
+    col_clean1, col_clean2, col_clean3 = st.columns(3)
+    
+    with col_clean1:
+        if st.button("🔄 Recargar Datos", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+    
+    with col_clean2:
+        if st.button("🧹 Limpiar Filtros", use_container_width=True):
+            for key in list(st.session_state.keys()):
+                if 'admin' in key or 'date' in key:
+                    del st.session_state[key]
+            st.rerun()
+    
+    with col_clean3:
+        if st.button("📊 Ver Todos los Datos", use_container_width=True):
+            st.session_state['apply_filters'] = False
+            st.rerun()
 
 
 
