@@ -433,7 +433,7 @@ def admin_panel():
         # RANGO DE FECHAS DINÁMICO
         st.subheader("📅 Rango de Fechas")
         
-        current_year = datetime.now().year
+        current_year = 2026
         
         # Fechas límite del sistema (1 de abril a 1 de diciembre)
         system_start = datetime(current_year, 4, 1).date()  # 1 de abril
