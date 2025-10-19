@@ -133,6 +133,12 @@ def load_courses():
 
     return courses
 
+
+
+# ==============================
+# CARGA DE DATOS - emails
+# ==============================
+
 @st.cache_data(ttl=3600)
 def load_emails():
     try:
@@ -253,6 +259,10 @@ def load_all_asistencia():
         # Convertir fechas de forma segura: errores → NaT
         df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
     return df
+
+
+
+
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
@@ -388,9 +398,17 @@ Preuniversitario CIMMA"""
     else:
         main_app()
 
+
+
+
+
+
+
+
 # ==============================
 # PANEL ADMINISTRATIVO
 # ==============================
+
 
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
@@ -398,11 +416,67 @@ def admin_panel():
 
     # Cargar datos
     df = load_all_asistencia()
+    
+    # DIAGNÓSTICO INICIAL
+    with st.expander("🔍 Diagnóstico de Datos Cargados", expanded=True):
+        if df.empty:
+            st.error("❌ El DataFrame está VACÍO")
+            return
+        else:
+            st.success(f"✅ DataFrame cargado con {len(df)} registros")
+            st.write("**Columnas:**", list(df.columns))
+            
+            if 'Fecha' in df.columns:
+                st.write("**Muestra de fechas (texto original):**")
+                st.write(df['Fecha'].head(10))
+    
     if df.empty:
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # DEBUG: Mostrar información básica de los datos
+    # CONVERSIÓN DE FECHAS - ESPAÑOL A DATETIME
+    st.info("🔄 Procesando fechas en formato español...")
+    
+    # Diccionario de meses en español
+    meses_espanol = {
+        'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
+        'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
+    }
+    
+    def convertir_fecha_espanol(fecha_texto):
+        if pd.isna(fecha_texto) or fecha_texto == '':
+            return pd.NaT
+        
+        try:
+            # Ejemplo: "6 de abril de 2026"
+            partes = fecha_texto.lower().split(' de ')
+            if len(partes) == 3:
+                dia = int(partes[0].strip())
+                mes = meses_espanol[partes[1].strip()]
+                año = int(partes[2].strip())
+                return datetime(año, mes, dia)
+        except Exception as e:
+            st.warning(f"Error convirtiendo fecha: {fecha_texto} - {e}")
+        
+        return pd.NaT
+    
+    # Aplicar conversión si la columna Fecha existe y es texto
+    if 'Fecha' in df.columns and df['Fecha'].dtype == 'object':
+        df['Fecha'] = df['Fecha'].apply(convertir_fecha_espanol)
+        st.success(f"✅ Fechas convertidas: {df['Fecha'].notna().sum()} fechas válidas")
+        
+        # Mostrar resultado de la conversión
+        with st.expander("🔍 Resultado de conversión de fechas"):
+            fechas_convertidas = df[df['Fecha'].notna()]['Fecha']
+            if not fechas_convertidas.empty:
+                st.write("**Fechas convertidas correctamente:**")
+                st.write(f"- Rango: {fechas_convertidas.min().strftime('%d/%m/%Y')} a {fechas_convertidas.max().strftime('%d/%m/%Y')}")
+                st.write("**Ejemplos de fechas convertidas:**")
+                st.write(fechas_convertidas.head(10))
+            else:
+                st.warning("⚠️ No se pudieron convertir las fechas")
+
+    # Filtros en sidebar
     st.sidebar.header("📊 Información de Datos")
     st.sidebar.write(f"**Total de registros:** {len(df)}")
     
@@ -410,23 +484,18 @@ def admin_panel():
         st.sidebar.write(f"**Cursos encontrados:** {len(df['Curso'].unique())}")
         st.sidebar.write(f"**Estudiantes únicos:** {len(df['Estudiante'].unique())}")
         
-        # Información sobre fechas
+        # Información sobre fechas después de la conversión
         if 'Fecha' in df.columns and df['Fecha'].notna().any():
             fechas_validas = df[df['Fecha'].notna()]['Fecha']
             st.sidebar.write(f"**Rango de fechas:**")
             st.sidebar.write(f"{fechas_validas.min().strftime('%d/%m/%Y')} - {fechas_validas.max().strftime('%d/%m/%Y')}")
         else:
             st.sidebar.write("**❌ No hay fechas válidas**")
-        
-        # Información sobre asistencia
-        total_asistencias = df['Asistencia'].sum()
-        porcentaje_asistencia = (total_asistencias / len(df) * 100) if len(df) > 0 else 0
-        st.sidebar.write(f"**Asistencia global:** {porcentaje_asistencia:.1f}%")
 
     # Filtros en sidebar
     st.sidebar.header("🔍 Filtros")
     
-    # Lista de cursos (usando los cursos reales de los datos)
+    # Lista de cursos
     cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
     curso_seleccionado = st.sidebar.selectbox("Seleccionar Curso", cursos)
     
@@ -439,8 +508,8 @@ def admin_panel():
     
     estudiante_seleccionado = st.sidebar.selectbox("Seleccionar Estudiante", estudiantes)
     
-    # Fechas - usar el rango real de los datos
-    if df['Fecha'].notna().any():
+    # Fechas - usar el rango real de los datos después de la conversión
+    if 'Fecha' in df.columns and df['Fecha'].notna().any():
         fecha_min = df['Fecha'].min().date()
         fecha_max = df['Fecha'].max().date()
     else:
@@ -608,18 +677,36 @@ def admin_panel():
     
     # Formatear fechas para mostrar
     if 'Fecha' in datos_mostrar.columns:
-        datos_mostrar['Fecha'] = datos_mostrar['Fecha'].apply(
-            lambda x: x.strftime('%Y-%m-%d %H:%M') if pd.notna(x) else 'Sin fecha'
+        # Crear columna formateada
+        datos_mostrar['Fecha_Formateada'] = datos_mostrar['Fecha'].apply(
+            lambda x: x.strftime('%d/%m/%Y %H:%M') if pd.notna(x) else 'Sin fecha'
         )
+    else:
+        datos_mostrar['Fecha_Formateada'] = 'Columna no disponible'
     
     # Seleccionar columnas para mostrar
-    columnas_a_mostrar = ['Fecha', 'Estudiante', 'Curso', 'Asistencia']
-    if 'Hora Registro' in datos_mostrar.columns:
-        columnas_a_mostrar.append('Hora Registro')
-    if 'Información' in datos_mostrar.columns:
-        columnas_a_mostrar.append('Información')
+    columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Asistencia']
     
-    st.dataframe(datos_mostrar[columnas_a_mostrar], use_container_width=True, height=400)
+    # Agregar columnas adicionales si existen
+    columnas_extra = ['Hora Registro', 'Información']
+    for col in columnas_extra:
+        if col in datos_mostrar.columns:
+            columnas_a_mostrar.append(col)
+    
+    # Filtrar solo las columnas que existen
+    columnas_finales = [col for col in columnas_a_mostrar if col in datos_mostrar.columns]
+    
+    # Mostrar tabla con nombres de columnas amigables
+    nombres_amigables = {
+        'Fecha_Formateada': 'Fecha',
+        'Hora Registro': 'Hora',
+        'Información': 'Información'
+    }
+    
+    datos_tabla = datos_mostrar[columnas_finales].rename(columns=nombres_amigables)
+    
+    st.dataframe(datos_tabla, use_container_width=True, height=400)
+    st.caption(f"Mostrando {len(datos_tabla)} registros")
 
     # OPCIONES DE EXPORTACIÓN
     st.subheader("📤 Exportar Datos")
@@ -684,7 +771,6 @@ def admin_panel():
     with col2:
         if st.button("📊 Ver Todos los Datos", use_container_width=True):
             st.rerun()
-
 
 
 
