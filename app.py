@@ -430,10 +430,6 @@ def admin_panel():
         
         # Botón para limpiar filtros
         if st.button("🧹 Limpiar Filtros", use_container_width=True):
-            # Limpiar solo variables de filtros
-            for key in list(st.session_state.keys()):
-                if any(filter_word in key for filter_word in ['filtro', 'filter', 'date', 'select', 'apply']):
-                    del st.session_state[key]
             st.rerun()
 
         # Obtener opciones únicas
@@ -441,7 +437,7 @@ def admin_panel():
         estudiantes_opciones = ["Todos"] + sorted(df["Estudiante"].unique().tolist())
         profesores_opciones = ["Todos"] + sorted(df["Profesor"].dropna().unique().tolist())
 
-        curso_sel = st.selectbox("Curso/Asignatura", cursos_opciones, key="filtro_curso")
+        curso_sel = st.selectbox("Curso", cursos_opciones, key="filtro_curso")
         est_sel = st.selectbox("Alumno", estudiantes_opciones, key="filtro_estudiante")
         prof_sel = st.selectbox("Profesor", profesores_opciones, key="filtro_profesor")
 
@@ -495,62 +491,91 @@ def admin_panel():
 
         st.caption(f"📅 Período académico 2026: {system_start.strftime('%d/%m/%Y')} - {system_end.strftime('%d/%m/%Y')}")
 
-    # INICIAL: Mostrar todos los datos hasta que se apliquen filtros
+    # APLICAR FILTROS AUTOMÁTICAMENTE SIN NECESIDAD DE BOTÓN
     filtered_df = df.copy()
-    filters_active = False
-
-    # Aplicar filtros solo si se presiona el botón
-    if apply_filters:
-        filters_active = True
-        # Aplicar filtros de selección
-        if curso_sel != "Todos":
-            filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
-        if est_sel != "Todos":
-            filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
-        if prof_sel != "Todos":
-            filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
-        
-        # Filtrar por rango de fechas
-        try:
-            # Primero eliminar valores NaT
-            filtered_df = filtered_df[filtered_df["Fecha"].notna()]
+    filters_applied = False
+    
+    # Aplicar filtro de curso si no es "Todos"
+    if curso_sel != "Todos":
+        filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
+        filters_applied = True
+        st.sidebar.info(f"📚 Curso filtrado: {curso_sel}")
+    
+    # Aplicar filtro de alumno si no es "Todos"
+    if est_sel != "Todos":
+        filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
+        filters_applied = True
+        st.sidebar.info(f"👤 Alumno filtrado: {est_sel}")
+    
+    # Aplicar filtro de profesor si no es "Todos"
+    if prof_sel != "Todos":
+        filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
+        filters_applied = True
+        st.sidebar.info(f"🧑‍🏫 Profesor filtrado: {prof_sel}")
+    
+    # Aplicar filtro de fechas automáticamente
+    try:
+        filtered_df = filtered_df[filtered_df["Fecha"].notna()]
+        if not filtered_df.empty:
+            chile_tz = pytz.timezone("America/Santiago")
+            start_datetime = chile_tz.localize(datetime.combine(start_date, time(0, 0, 0)))
+            end_datetime = chile_tz.localize(datetime.combine(end_date, time(23, 59, 59)))
             
-            if not filtered_df.empty:
-                # Convertir fechas seleccionadas a datetime con timezone
-                chile_tz = pytz.timezone("America/Santiago")
-                start_datetime = chile_tz.localize(datetime.combine(start_date, time(0, 0, 0)))
-                end_datetime = chile_tz.localize(datetime.combine(end_date, time(23, 59, 59)))
-                
-                # Aplicar filtro de fechas
-                mask = (
-                    (filtered_df["Fecha"] >= start_datetime) & 
-                    (filtered_df["Fecha"] <= end_datetime)
-                )
-                filtered_df = filtered_df[mask]
-                
-        except Exception as e:
-            st.error(f"Error en filtro de fechas: {e}")
-            # Fallback: usar comparación por fecha
-            filtered_df = filtered_df[
-                (filtered_df["Fecha"].dt.date >= start_date) & 
-                (filtered_df["Fecha"].dt.date <= end_date)
-            ]
+            mask = (
+                (filtered_df["Fecha"] >= start_datetime) & 
+                (filtered_df["Fecha"] <= end_datetime)
+            )
+            filtered_df = filtered_df[mask]
+            filters_applied = True
+            
+    except Exception as e:
+        # Fallback
+        filtered_df = filtered_df[
+            (filtered_df["Fecha"].dt.date >= start_date) & 
+            (filtered_df["Fecha"].dt.date <= end_date)
+        ]
+        filters_applied = True
+
+    # Si se presiona el botón "Aplicar Filtros", forzar la aplicación
+    if apply_filters:
+        filters_applied = True
+        st.success("✅ Filtros aplicados manualmente")
 
     # VERIFICAR SI HAY DATOS PARA MOSTRAR
     if filtered_df.empty:
-        if filters_active:
-            st.warning("🚫 No hay datos que coincidan con los filtros seleccionados.")
-            st.info("💡 Prueba con diferentes filtros o usa el botón 'Limpiar Filtros'")
-        else:
-            st.warning("No hay datos de asistencia disponibles.")
+        st.error("🚫 No hay datos que coincidan con los filtros seleccionados.")
+        
+        # Mostrar información de diagnóstico
+        with st.expander("🔍 Diagnóstico de datos"):
+            st.write(f"**Datos originales:** {len(df)} registros")
+            st.write(f"**Cursos disponibles:** {', '.join(sorted(df['Curso'].unique()))}")
+            st.write(f"**Rango de fechas en datos:** {df['Fecha'].min().strftime('%d/%m/%Y') if df['Fecha'].notna().any() else 'N/A'} - {df['Fecha'].max().strftime('%d/%m/%Y') if df['Fecha'].notna().any() else 'N/A'}")
+            st.write(f"**Filtros aplicados:**")
+            st.write(f"  - Curso: {curso_sel}")
+            st.write(f"  - Alumno: {est_sel}") 
+            st.write(f"  - Profesor: {prof_sel}")
+            st.write(f"  - Fechas: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
+        
+        st.info("💡 **Sugerencias:**")
+        st.write("• Prueba seleccionar 'Todos' en algunos filtros")
+        st.write("• Verifica que el rango de fechas incluya datos existentes")
+        st.write("• Asegúrate de que el curso seleccionado tenga registros")
         return
 
-    # MOSTRAR INFORMACIÓN DE FILTROS APLICADOS
-    if filters_active:
-        st.success(f"✅ Filtros aplicados: {len(filtered_df)} registros encontrados")
-        st.info(f"📅 Período: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
+    # MOSTRAR INFORMACIÓN DE FILTROS
+    if filters_applied:
+        st.success(f"✅ Mostrando {len(filtered_df)} registros filtrados")
+        
+        # Mostrar resumen de filtros aplicados
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            st.info(f"**Curso:** {curso_sel}")
+        with col_f2:
+            st.info(f"**Alumno:** {est_sel}")
+        with col_f3:
+            st.info(f"**Período:** {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
     else:
-        st.info(f"📊 Mostrando todos los {len(filtered_df)} registros disponibles. Usa los filtros para refinar la búsqueda.")
+        st.info(f"📊 Mostrando todos los {len(filtered_df)} registros disponibles")
 
     # MÉTRICAS PRINCIPALES
     st.subheader("📈 Métricas de Asistencia")
@@ -579,46 +604,51 @@ def admin_panel():
     with col4:
         st.metric("Días con clases", f"{dias_con_clases}/{total_dias_periodo}")
 
-    # GRÁFICOS
-    st.subheader("📊 Análisis Visual")
-    
-    # Gráfico por Curso
-    if not filtered_df.empty:
-        try:
-            asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
-            asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
-            fig_curso = px.bar(
-                asist_curso.reset_index(), 
-                x="Curso", 
-                y="Porcentaje",
-                hover_data=['sum', 'count'], 
-                title="Asistencia por Curso/Asignatura",
-                color="Porcentaje", 
-                color_continuous_scale="Blues"
-            )
-            st.plotly_chart(fig_curso, use_container_width=True)
-        except Exception as e:
-            st.error(f"Error en gráfico de cursos: {e}")
+    # GRÁFICOS - SOLO SI HAY SUFICIENTES DATOS
+    if len(filtered_df) > 0:
+        st.subheader("📊 Análisis Visual")
+        
+        # Gráfico por Curso (solo si hay múltiples cursos o se muestra "Todos")
+        if curso_sel == "Todos" and len(filtered_df['Curso'].unique()) > 1:
+            try:
+                asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
+                asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
+                fig_curso = px.bar(
+                    asist_curso.reset_index(), 
+                    x="Curso", 
+                    y="Porcentaje",
+                    hover_data=['sum', 'count'], 
+                    title="Asistencia por Curso",
+                    color="Porcentaje", 
+                    color_continuous_scale="Blues"
+                )
+                st.plotly_chart(fig_curso, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error en gráfico de cursos: {e}")
+        else:
+            st.info(f"📚 Mostrando datos del curso: **{curso_sel}**")
 
-    # Gráfico por Alumno
-    if not filtered_df.empty:
-        try:
-            asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
-            asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
-            asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
-            fig_est = px.bar(
-                asist_est_sorted, 
-                x="Estudiante", 
-                y="Porcentaje",
-                hover_data=['sum', 'count'], 
-                title="Asistencia por Alumno",
-                color="Porcentaje", 
-                color_continuous_scale="Greens"
-            )
-            fig_est.update_layout(xaxis_tickangle=-45)
-            st.plotly_chart(fig_est, use_container_width=True)
-        except Exception as e:
-            st.error(f"Error en gráfico de alumnos: {e}")
+        # Gráfico por Alumno
+        if len(filtered_df['Estudiante'].unique()) > 1:
+            try:
+                asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
+                asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
+                asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
+                fig_est = px.bar(
+                    asist_est_sorted, 
+                    x="Estudiante", 
+                    y="Porcentaje",
+                    hover_data=['sum', 'count'], 
+                    title=f"Asistencia por Alumno - {curso_sel}",
+                    color="Porcentaje", 
+                    color_continuous_scale="Greens"
+                )
+                fig_est.update_layout(xaxis_tickangle=-45)
+                st.plotly_chart(fig_est, use_container_width=True)
+            except Exception as e:
+                st.error(f"Error en gráfico de alumnos: {e}")
+        else:
+            st.info(f"👤 Mostrando datos de: **{filtered_df['Estudiante'].iloc[0] if len(filtered_df) > 0 else 'N/A'}**")
 
     # TABLA DETALLADA
     st.subheader("📋 Registro Detallado")
@@ -647,7 +677,7 @@ def admin_panel():
     df_mostrar = display_df[columnas_existentes].rename(columns={'Fecha_Formateada': 'Fecha'})
     
     # Mostrar tabla
-    st.dataframe(df_mostrar, use_container_width=True)
+    st.dataframe(df_mostrar, use_container_width=True, height=400)
     
     # Información sobre la tabla
     st.caption(f"Mostrando {len(df_mostrar)} registros")
@@ -677,7 +707,7 @@ def admin_panel():
         st.download_button(
             "📥 Descargar como CSV", 
             csv, 
-            "asistencia_filtrada.csv", 
+            f"asistencia_{curso_sel.lower().replace(' ', '_') if curso_sel != 'Todos' else 'completa'}.csv", 
             "text/csv",
             use_container_width=True
         )
@@ -703,9 +733,10 @@ def admin_panel():
             
             # Resumen
             summary_data = {
-                'Métrica': ['Período', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
+                'Métrica': ['Período', 'Curso', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
                 'Valor': [
                     f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}",
+                    curso_sel,
                     total_registros,
                     total_asistencias,
                     total_ausencias,
@@ -718,27 +749,10 @@ def admin_panel():
         st.download_button(
             "📥 Descargar como Excel", 
             excel_data, 
-            "asistencia_filtrada.xlsx", 
+            f"asistencia_{curso_sel.lower().replace(' ', '_') if curso_sel != 'Todos' else 'completa'}.xlsx", 
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
-
-    # BOTONES ADICIONALES
-    st.markdown("---")
-    col_btn1, col_btn2 = st.columns(2)
-    
-    with col_btn1:
-        if st.button("🔄 Recargar Todo", use_container_width=True):
-            st.cache_data.clear()
-            st.rerun()
-    
-    with col_btn2:
-        if st.button("📊 Ver Todos los Datos", use_container_width=True):
-            # Limpiar solo filtros
-            for key in list(st.session_state.keys()):
-                if any(filter_word in key for filter_word in ['filtro', 'filter', 'date', 'select', 'apply']):
-                    del st.session_state[key]
-            st.rerun()
 
 
 
