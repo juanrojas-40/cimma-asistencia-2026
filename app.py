@@ -460,6 +460,9 @@ Preuniversitario CIMMA"""
 
 
 
+
+
+
 # ==============================
 # FUNCIÓN PARA ENVIAR RESUMEN DE ASISTENCIA
 # ==============================
@@ -467,36 +470,65 @@ Preuniversitario CIMMA"""
 def enviar_resumen_asistencia(datos_filtrados):
     """Envía un resumen de asistencia a los apoderados de los estudiantes filtrados"""
     
+    st.info("🔄 Cargando información de apoderados...")
+    
     # Cargar emails y nombres de apoderados
     emails, nombres_apoderados = load_emails()
     
     if not emails:
         st.error("❌ No se encontraron emails de apoderados en la hoja 'MAILS'")
+        st.info("💡 Verifica que la hoja 'MAILS' exista y tenga los datos correctos")
         return
+    
+    st.success(f"✅ Se cargaron {len(emails)} emails de apoderados")
     
     # Obtener estudiantes únicos de los datos filtrados
     estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
+    st.info(f"📊 Se encontraron {len(estudiantes_filtrados)} estudiantes en los datos filtrados")
     
     # Contar emails que se enviarán
     emails_a_enviar = 0
     estudiantes_con_email = []
+    estudiantes_sin_email = []
     
     for estudiante in estudiantes_filtrados:
         nombre_lower = estudiante.strip().lower()
         if nombre_lower in emails:
             emails_a_enviar += 1
             estudiantes_con_email.append(estudiante)
+        else:
+            estudiantes_sin_email.append(estudiante)
+    
+    # Mostrar estudiantes sin email para debugging
+    if estudiantes_sin_email:
+        with st.expander("⚠️ Estudiantes sin email registrado"):
+            st.write("Los siguientes estudiantes no tienen email registrado en la hoja MAILS:")
+            for est in estudiantes_sin_email[:10]:  # Mostrar solo los primeros 10
+                st.write(f"- {est}")
+            if len(estudiantes_sin_email) > 10:
+                st.write(f"... y {len(estudiantes_sin_email) - 10} más")
     
     if emails_a_enviar == 0:
         st.error("❌ No se encontraron emails para los estudiantes filtrados")
+        st.info("💡 Verifica que los nombres en la hoja MAILS coincidan exactamente con los nombres en los registros de asistencia")
         return
     
-    # Mostrar confirmación
-    st.info(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
+    # Mostrar confirmación con más detalles
+    st.success(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
     
-    if st.button("✅ Confirmar envío", key="confirmar_envio"):
+    with st.expander("👀 Ver estudiantes que recibirán el resumen"):
+        for estudiante in estudiantes_con_email:
+            nombre_lower = estudiante.strip().lower()
+            email = emails.get(nombre_lower, "No encontrado")
+            apoderado = nombres_apoderados.get(nombre_lower, "No especificado")
+            st.write(f"- **{estudiante}** → {apoderado} ({email})")
+    
+    # Usar un key único para el botón de confirmación
+    if st.button("✅ Confirmar envío de resúmenes", key="confirmar_envio_resumen"):
+        st.info("🚀 Iniciando envío de resúmenes...")
         progress_bar = st.progress(0)
         resultados = []
+        emails_enviados = 0
         
         for i, estudiante in enumerate(estudiantes_con_email):
             nombre_lower = estudiante.strip().lower()
@@ -504,6 +536,7 @@ def enviar_resumen_asistencia(datos_filtrados):
             nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado/a")
             
             if not correo_destino:
+                st.warning(f"⚠️ No se encontró email para {estudiante}")
                 continue
             
             # Filtrar datos del estudiante específico
@@ -550,7 +583,15 @@ Saludos cordiales,
 Preuniversitario CIMMA 2026"""
             
             # Enviar email
+            st.write(f"📤 Enviando resumen para {estudiante}...")
             exito = send_email(correo_destino, subject, body)
+            
+            if exito:
+                emails_enviados += 1
+                st.success(f"✅ Email enviado a {nombre_apoderado} ({correo_destino})")
+            else:
+                st.error(f"❌ Error al enviar email a {correo_destino}")
+            
             resultados.append({
                 'estudiante': estudiante,
                 'apoderado': nombre_apoderado,
@@ -561,18 +602,34 @@ Preuniversitario CIMMA 2026"""
             # Actualizar progreso
             progress_bar.progress((i + 1) / len(estudiantes_con_email))
         
-        # Mostrar resultados
-        st.success("✅ Proceso de envío completado")
+        # Mostrar resultados finales
+        st.success(f"✅ Proceso de envío completado: {emails_enviados}/{len(estudiantes_con_email)} emails enviados exitosamente")
         
-        with st.expander("📋 Ver detalles del envío"):
+        with st.expander("📋 Ver detalles completos del envío"):
             exitosos = sum(1 for r in resultados if r['exito'])
             fallidos = len(resultados) - exitosos
             
             st.write(f"**Resultados:** {exitosos} exitosos, {fallidos} fallidos")
             
+            st.subheader("✅ Emails enviados exitosamente:")
             for resultado in resultados:
-                icono = "✅" if resultado['exito'] else "❌"
-                st.write(f"{icono} {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
+                if resultado['exito']:
+                    st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
+            
+            if fallidos > 0:
+                st.subheader("❌ Emails con error:")
+                for resultado in resultados:
+                    if not resultado['exito']:
+                        st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
+
+
+
+
+
+
+
+
+
 
 # ==============================
 # PANEL ADMINISTRATIVO
