@@ -397,11 +397,9 @@ def admin_panel():
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
 
     # Botón para limpiar caché
-    col_cache, col_space = st.columns([1, 5])
-    with col_cache:
-        if st.button("🔄 Limpiar Caché", help="Actualizar datos y limpiar caché"):
-            st.cache_data.clear()
-            st.rerun()
+    if st.button("🔄 Limpiar Caché", help="Actualizar datos y limpiar caché"):
+        st.cache_data.clear()
+        st.rerun()
 
     df = load_all_asistencia()
     if df.empty:
@@ -414,7 +412,7 @@ def admin_panel():
     df['Profesor'] = df['Curso'].map(curso_to_prof)
     df['Asignatura'] = df['Curso']
 
-    # Asegurar que la columna Fecha esté en formato datetime CORREGIDO
+    # Asegurar que la columna Fecha esté en formato datetime
     if not df.empty and 'Fecha' in df.columns:
         if df['Fecha'].dtype != 'datetime64[ns]':
             df['Fecha'] = pd.to_datetime(df['Fecha'], errors='coerce')
@@ -422,79 +420,32 @@ def admin_panel():
         # Verificar si ya tiene timezone
         if df['Fecha'].dt.tz is None:
             chile_tz = pytz.timezone("America/Santiago")
-            # Usar apply para manejar mejor los valores NaT
             df['Fecha'] = df['Fecha'].apply(
                 lambda x: chile_tz.localize(x) if pd.notna(x) else x
             )
 
-    # DEBUG: Mostrar información de los datos cargados
-    with st.sidebar:
-        st.header("ℹ️ Información de Datos")
-        st.write(f"Total registros: {len(df)}")
-        if not df.empty:
-            st.write(f"Cursos: {len(df['Curso'].unique())}")
-            st.write(f"Estudiantes: {len(df['Estudiante'].unique())}")
-            if df['Fecha'].notna().any():
-                valid_dates = df[df['Fecha'].notna()]['Fecha']
-                st.write(f"Rango fechas: {valid_dates.min().strftime('%d/%m/%Y')} - {valid_dates.max().strftime('%d/%m/%Y')}")
-
-        # Botón para limpiar filtros en sidebar - CORREGIDO
-        if st.button("🧹 Limpiar Filtros", use_container_width=True, key="clear_filters_sidebar"):
-            # Solo limpiar las variables específicas de filtros
-            keys_to_clear = [
-                'start_date_admin', 'end_date_admin', 
-                'apply_filters_admin', 'curso_selected', 
-                'estudiante_selected', 'profesor_selected'
-            ]
-            for key in keys_to_clear:
-                if key in st.session_state:
-                    del st.session_state[key]
-            st.rerun()
-
     # Filtros en sidebar
     with st.sidebar:
         st.header("🔍 Filtros")
+        
+        # Botón para limpiar filtros
+        if st.button("🧹 Limpiar Filtros", use_container_width=True):
+            # Limpiar solo variables de filtros
+            for key in list(st.session_state.keys()):
+                if any(filter_word in key for filter_word in ['filtro', 'filter', 'date', 'select', 'apply']):
+                    del st.session_state[key]
+            st.rerun()
 
         # Obtener opciones únicas
         cursos_opciones = ["Todos"] + sorted(df["Curso"].unique().tolist())
         estudiantes_opciones = ["Todos"] + sorted(df["Estudiante"].unique().tolist())
         profesores_opciones = ["Todos"] + sorted(df["Profesor"].dropna().unique().tolist())
 
-        # Usar session_state para mantener los valores seleccionados
-        if 'curso_selected' not in st.session_state:
-            st.session_state.curso_selected = "Todos"
-        if 'estudiante_selected' not in st.session_state:
-            st.session_state.estudiante_selected = "Todos"
-        if 'profesor_selected' not in st.session_state:
-            st.session_state.profesor_selected = "Todos"
+        curso_sel = st.selectbox("Curso/Asignatura", cursos_opciones, key="filtro_curso")
+        est_sel = st.selectbox("Alumno", estudiantes_opciones, key="filtro_estudiante")
+        prof_sel = st.selectbox("Profesor", profesores_opciones, key="filtro_profesor")
 
-        curso_sel = st.selectbox(
-            "Curso/Asignatura", 
-            cursos_opciones,
-            key="curso_select",
-            index=cursos_opciones.index(st.session_state.curso_selected) if st.session_state.curso_selected in cursos_opciones else 0
-        )
-        
-        est_sel = st.selectbox(
-            "Alumno", 
-            estudiantes_opciones,
-            key="estudiante_select", 
-            index=estudiantes_opciones.index(st.session_state.estudiante_selected) if st.session_state.estudiante_selected in estudiantes_opciones else 0
-        )
-        
-        prof_sel = st.selectbox(
-            "Profesor", 
-            profesores_opciones,
-            key="profesor_select",
-            index=profesores_opciones.index(st.session_state.profesor_selected) if st.session_state.profesor_selected in profesores_opciones else 0
-        )
-
-        # Actualizar session_state con las selecciones actuales
-        st.session_state.curso_selected = curso_sel
-        st.session_state.estudiante_selected = est_sel
-        st.session_state.profesor_selected = prof_sel
-
-        # RANGO DE FECHAS DINÁMICO - AÑO 2026
+        # RANGO DE FECHAS - AÑO 2026
         st.subheader("📅 Rango de Fechas 2026")
         
         # Fechas límite del sistema para 2026
@@ -511,65 +462,46 @@ def admin_panel():
             actual_min_date = max(system_start, min_date_data)
             actual_max_date = min(system_end, max_date_data)
         else:
-            # Si no hay datos, usar el rango completo del sistema
             actual_min_date = system_start
             actual_max_date = system_end
-
-        # Usar session_state para las fechas
-        if 'start_date_admin' not in st.session_state:
-            st.session_state.start_date_admin = actual_min_date
-        if 'end_date_admin' not in st.session_state:
-            st.session_state.end_date_admin = actual_max_date
 
         # Selectores de fecha
         col_fecha1, col_fecha2 = st.columns(2)
         with col_fecha1:
             start_date = st.date_input(
                 "Fecha de inicio", 
-                value=st.session_state.start_date_admin,
+                value=actual_min_date,
                 min_value=system_start,
                 max_value=system_end,
-                key="start_date_input"
+                key="filtro_start_date"
             )
         
         with col_fecha2:
             end_date = st.date_input(
                 "Fecha de término", 
-                value=st.session_state.end_date_admin,
+                value=actual_max_date,
                 min_value=system_start,
                 max_value=system_end,
-                key="end_date_input"
+                key="filtro_end_date"
             )
-        
-        # Actualizar session_state con las fechas seleccionadas
-        st.session_state.start_date_admin = start_date
-        st.session_state.end_date_admin = end_date
         
         # Validación de fechas
         if start_date > end_date:
             st.error("❌ La fecha de inicio no puede ser mayor que la fecha de término")
-            # Corregir automáticamente
             start_date, end_date = end_date, start_date
-            st.session_state.start_date_admin = start_date
-            st.session_state.end_date_admin = end_date
 
         # Botón para aplicar filtros
-        apply_filters = st.button("Aplicar Filtros", use_container_width=True, type="primary", key="apply_filters_btn")
-        
-        # Estado para controlar si los filtros están aplicados
-        if 'filters_applied' not in st.session_state:
-            st.session_state.filters_applied = False
-
-        if apply_filters:
-            st.session_state.filters_applied = True
+        apply_filters = st.button("Aplicar Filtros", use_container_width=True, type="primary", key="apply_filters")
 
         st.caption(f"📅 Período académico 2026: {system_start.strftime('%d/%m/%Y')} - {system_end.strftime('%d/%m/%Y')}")
 
-    # Aplicar filtros
+    # INICIAL: Mostrar todos los datos hasta que se apliquen filtros
     filtered_df = df.copy()
-    
-    # Aplicar filtros solo si están activados en session_state
-    if st.session_state.filters_applied:
+    filters_active = False
+
+    # Aplicar filtros solo si se presiona el botón
+    if apply_filters:
+        filters_active = True
         # Aplicar filtros de selección
         if curso_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
@@ -604,52 +536,25 @@ def admin_panel():
                 (filtered_df["Fecha"].dt.date <= end_date)
             ]
 
-        # Mostrar información del filtro aplicado
-        if not filtered_df.empty:
-            st.success(f"✅ Filtros aplicados: {len(filtered_df)} registros encontrados")
-            st.info(f"📊 Rango de fechas: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
-
-    # Si no hay datos después de filtrar, mostrar información útil
+    # VERIFICAR SI HAY DATOS PARA MOSTRAR
     if filtered_df.empty:
-        if st.session_state.filters_applied:
+        if filters_active:
             st.warning("🚫 No hay datos que coincidan con los filtros seleccionados.")
+            st.info("💡 Prueba con diferentes filtros o usa el botón 'Limpiar Filtros'")
         else:
-            st.info("📊 Mostrando todos los datos disponibles. Usa los filtros para refinar la búsqueda.")
-        
-        # Mostrar sugerencias específicas solo cuando se aplicaron filtros
-        if st.session_state.filters_applied:
-            col_sug1, col_sug2 = st.columns(2)
-            with col_sug1:
-                st.write("**💡 Sugerencias:**")
-                st.write("• Verifica que las fechas estén dentro del rango de datos")
-                st.write("• Prueba con menos filtros simultáneos")
-                st.write("• Revisa que los cursos/alumnos seleccionados tengan datos")
-                st.write("• Usa el botón 'Limpiar Filtros' para empezar de nuevo")
-            
-            with col_sug2:
-                st.write("**📊 Datos disponibles:**")
-                if not df.empty:
-                    st.write(f"• Total registros: {len(df)}")
-                    if df['Fecha'].notna().any():
-                        valid_dates = df[df['Fecha'].notna()]['Fecha']
-                        st.write(f"• Rango fechas: {valid_dates.min().strftime('%d/%m/%Y')} - {valid_dates.max().strftime('%d/%m/%Y')}")
-                    st.write(f"• Cursos: {len(df['Curso'].unique())}")
-                    st.write(f"• Estudiantes: {len(df['Estudiante'].unique())}")
-        
-        # Si no hay datos incluso sin filtros, mostrar tabla vacía
-        if not st.session_state.filters_applied and df.empty:
-            return
-        elif not st.session_state.filters_applied:
-            # Mostrar todos los datos si no hay filtros aplicados
-            filtered_df = df
+            st.warning("No hay datos de asistencia disponibles.")
+        return
 
-    # MOSTRAR DATOS FILTRADOS - SI LLEGAMOS AQUÍ, HAY DATOS
-    if st.session_state.filters_applied:
-        st.success(f"✅ Mostrando {len(filtered_df)} registros filtrados")
+    # MOSTRAR INFORMACIÓN DE FILTROS APLICADOS
+    if filters_active:
+        st.success(f"✅ Filtros aplicados: {len(filtered_df)} registros encontrados")
+        st.info(f"📅 Período: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
     else:
-        st.info(f"📊 Mostrando todos los {len(filtered_df)} registros disponibles")
+        st.info(f"📊 Mostrando todos los {len(filtered_df)} registros disponibles. Usa los filtros para refinar la búsqueda.")
 
-    # Métricas clave
+    # MÉTRICAS PRINCIPALES
+    st.subheader("📈 Métricas de Asistencia")
+    
     col1, col2, col3, col4 = st.columns(4)
     
     total_registros = len(filtered_df)
@@ -674,35 +579,165 @@ def admin_panel():
     with col4:
         st.metric("Días con clases", f"{dias_con_clases}/{total_dias_periodo}")
 
-    # Resto del código para gráficos y tabla (igual que antes)
-    # ... (mantener el código de gráficos y tabla que ya funciona)
-
-    # Botones de control al final - CORREGIDOS
-    st.markdown("---")
-    col_clean1, col_clean2, col_clean3 = st.columns(3)
+    # GRÁFICOS
+    st.subheader("📊 Análisis Visual")
     
-    with col_clean1:
-        if st.button("🔄 Recargar Datos", use_container_width=True, key="reload_data_btn"):
+    # Gráfico por Curso
+    if not filtered_df.empty:
+        try:
+            asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
+            asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
+            fig_curso = px.bar(
+                asist_curso.reset_index(), 
+                x="Curso", 
+                y="Porcentaje",
+                hover_data=['sum', 'count'], 
+                title="Asistencia por Curso/Asignatura",
+                color="Porcentaje", 
+                color_continuous_scale="Blues"
+            )
+            st.plotly_chart(fig_curso, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error en gráfico de cursos: {e}")
+
+    # Gráfico por Alumno
+    if not filtered_df.empty:
+        try:
+            asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
+            asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
+            asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
+            fig_est = px.bar(
+                asist_est_sorted, 
+                x="Estudiante", 
+                y="Porcentaje",
+                hover_data=['sum', 'count'], 
+                title="Asistencia por Alumno",
+                color="Porcentaje", 
+                color_continuous_scale="Greens"
+            )
+            fig_est.update_layout(xaxis_tickangle=-45)
+            st.plotly_chart(fig_est, use_container_width=True)
+        except Exception as e:
+            st.error(f"Error en gráfico de alumnos: {e}")
+
+    # TABLA DETALLADA
+    st.subheader("📋 Registro Detallado")
+    
+    # Crear DataFrame para mostrar
+    display_df = filtered_df.copy()
+    
+    # Función segura para formatear fechas
+    def safe_date_format(x):
+        if pd.isna(x):
+            return "Sin fecha"
+        try:
+            if hasattr(x, 'strftime'):
+                return x.strftime("%Y-%m-%d %H:%M")
+            return str(x)
+        except (AttributeError, ValueError, TypeError):
+            return "Fecha inválida"
+    
+    display_df["Fecha_Formateada"] = display_df["Fecha"].apply(safe_date_format)
+    
+    # Columnas a mostrar
+    columnas_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Profesor', 'Asistencia']
+    columnas_existentes = [col for col in columnas_mostrar if col in display_df.columns]
+    
+    # Renombrar para mostrar
+    df_mostrar = display_df[columnas_existentes].rename(columns={'Fecha_Formateada': 'Fecha'})
+    
+    # Mostrar tabla
+    st.dataframe(df_mostrar, use_container_width=True)
+    
+    # Información sobre la tabla
+    st.caption(f"Mostrando {len(df_mostrar)} registros")
+
+    # OPCIONES DE DESCARGA
+    st.subheader("📤 Exportar Datos")
+    
+    col_dl1, col_dl2 = st.columns(2)
+    
+    with col_dl1:
+        # Preparar CSV
+        csv_df = filtered_df.copy()
+        
+        def safe_csv_date(x):
+            if pd.isna(x):
+                return ""
+            try:
+                if hasattr(x, 'strftime'):
+                    return x.strftime('%Y-%m-%d %H:%M:%S')
+                return str(x)
+            except (AttributeError, ValueError, TypeError):
+                return ""
+        
+        csv_df['Fecha'] = csv_df['Fecha'].apply(safe_csv_date)
+        csv = csv_df.to_csv(index=False).encode('utf-8')
+        
+        st.download_button(
+            "📥 Descargar como CSV", 
+            csv, 
+            "asistencia_filtrada.csv", 
+            "text/csv",
+            use_container_width=True
+        )
+    
+    with col_dl2:
+        # Preparar Excel
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            excel_df = filtered_df.copy()
+            
+            def safe_excel_date(x):
+                if pd.isna(x):
+                    return pd.NaT
+                try:
+                    if hasattr(x, 'tz') and x.tz is not None:
+                        return x.tz_localize(None)
+                    return x
+                except (AttributeError, ValueError, TypeError):
+                    return pd.NaT
+            
+            excel_df['Fecha'] = excel_df['Fecha'].apply(safe_excel_date)
+            excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
+            
+            # Resumen
+            summary_data = {
+                'Métrica': ['Período', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
+                'Valor': [
+                    f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}",
+                    total_registros,
+                    total_asistencias,
+                    total_ausencias,
+                    f"{porc_asistencia:.2f}%"
+                ]
+            }
+            pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Resumen')
+            
+        excel_data = output.getvalue()
+        st.download_button(
+            "📥 Descargar como Excel", 
+            excel_data, 
+            "asistencia_filtrada.xlsx", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
+
+    # BOTONES ADICIONALES
+    st.markdown("---")
+    col_btn1, col_btn2 = st.columns(2)
+    
+    with col_btn1:
+        if st.button("🔄 Recargar Todo", use_container_width=True):
             st.cache_data.clear()
             st.rerun()
     
-    with col_clean2:
-        if st.button("🧹 Limpiar Filtros", use_container_width=True, key="clear_filters_btn"):
-            # Solo limpiar variables específicas de filtros sin afectar la sesión completa
-            filter_keys = [
-                'curso_selected', 'estudiante_selected', 'profesor_selected',
-                'start_date_admin', 'end_date_admin', 'filters_applied',
-                'curso_select', 'estudiante_select', 'profesor_select',
-                'start_date_input', 'end_date_input', 'apply_filters_btn'
-            ]
-            for key in filter_keys:
-                if key in st.session_state:
+    with col_btn2:
+        if st.button("📊 Ver Todos los Datos", use_container_width=True):
+            # Limpiar solo filtros
+            for key in list(st.session_state.keys()):
+                if any(filter_word in key for filter_word in ['filtro', 'filter', 'date', 'select', 'apply']):
                     del st.session_state[key]
-            st.rerun()
-    
-    with col_clean3:
-        if st.button("📊 Ver Todos los Datos", use_container_width=True, key="show_all_data_btn"):
-            st.session_state.filters_applied = False
             st.rerun()
 
 
