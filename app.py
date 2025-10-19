@@ -468,7 +468,6 @@ Preuniversitario CIMMA"""
 # PANEL ADMINISTRATIVO
 # ==============================
 
-
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
@@ -658,7 +657,7 @@ def admin_panel():
                 st.write(f"- {filtro}")
             
             st.write("### 💡 Sugerencias:")
-            st.write("1. **Verifica las fechas** - Asegúrate de que el rango incluya datos existentes")
+            st.write("1. **Verifica las fechas** - Asegúrate de que el rango incluía datos existentes")
             st.write("2. **Prueba con 'Todos'** - Selecciona 'Todos' en curso o estudiante")
             st.write("3. **Revisa los datos** - Los filtros pueden estar muy restrictivos")
         
@@ -808,7 +807,7 @@ def admin_panel():
     # OPCIONES DE EXPORTACIÓN
     st.subheader("📤 Exportar Datos")
     
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)  # Cambiar a 3 columnas para agregar el nuevo botón
     
     with col1:
         # Preparar CSV
@@ -861,6 +860,11 @@ def admin_panel():
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
+    
+    with col3:
+        # NUEVO: Botón para enviar resumen por email
+        if st.button("📧 Enviar Resumen por Email", use_container_width=True):
+            enviar_resumen_asistencia(datos_filtrados)
 
     # BOTONES DE CONTROL
     st.markdown("---")
@@ -875,6 +879,119 @@ def admin_panel():
         if st.button("📊 Ver Todos los Datos", use_container_width=True):
             st.rerun()
 
+# ==============================
+# FUNCIÓN PARA ENVIAR RESUMEN DE ASISTENCIA
+# ==============================
+
+def enviar_resumen_asistencia(datos_filtrados):
+    """Envía un resumen de asistencia a los apoderados de los estudiantes filtrados"""
+    
+    # Cargar emails y nombres de apoderados
+    emails, nombres_apoderados = load_emails()
+    
+    if not emails:
+        st.error("❌ No se encontraron emails de apoderados en la hoja 'MAILS'")
+        return
+    
+    # Obtener estudiantes únicos de los datos filtrados
+    estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
+    
+    # Contar emails que se enviarán
+    emails_a_enviar = 0
+    estudiantes_con_email = []
+    
+    for estudiante in estudiantes_filtrados:
+        nombre_lower = estudiante.strip().lower()
+        if nombre_lower in emails:
+            emails_a_enviar += 1
+            estudiantes_con_email.append(estudiante)
+    
+    if emails_a_enviar == 0:
+        st.error("❌ No se encontraron emails para los estudiantes filtrados")
+        return
+    
+    # Mostrar confirmación
+    st.info(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
+    
+    if st.button("✅ Confirmar envío", key="confirmar_envio"):
+        progress_bar = st.progress(0)
+        resultados = []
+        
+        for i, estudiante in enumerate(estudiantes_con_email):
+            nombre_lower = estudiante.strip().lower()
+            correo_destino = emails.get(nombre_lower)
+            nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado/a")
+            
+            if not correo_destino:
+                continue
+            
+            # Filtrar datos del estudiante específico
+            datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
+            
+            # Calcular estadísticas del estudiante
+            total_clases = len(datos_estudiante)
+            asistencias = datos_estudiante['Asistencia'].sum()
+            ausencias = total_clases - asistencias
+            porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
+            
+            # Obtener cursos únicos del estudiante
+            cursos_estudiante = datos_estudiante['Curso'].unique()
+            
+            # Crear resumen por curso
+            resumen_cursos = []
+            for curso in cursos_estudiante:
+                datos_curso = datos_estudiante[datos_estudiante['Curso'] == curso]
+                total_curso = len(datos_curso)
+                asistencias_curso = datos_curso['Asistencia'].sum()
+                porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
+                resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
+            
+            # Crear el cuerpo del email
+            subject = f"Resumen de Asistencia - {estudiante}"
+            body = f"""Hola {nombre_apoderado},
+
+Este es un resumen automático de asistencia para el/la estudiante {estudiante}.
+
+📊 **RESUMEN GENERAL:**
+• Total de clases registradas: {total_clases}
+• Asistencias: {asistencias}
+• Ausencias: {ausencias}
+• Porcentaje de asistencia: {porcentaje_asistencia:.1f}%
+
+📚 **DETALLE POR CURSO:**
+""" + "\n".join(resumen_cursos) + f"""
+
+📅 **Período analizado:** {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}
+
+Para consultas específicas, por favor contacte a la administración.
+
+Saludos cordiales,
+Preuniversitario CIMMA 2026"""
+            
+            # Enviar email
+            exito = send_email(correo_destino, subject, body)
+            resultados.append({
+                'estudiante': estudiante,
+                'apoderado': nombre_apoderado,
+                'email': correo_destino,
+                'exito': exito
+            })
+            
+            # Actualizar progreso
+            progress_bar.progress((i + 1) / len(estudiantes_con_email))
+        
+        # Mostrar resultados
+        st.success("✅ Proceso de envío completado")
+        
+        with st.expander("📋 Ver detalles del envío"):
+            exitosos = sum(1 for r in resultados if r['exito'])
+            fallidos = len(resultados) - exitosos
+            
+            st.write(f"**Resultados:** {exitosos} exitosos, {fallidos} fallidos")
+            
+            for resultado in resultados:
+                icono = "✅" if resultado['exito'] else "❌"
+                st.write(f"{icono} {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
 
 
 
