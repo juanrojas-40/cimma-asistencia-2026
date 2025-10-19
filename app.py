@@ -50,7 +50,7 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         msg["Subject"] = subject
         msg["Date"] = formatdate(localtime=True)
         # --- ✅ CAMBIO CRÍTICO: enviar como HTML ---
-        msg.attach(MIMEText(body, "html"))
+        msg.attach(MIMEText(body, "plain"))
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
         try:
             server.starttls()
