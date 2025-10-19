@@ -715,7 +715,9 @@ def admin_panel():
 
             # AGREGAR ESTAS LÍNEAS PARA FORMATEAR EL TEXTO
             fig1.update_traces(texttemplate='%{text:.1f}%', 
-                            textposition='inside')  # 'inside', 'outside', 'auto', etc.
+                            textposition='inside',  # 'inside', 'outside', 'auto', etc.
+                            textfont_size=16)           
+
             fig1.update_layout(uniformtext_minsize=8, 
                             uniformtext_mode='hide')
 
