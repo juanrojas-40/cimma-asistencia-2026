@@ -400,6 +400,12 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
+    # --- Asegurar que 'Fecha' sea datetime (con manejo de errores) ---
+    df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+    # Si hay fechas con zona horaria, eliminarla
+    if df["Fecha"].dt.tz is not None:
+        df["Fecha"] = df["Fecha"].dt.tz_localize(None)
+
     cursos = ["Todos"] + sorted(df["Curso"].unique().tolist())
     curso_sel = st.selectbox("Curso", cursos)
     if curso_sel != "Todos":
