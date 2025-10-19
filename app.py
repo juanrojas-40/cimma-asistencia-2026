@@ -405,10 +405,6 @@ Preuniversitario CIMMA"""
 
 
 
-# ==============================
-# FUNCIÓN PARA ENVIAR RESUMEN DE ASISTENCIA
-# ==============================
-
 def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=None):
     """Envía un resumen de asistencia a los apoderados de los estudiantes filtrados"""
     st.info("🔍 Verificando configuración de email...")
@@ -447,14 +443,14 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
         if len(estudiantes_filtrados) > 10:
             st.write(f"... y {len(estudiantes_filtrados) - 10} más")
 
-    # --- Ajuste 1: Obtener fechas desde st.session_state con fallback seguro ---
+    # --- Ajuste: Obtener fechas desde st.session_state con fallback seguro ---
     fecha_inicio = st.session_state.get('fecha_inicio', date.today())
     fecha_fin = st.session_state.get('fecha_fin', date.today())
 
     emails_a_enviar = 0
     estudiantes_con_email = []
     estudiantes_sin_email = []
-    estudiantes_porcentaje_alto = []
+
     for estudiante in estudiantes_filtrados:
         nombre_lower = estudiante.strip().lower()
         datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
@@ -462,11 +458,9 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
         asistencias = datos_estudiante['Asistencia'].sum()
         porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
         if nombre_lower in emails:
-            if min_porcentaje is None or min_porcentaje == 0 or porcentaje_asistencia <= min_porcentaje:
-                emails_a_enviar += 1
-                estudiantes_con_email.append((estudiante, porcentaje_asistencia))
-            else:
-                estudiantes_porcentaje_alto.append((estudiante, porcentaje_asistencia))
+            # ✅ Incluir SIEMPRE si tiene email, sin importar el porcentaje
+            emails_a_enviar += 1
+            estudiantes_con_email.append((estudiante, porcentaje_asistencia))
         else:
             estudiantes_sin_email.append(estudiante)
 
@@ -479,22 +473,15 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
             if len(estudiantes_sin_email) > 10:
                 st.write(f"... y {len(estudiantes_sin_email) - 10} más")
 
-    if estudiantes_porcentaje_alto:
-        with st.expander("ℹ️ Estudiantes excluidos por porcentaje alto"):
-            st.write(f"Los siguientes estudiantes tienen asistencia mayor a {min_porcentaje}%:")
-            for est, porc in estudiantes_porcentaje_alto[:10]:
-                st.write(f"- {est} ({porc:.1f}%)")
-            if len(estudiantes_porcentaje_alto) > 10:
-                st.write(f"... y {len(estudiantes_porcentaje_alto) - 10} más")
+    # ✅ Eliminado el bloque "estudiantes_porcentaje_alto" porque ya no se filtra
 
     if emails_a_enviar == 0:
-        st.error("❌ No se encontraron estudiantes que cumplan los criterios para enviar emails")
-        st.info(f"""
-        💡 **Posibles soluciones:**
-        1. Verifica que los nombres en la hoja MAILS coincidan con los de asistencia
-        2. Reduce el porcentaje mínimo de asistencia ({min_porcentaje}%)
-        3. Amplía los filtros de curso, estudiante o fechas
-        4. Revisa los datos en la hoja MAILS
+        st.error("❌ No se encontraron estudiantes con email registrado para enviar resúmenes")
+        st.info("""
+        💡 **Verifica lo siguiente:**
+        1. La hoja **MAILS** contiene emails válidos
+        2. Los nombres coinciden exactamente con los de asistencia
+        3. El formato de los correos es correcto
         """)
         return
 
@@ -533,7 +520,6 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
 
             subject = f"Resumen de Asistencia - {estudiante}"
-            # --- Ajuste 2: Corregir el uso de .format() con salto de línea ---
             body = email_template.format(
                 nombre_apoderado=nombre_apoderado,
                 estudiante=estudiante,
@@ -580,7 +566,6 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 for resultado in resultados:
                     if not resultado['exito']:
                         st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
-
 
 
 
