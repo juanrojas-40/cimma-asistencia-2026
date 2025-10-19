@@ -439,10 +439,11 @@ def admin_panel():
         system_start = datetime(current_year, 4, 1).date()  # 1 de abril
         system_end = datetime(current_year, 12, 1).date()   # 1 de diciembre
         
-        # Obtener el rango real de fechas disponibles en los datos
+        # Obtener el rango real de fechas disponibles en los datos (excluyendo NaT)
         if not df.empty and df["Fecha"].notna().any():
-            min_date_data = df["Fecha"].min().date()
-            max_date_data = df["Fecha"].max().date()
+            valid_dates = df[df["Fecha"].notna()]["Fecha"]
+            min_date_data = valid_dates.min().date()
+            max_date_data = valid_dates.max().date()
             
             # Usar el rango más restrictivo entre datos disponibles y sistema
             actual_min_date = max(system_start, min_date_data)
@@ -480,12 +481,12 @@ def admin_panel():
         # Convertir a timestamp CON LA MISMA TIMEZONE que los datos
         chile_tz = pytz.timezone("America/Santiago")
         
-        # Crear datetime objects con timezone
+        # Crear datetime objects con timezone - FORMA CORREGIDA
         start_datetime = chile_tz.localize(
-            datetime.combine(start_date, time.min)
+            datetime.combine(start_date, time(0, 0, 0))
         )
         end_datetime = chile_tz.localize(
-            datetime.combine(end_date, time.max)
+            datetime.combine(end_date, time(23, 59, 59))
         )
 
         # Botón para aplicar filtros
@@ -539,10 +540,17 @@ def admin_panel():
     if filtered_df.empty:
         st.info("No hay datos que coincidan con los filtros seleccionados.")
         
-        # Mostrar sugerencia si no hay datos pero hay datos en el rango completo
+        # Mostrar sugerencia si no hay datos pero hay datos en el rango completo - FORMA SEGURA
         if not df.empty:
-            total_records = len(df)
-            date_range_info = f"Rango completo de datos: {df['Fecha'].min().strftime('%d/%m/%Y')} - {df['Fecha'].max().strftime('%d/%m/%Y')}"
+            # Obtener fechas válidas (excluyendo NaT)
+            valid_dates = df[df["Fecha"].notna()]["Fecha"]
+            if not valid_dates.empty:
+                min_date = valid_dates.min().strftime('%d/%m/%Y')
+                max_date = valid_dates.max().strftime('%d/%m/%Y')
+                date_range_info = f"Rango completo de datos: {min_date} - {max_date}"
+            else:
+                date_range_info = "No hay fechas válidas en los datos"
+                
             st.caption(f"ℹ️ {date_range_info}")
             st.caption("💡 Prueba ajustar las fechas o filtros para ver datos")
         return
@@ -555,8 +563,8 @@ def admin_panel():
     total_ausencias = total_registros - total_asistencias
     porc_asistencia = (total_asistencias / total_registros * 100) if total_registros > 0 else 0
     
-    # Calcular días únicos con clases en el período seleccionado
-    dias_con_clases = filtered_df["Fecha"].dt.date.nunique()
+    # Calcular días únicos con clases en el período seleccionado (excluyendo NaT)
+    dias_con_clases = filtered_df[filtered_df["Fecha"].notna()]["Fecha"].dt.date.nunique()
     total_dias_periodo = (end_date - start_date).days + 1
     
     with col1:
@@ -616,50 +624,66 @@ def admin_panel():
 
     st.subheader("📅 Tendencia de Asistencia Diaria")
     if not filtered_df.empty:
-        asist_time = filtered_df.groupby(filtered_df["Fecha"].dt.date)["Asistencia"].agg(['sum', 'count'])
-        asist_time['Porcentaje'] = (asist_time['sum'] / asist_time['count'] * 100)
-        fig_time = px.line(
-            asist_time.reset_index(), 
-            x="Fecha", 
-            y="Porcentaje",
-            hover_data=['sum', 'count'], 
-            title=f"Tendencia de Asistencia Diaria ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-            markers=True
-        )
-        fig_time.update_layout(xaxis_title="Fecha", yaxis_title="Porcentaje de Asistencia (%)")
-        st.plotly_chart(fig_time)
+        # Filtrar solo fechas válidas para el gráfico
+        valid_date_df = filtered_df[filtered_df["Fecha"].notna()]
+        if not valid_date_df.empty:
+            asist_time = valid_date_df.groupby(valid_date_df["Fecha"].dt.date)["Asistencia"].agg(['sum', 'count'])
+            asist_time['Porcentaje'] = (asist_time['sum'] / asist_time['count'] * 100)
+            fig_time = px.line(
+                asist_time.reset_index(), 
+                x="Fecha", 
+                y="Porcentaje",
+                hover_data=['sum', 'count'], 
+                title=f"Tendencia de Asistencia Diaria ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+                markers=True
+            )
+            fig_time.update_layout(xaxis_title="Fecha", yaxis_title="Porcentaje de Asistencia (%)")
+            st.plotly_chart(fig_time)
+        else:
+            st.info("No hay fechas válidas para mostrar la tendencia")
 
     # Mapa de calor
     st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha")
     if not filtered_df.empty:
         try:
-            # Usar fecha sin timezone para el pivot
-            pivot_df = filtered_df.copy()
-            pivot_df['Fecha_Date'] = pivot_df['Fecha'].dt.date
-            
-            pivot_table = pivot_df.pivot_table(
-                index="Estudiante", 
-                columns="Fecha_Date", 
-                values="Asistencia", 
-                aggfunc="mean",
-                fill_value=0
-            )
-            fig_heatmap = px.imshow(
-                pivot_table, 
-                color_continuous_scale="RdYlGn",
-                title=f"Mapa de Calor de Asistencia ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
-                aspect="auto"
-            )
-            st.plotly_chart(fig_heatmap)
+            # Usar fecha sin timezone para el pivot, excluyendo NaT
+            pivot_df = filtered_df[filtered_df["Fecha"].notna()].copy()
+            if not pivot_df.empty:
+                pivot_df['Fecha_Date'] = pivot_df['Fecha'].dt.date
+                
+                pivot_table = pivot_df.pivot_table(
+                    index="Estudiante", 
+                    columns="Fecha_Date", 
+                    values="Asistencia", 
+                    aggfunc="mean",
+                    fill_value=0
+                )
+                fig_heatmap = px.imshow(
+                    pivot_table, 
+                    color_continuous_scale="RdYlGn",
+                    title=f"Mapa de Calor de Asistencia ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+                    aspect="auto"
+                )
+                st.plotly_chart(fig_heatmap)
+            else:
+                st.info("No hay fechas válidas para generar el mapa de calor")
         except Exception as e:
             st.warning(f"No se pudo generar el mapa de calor: {e}")
 
-    # Tabla detallada interactiva
+    # Tabla detallada interactiva - MANEJO SEGURO DE FECHAS
     st.subheader("📋 Registro Detallado")
     display_df = filtered_df.copy()
-    display_df["Fecha"] = display_df["Fecha"].apply(
-        lambda x: x.strftime("%Y-%m-%d %H:%M") if pd.notna(x) else "Sin fecha"
-    )
+    
+    # Función segura para formatear fechas
+    def safe_date_format(x):
+        if pd.isna(x):
+            return "Sin fecha"
+        try:
+            return x.strftime("%Y-%m-%d %H:%M")
+        except (AttributeError, ValueError):
+            return "Fecha inválida"
+    
+    display_df["Fecha"] = display_df["Fecha"].apply(safe_date_format)
     st.dataframe(display_df, use_container_width=True)
 
     # Opciones de descarga
@@ -668,7 +692,17 @@ def admin_panel():
     with col_dl1:
         # Preparar CSV sin problemas de timezone
         csv_df = filtered_df.copy()
-        csv_df['Fecha'] = csv_df['Fecha'].dt.strftime('%Y-%m-%d %H:%M:%S')
+        
+        # Función segura para formatear fechas en CSV
+        def safe_csv_date(x):
+            if pd.isna(x):
+                return ""
+            try:
+                return x.strftime('%Y-%m-%d %H:%M:%S')
+            except (AttributeError, ValueError):
+                return ""
+        
+        csv_df['Fecha'] = csv_df['Fecha'].apply(safe_csv_date)
         csv = csv_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             "📥 Descargar como CSV", 
@@ -682,7 +716,10 @@ def admin_panel():
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             # Preparar datos para Excel
             excel_df = filtered_df.copy()
-            excel_df['Fecha'] = excel_df['Fecha'].dt.tz_localize(None)  # Remover timezone para Excel
+            # Remover timezone para Excel y manejar NaT
+            excel_df['Fecha'] = excel_df['Fecha'].apply(
+                lambda x: x.tz_localize(None) if pd.notna(x) else pd.NaT
+            )
             excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
             
             # Agregar hoja con resumen
@@ -747,8 +784,22 @@ def admin_panel():
         # Estadísticas adicionales
         st.write(f"**📊 Estadísticas del período seleccionado:**")
         st.write(f"• Período analizado: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
-        st.write(f"• Total de registros: {total_regords}")
+        st.write(f"• Total de registros: {total_registros}")
         st.write(f"• Ratio asistencia/ausencia: {total_asistencias}:{total_ausencias}")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
