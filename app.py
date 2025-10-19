@@ -430,14 +430,12 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        # RANGO DE FECHAS DINÁMICO
-        st.subheader("📅 Rango de Fechas")
+        # RANGO DE FECHAS DINÁMICO - AÑO 2026
+        st.subheader("📅 Rango de Fechas 2026")
         
-        current_year = 2026
-        
-        # Fechas límite del sistema (1 de abril a 1 de diciembre)
-        system_start = datetime(current_year, 4, 1).date()  # 1 de abril
-        system_end = datetime(current_year, 12, 1).date()   # 1 de diciembre
+        # Fechas límite del sistema para 2026 (1 de abril a 1 de diciembre)
+        system_start = datetime(2026, 4, 1).date()  # 1 de abril 2026
+        system_end = datetime(2026, 12, 1).date()   # 1 de diciembre 2026
         
         # Obtener el rango real de fechas disponibles en los datos (excluyendo NaT)
         if not df.empty and df["Fecha"].notna().any():
@@ -452,14 +450,14 @@ def admin_panel():
             actual_min_date = system_start
             actual_max_date = system_end
         
-        # Selectores de fecha con límites dinámicos
+        # Selectores de fecha con límites dinámicos para 2026
         col_fecha1, col_fecha2 = st.columns(2)
         with col_fecha1:
             start_date = st.date_input(
                 "Fecha de inicio", 
                 value=actual_min_date,
-                min_value=actual_min_date,
-                max_value=actual_max_date,
+                min_value=system_start,
+                max_value=system_end,
                 key="start_date"
             )
         
@@ -467,8 +465,8 @@ def admin_panel():
             end_date = st.date_input(
                 "Fecha de término", 
                 value=actual_max_date,
-                min_value=actual_min_date,
-                max_value=actual_max_date,
+                min_value=system_start,
+                max_value=system_end,
                 key="end_date"
             )
         
@@ -481,12 +479,12 @@ def admin_panel():
         # Convertir a timestamp CON LA MISMA TIMEZONE que los datos
         chile_tz = pytz.timezone("America/Santiago")
         
-        # Crear datetime objects con timezone - FORMA CORREGIDA
+        # Crear datetime objects con timezone para 2026
         start_datetime = chile_tz.localize(
-            datetime.combine(start_date, time(0, 0, 0))
+            datetime(2026, start_date.month, start_date.day, 0, 0, 0)
         )
         end_datetime = chile_tz.localize(
-            datetime.combine(end_date, time(23, 59, 59))
+            datetime(2026, end_date.month, end_date.day, 23, 59, 59)
         )
 
         # Botón para aplicar filtros
@@ -495,8 +493,8 @@ def admin_panel():
         else:
             st.session_state['apply_filters'] = st.session_state.get('apply_filters', False)
 
-        # Mostrar información del rango disponible
-        st.caption(f"📅 Período académico: {system_start.strftime('%d/%m/%Y')} - {system_end.strftime('%d/%m/%Y')}")
+        # Mostrar información del rango disponible para 2026
+        st.caption(f"📅 Período académico 2026: {system_start.strftime('%d/%m/%Y')} - {system_end.strftime('%d/%m/%Y')}")
 
     # Aplicar filtros solo al presionar el botón
     filtered_df = df.copy()
@@ -514,7 +512,7 @@ def admin_panel():
             # Primero eliminar valores NaT
             filtered_df = filtered_df[filtered_df["Fecha"].notna()]
             
-            # Luego aplicar filtro de fechas
+            # Luego aplicar filtro de fechas para 2026
             mask = (
                 (filtered_df["Fecha"] >= start_datetime) & 
                 (filtered_df["Fecha"] <= end_datetime)
@@ -531,7 +529,7 @@ def admin_panel():
 
     # Mostrar información del rango de fechas aplicado
     if 'apply_filters' in st.session_state and st.session_state['apply_filters'] and not filtered_df.empty:
-        st.success(f"📊 **Rango de fechas aplicado:** {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
+        st.success(f"📊 **Rango de fechas 2026 aplicado:** {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
         
         # Calcular días del período seleccionado
         dias_periodo = (end_date - start_date).days + 1
@@ -576,7 +574,7 @@ def admin_panel():
     with col4:
         st.metric("Días con clases", f"{dias_con_clases}/{total_dias_periodo}")
 
-    # Gráficos avanzados con títulos dinámicos
+    # Gráficos avanzados con títulos dinámicos para 2026
     st.subheader("📈 Análisis por Curso/Asignatura")
     if not filtered_df.empty:
         asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
@@ -586,7 +584,7 @@ def admin_panel():
             x="Curso", 
             y="Porcentaje",
             hover_data=['sum', 'count'], 
-            title=f"Asistencia por Curso/Asignatura ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            title=f"Asistencia por Curso/Asignatura 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
             color="Porcentaje", 
             color_continuous_scale="Blues"
         )
@@ -602,7 +600,7 @@ def admin_panel():
             x="Estudiante", 
             y="Porcentaje",
             hover_data=['sum', 'count'], 
-            title=f"Asistencia por Alumno ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            title=f"Asistencia por Alumno 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
             color="Porcentaje", 
             color_continuous_scale="Greens"
         )
@@ -617,12 +615,12 @@ def admin_panel():
             asist_prof.reset_index(), 
             values="Porcentaje", 
             names="Profesor",
-            title=f"Distribución de Asistencia por Profesor ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            title=f"Distribución de Asistencia por Profesor 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
             color_discrete_sequence=px.colors.qualitative.Pastel
         )
         st.plotly_chart(fig_prof)
 
-    st.subheader("📅 Tendencia de Asistencia Diaria")
+    st.subheader("📅 Tendencia de Asistencia Diaria 2026")
     if not filtered_df.empty:
         # Filtrar solo fechas válidas para el gráfico
         valid_date_df = filtered_df[filtered_df["Fecha"].notna()]
@@ -634,7 +632,7 @@ def admin_panel():
                 x="Fecha", 
                 y="Porcentaje",
                 hover_data=['sum', 'count'], 
-                title=f"Tendencia de Asistencia Diaria ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+                title=f"Tendencia de Asistencia Diaria 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
                 markers=True
             )
             fig_time.update_layout(xaxis_title="Fecha", yaxis_title="Porcentaje de Asistencia (%)")
@@ -642,8 +640,8 @@ def admin_panel():
         else:
             st.info("No hay fechas válidas para mostrar la tendencia")
 
-    # Mapa de calor
-    st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha")
+    # Mapa de calor para 2026
+    st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha 2026")
     if not filtered_df.empty:
         try:
             # Usar fecha sin timezone para el pivot, excluyendo NaT
@@ -661,7 +659,7 @@ def admin_panel():
                 fig_heatmap = px.imshow(
                     pivot_table, 
                     color_continuous_scale="RdYlGn",
-                    title=f"Mapa de Calor de Asistencia ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+                    title=f"Mapa de Calor de Asistencia 2026 ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
                     aspect="auto"
                 )
                 st.plotly_chart(fig_heatmap)
@@ -671,7 +669,7 @@ def admin_panel():
             st.warning(f"No se pudo generar el mapa de calor: {e}")
 
     # Tabla detallada interactiva - MANEJO SEGURO DE FECHAS
-    st.subheader("📋 Registro Detallado")
+    st.subheader("📋 Registro Detallado 2026")
     display_df = filtered_df.copy()
     
     # Función segura para formatear fechas
@@ -686,8 +684,8 @@ def admin_panel():
     display_df["Fecha"] = display_df["Fecha"].apply(safe_date_format)
     st.dataframe(display_df, use_container_width=True)
 
-    # Opciones de descarga
-    st.subheader("📤 Exportar Datos")
+    # Opciones de descarga para datos 2026
+    st.subheader("📤 Exportar Datos 2026")
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
         # Preparar CSV sin problemas de timezone
@@ -707,7 +705,7 @@ def admin_panel():
         st.download_button(
             "📥 Descargar como CSV", 
             csv, 
-            f"asistencia_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv", 
+            f"asistencia_2026_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv", 
             "text/csv",
             use_container_width=True
         )
@@ -720,11 +718,11 @@ def admin_panel():
             excel_df['Fecha'] = excel_df['Fecha'].apply(
                 lambda x: x.tz_localize(None) if pd.notna(x) else pd.NaT
             )
-            excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
+            excel_df.to_excel(writer, index=False, sheet_name='Asistencia_2026')
             
             # Agregar hoja con resumen
             summary_data = {
-                'Métrica': ['Período', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
+                'Métrica': ['Período 2026', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
                 'Valor': [
                     f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}",
                     total_registros,
@@ -733,19 +731,19 @@ def admin_panel():
                     f"{porc_asistencia:.2f}%"
                 ]
             }
-            pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Resumen')
+            pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Resumen_2026')
             
         excel_data = output.getvalue()
         st.download_button(
             "📥 Descargar como Excel", 
             excel_data, 
-            f"asistencia_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx", 
+            f"asistencia_2026_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx", 
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             use_container_width=True
         )
 
-    # Insights adicionales DINÁMICOS
-    st.subheader("🔍 Insights Avanzados")
+    # Insights adicionales DINÁMICOS para 2026
+    st.subheader("🔍 Insights Avanzados 2026")
     if not filtered_df.empty:
         # Mejor y peor alumno
         top_est = asist_est_sorted.iloc[0]["Estudiante"] if not asist_est_sorted.empty else "N/A"
@@ -760,13 +758,13 @@ def admin_panel():
         col_insight1, col_insight2 = st.columns(2)
         
         with col_insight1:
-            st.write("**👥 Rendimiento por Alumno:**")
+            st.write("**👥 Rendimiento por Alumno 2026:**")
             st.write(f"• **Mejor alumno:** {top_est} ({top_porc:.1f}%)")
             st.write(f"• **Alumno con menor asistencia:** {low_est} ({low_porc:.1f}%)")
             st.write(f"• **Asistencia promedio:** {porc_asistencia:.1f}%")
             
         with col_insight2:
-            st.write("**📚 Rendimiento por Curso:**")
+            st.write("**📚 Rendimiento por Curso 2026:**")
             if mejor_curso is not None:
                 st.write(f"• **Mejor curso:** {mejor_curso.name} ({mejor_curso['Porcentaje']:.1f}%)")
             if peor_curso is not None:
@@ -775,14 +773,14 @@ def admin_panel():
         
         # Alertas basadas en el porcentaje dinámico
         if porc_asistencia < 70:
-            st.error("⚠️ **Alerta:** La asistencia promedio es menor al 70%. Considerar acciones correctivas.")
+            st.error("⚠️ **Alerta 2026:** La asistencia promedio es menor al 70%. Considerar acciones correctivas.")
         elif porc_asistencia < 80:
-            st.warning("📋 **Atención:** La asistencia promedio está entre 70-80%. Monitorear situación.")
+            st.warning("📋 **Atención 2026:** La asistencia promedio está entre 70-80%. Monitorear situación.")
         else:
-            st.success("✅ **Excelente:** La asistencia promedio es mayor al 80%.")
+            st.success("✅ **Excelente 2026:** La asistencia promedio es mayor al 80%.")
 
-        # Estadísticas adicionales
-        st.write(f"**📊 Estadísticas del período seleccionado:**")
+        # Estadísticas adicionales para 2026
+        st.write(f"**📊 Estadísticas del período 2026:**")
         st.write(f"• Período analizado: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
         st.write(f"• Total de registros: {total_registros}")
         st.write(f"• Ratio asistencia/ausencia: {total_asistencias}:{total_ausencias}")
