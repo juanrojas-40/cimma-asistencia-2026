@@ -391,6 +391,7 @@ Preuniversitario CIMMA"""
 # PANEL ADMINISTRATIVO
 # ==============================
 
+
 def admin_panel():
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
     st.subheader(f"Bienvenido, {st.session_state['user_name']}")
@@ -419,11 +420,9 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        # Manejo seguro de fechas mínimas y máximas
-        valid_dates = df["Fecha"].dropna()
-        min_date = valid_dates.min().date() if not valid_dates.empty else datetime.today().date()
-        max_date = valid_dates.max().date() if not valid_dates.empty else datetime.today().date()
-        start_date, end_date = st.date_input("Rango de fechas", [min_date, max_date])
+        # Fechas específicas para 2026
+        start_date = st.date_input("Fecha de inicio", datetime(2026, 1, 1))
+        end_date = st.date_input("Fecha de término", datetime(2026, 12, 31))
 
     # Aplicar filtros
     filtered_df = df.copy()
@@ -528,7 +527,6 @@ def admin_panel():
 
     # Tabla detallada interactiva con formato robusto para fechas
     st.subheader("📋 Registro Detallado")
-    # Crear una copia para mostrar con formato de fecha seguro
     display_df = filtered_df.copy()
     display_df["Fecha"] = display_df["Fecha"].apply(
         lambda x: x.strftime("%Y-%m-%d") if pd.notna(x) else "Sin fecha"
@@ -562,6 +560,18 @@ def admin_panel():
         st.write(f"**Asistencia Promedio en el Rango:** {avg_asist:.2f}%")
         if avg_asist < 70:
             st.warning("⚠️ La asistencia promedio es baja. Considerar acciones correctivas.")
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
