@@ -538,18 +538,13 @@ def admin_panel():
     # Filtros en sidebar
     st.sidebar.header("🔍 Filtros")
     
-    # Lista de cursos
-    cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
-    curso_seleccionado = st.sidebar.selectbox("Seleccionar Curso", cursos, key="curso_select")
+    # CORRECCIÓN 1: Usar session_state para manejar el estado de los filtros
+    if 'filtros_limpiados' not in st.session_state:
+        st.session_state.filtros_limpiados = False
     
-    # Lista de estudiantes (filtrada por curso si se selecciona uno)
-    if curso_seleccionado != "Todos":
-        estudiantes_curso = df[df['Curso'] == curso_seleccionado]['Estudiante'].unique()
-        estudiantes = ["Todos"] + sorted(estudiantes_curso.tolist())
-    else:
-        estudiantes = ["Todos"] + sorted(df['Estudiante'].unique().tolist())
-    
-    estudiante_seleccionado = st.sidebar.selectbox("Seleccionar Estudiante", estudiantes, key="estudiante_select")
+    # Inicializar valores por defecto
+    curso_default = "Todos"
+    estudiante_default = "Todos"
     
     # Fechas - usar el rango real de los datos después de la conversión
     if 'Fecha' in df.columns and df['Fecha'].notna().any():
@@ -559,11 +554,40 @@ def admin_panel():
         fecha_min = datetime(2026, 4, 1).date()
         fecha_max = datetime(2026, 12, 1).date()
     
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        fecha_inicio = st.date_input("Desde", value=fecha_min, min_value=fecha_min, max_value=fecha_max, key="fecha_inicio")
-    with col2:
-        fecha_fin = st.date_input("Hasta", value=fecha_max, min_value=fecha_min, max_value=fecha_max, key="fecha_fin")
+    fecha_inicio_default = fecha_min
+    fecha_fin_default = fecha_max
+    
+    # Si se presionó limpiar filtros, usar valores por defecto
+    if st.session_state.filtros_limpiados:
+        curso_seleccionado = curso_default
+        estudiante_seleccionado = estudiante_default
+        fecha_inicio = fecha_inicio_default
+        fecha_fin = fecha_fin_default
+        st.session_state.filtros_limpiados = False
+    else:
+        # Lista de cursos
+        cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
+        curso_seleccionado = st.sidebar.selectbox("Seleccionar Curso", cursos, index=0)
+        
+        # Lista de estudiantes (filtrada por curso si se selecciona uno)
+        if curso_seleccionado != "Todos":
+            estudiantes_curso = df[df['Curso'] == curso_seleccionado]['Estudiante'].unique()
+            estudiantes = ["Todos"] + sorted(estudiantes_curso.tolist())
+        else:
+            estudiantes = ["Todos"] + sorted(df['Estudiante'].unique().tolist())
+        
+        estudiante_seleccionado = st.sidebar.selectbox("Seleccionar Estudiante", estudiantes, index=0)
+        
+        col1, col2 = st.sidebar.columns(2)
+        with col1:
+            fecha_inicio = st.date_input("Desde", value=fecha_inicio_default, min_value=fecha_min, max_value=fecha_max)
+        with col2:
+            fecha_fin = st.date_input("Hasta", value=fecha_fin_default, min_value=fecha_min, max_value=fecha_max)
+
+    # CORRECCIÓN 1: Botón para limpiar filtros - usando un flag en session_state
+    if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True):
+        st.session_state.filtros_limpiados = True
+        st.rerun()
 
     # Aplicar filtros progresivamente
     datos_filtrados = df.copy()
@@ -586,19 +610,6 @@ def admin_panel():
             (datos_filtrados['Fecha'].dt.date <= fecha_fin)
         ]
         filtros_aplicados.append(f"📅 Período: {fecha_inicio.strftime('%d/%m/%Y')} - {fecha_fin.strftime('%d/%m/%Y')}")
-    
-    # CORRECCIÓN 1: Botón para limpiar filtros - usa session_state para resetear
-    if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True, key="limpiar_filtros"):
-        # Limpiar los filtros en session_state
-        if "curso_select" in st.session_state:
-            st.session_state.curso_select = "Todos"
-        if "estudiante_select" in st.session_state:
-            st.session_state.estudiante_select = "Todos"
-        if "fecha_inicio" in st.session_state:
-            st.session_state.fecha_inicio = fecha_min
-        if "fecha_fin" in st.session_state:
-            st.session_state.fecha_fin = fecha_max
-        st.rerun()
 
     # MOSTRAR RESULTADOS
     st.header("📈 Resultados del Análisis")
