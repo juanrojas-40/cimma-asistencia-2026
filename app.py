@@ -538,13 +538,11 @@ def admin_panel():
     # Filtros en sidebar
     st.sidebar.header("🔍 Filtros")
     
-    # CORRECCIÓN 1: Usar session_state para manejar el estado de los filtros
-    if 'filtros_limpiados' not in st.session_state:
-        st.session_state.filtros_limpiados = False
-    
-    # Inicializar valores por defecto
-    curso_default = "Todos"
-    estudiante_default = "Todos"
+    # CORRECCIÓN: Inicializar session_state para los filtros
+    if 'curso_seleccionado' not in st.session_state:
+        st.session_state.curso_seleccionado = "Todos"
+    if 'estudiante_seleccionado' not in st.session_state:
+        st.session_state.estudiante_seleccionado = "Todos"
     
     # Fechas - usar el rango real de los datos después de la conversión
     if 'Fecha' in df.columns and df['Fecha'].notna().any():
@@ -554,39 +552,64 @@ def admin_panel():
         fecha_min = datetime(2026, 4, 1).date()
         fecha_max = datetime(2026, 12, 1).date()
     
-    fecha_inicio_default = fecha_min
-    fecha_fin_default = fecha_max
-    
-    # Si se presionó limpiar filtros, usar valores por defecto
-    if st.session_state.filtros_limpiados:
-        curso_seleccionado = curso_default
-        estudiante_seleccionado = estudiante_default
-        fecha_inicio = fecha_inicio_default
-        fecha_fin = fecha_fin_default
-        st.session_state.filtros_limpiados = False
-    else:
-        # Lista de cursos
-        cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
-        curso_seleccionado = st.sidebar.selectbox("Seleccionar Curso", cursos, index=0)
-        
-        # Lista de estudiantes (filtrada por curso si se selecciona uno)
-        if curso_seleccionado != "Todos":
-            estudiantes_curso = df[df['Curso'] == curso_seleccionado]['Estudiante'].unique()
-            estudiantes = ["Todos"] + sorted(estudiantes_curso.tolist())
-        else:
-            estudiantes = ["Todos"] + sorted(df['Estudiante'].unique().tolist())
-        
-        estudiante_seleccionado = st.sidebar.selectbox("Seleccionar Estudiante", estudiantes, index=0)
-        
-        col1, col2 = st.sidebar.columns(2)
-        with col1:
-            fecha_inicio = st.date_input("Desde", value=fecha_inicio_default, min_value=fecha_min, max_value=fecha_max)
-        with col2:
-            fecha_fin = st.date_input("Hasta", value=fecha_fin_default, min_value=fecha_min, max_value=fecha_max)
+    if 'fecha_inicio' not in st.session_state:
+        st.session_state.fecha_inicio = fecha_min
+    if 'fecha_fin' not in st.session_state:
+        st.session_state.fecha_fin = fecha_max
 
-    # CORRECCIÓN 1: Botón para limpiar filtros - usando un flag en session_state
+    # CORRECCIÓN: Siempre mostrar los selectboxes, pero controlar sus valores con session_state
+    # Lista de cursos
+    cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
+    curso_seleccionado = st.sidebar.selectbox(
+        "Seleccionar Curso", 
+        cursos, 
+        index=cursos.index(st.session_state.curso_seleccionado) if st.session_state.curso_seleccionado in cursos else 0
+    )
+    
+    # Actualizar session_state con la selección actual
+    st.session_state.curso_seleccionado = curso_seleccionado
+    
+    # Lista de estudiantes (filtrada por curso si se selecciona uno)
+    if curso_seleccionado != "Todos":
+        estudiantes_curso = df[df['Curso'] == curso_seleccionado]['Estudiante'].unique()
+        estudiantes = ["Todos"] + sorted(estudiantes_curso.tolist())
+    else:
+        estudiantes = ["Todos"] + sorted(df['Estudiante'].unique().tolist())
+    
+    estudiante_seleccionado = st.sidebar.selectbox(
+        "Seleccionar Estudiante", 
+        estudiantes, 
+        index=estudiantes.index(st.session_state.estudiante_seleccionado) if st.session_state.estudiante_seleccionado in estudiantes else 0
+    )
+    
+    # Actualizar session_state con la selección actual
+    st.session_state.estudiante_seleccionado = estudiante_seleccionado
+    
+    col1, col2 = st.sidebar.columns(2)
+    with col1:
+        fecha_inicio = st.date_input(
+            "Desde", 
+            value=st.session_state.fecha_inicio, 
+            min_value=fecha_min, 
+            max_value=fecha_max
+        )
+        st.session_state.fecha_inicio = fecha_inicio
+        
+    with col2:
+        fecha_fin = st.date_input(
+            "Hasta", 
+            value=st.session_state.fecha_fin, 
+            min_value=fecha_min, 
+            max_value=fecha_max
+        )
+        st.session_state.fecha_fin = fecha_fin
+
+    # CORRECCIÓN: Botón para limpiar filtros - resetear session_state
     if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True):
-        st.session_state.filtros_limpiados = True
+        st.session_state.curso_seleccionado = "Todos"
+        st.session_state.estudiante_seleccionado = "Todos"
+        st.session_state.fecha_inicio = fecha_min
+        st.session_state.fecha_fin = fecha_max
         st.rerun()
 
     # Aplicar filtros progresivamente
@@ -594,22 +617,22 @@ def admin_panel():
     filtros_aplicados = []
     
     # Filtrar por curso
-    if curso_seleccionado != "Todos":
-        datos_filtrados = datos_filtrados[datos_filtrados['Curso'] == curso_seleccionado]
-        filtros_aplicados.append(f"📚 Curso: {curso_seleccionado}")
+    if st.session_state.curso_seleccionado != "Todos":
+        datos_filtrados = datos_filtrados[datos_filtrados['Curso'] == st.session_state.curso_seleccionado]
+        filtros_aplicados.append(f"📚 Curso: {st.session_state.curso_seleccionado}")
     
     # Filtrar por estudiante
-    if estudiante_seleccionado != "Todos":
-        datos_filtrados = datos_filtrados[datos_filtrados['Estudiante'] == estudiante_seleccionado]
-        filtros_aplicados.append(f"👤 Estudiante: {estudiante_seleccionado}")
+    if st.session_state.estudiante_seleccionado != "Todos":
+        datos_filtrados = datos_filtrados[datos_filtrados['Estudiante'] == st.session_state.estudiante_seleccionado]
+        filtros_aplicados.append(f"👤 Estudiante: {st.session_state.estudiante_seleccionado}")
     
     # Filtrar por fecha (solo si hay fechas válidas)
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any():
         datos_filtrados = datos_filtrados[
-            (datos_filtrados['Fecha'].dt.date >= fecha_inicio) & 
-            (datos_filtrados['Fecha'].dt.date <= fecha_fin)
+            (datos_filtrados['Fecha'].dt.date >= st.session_state.fecha_inicio) & 
+            (datos_filtrados['Fecha'].dt.date <= st.session_state.fecha_fin)
         ]
-        filtros_aplicados.append(f"📅 Período: {fecha_inicio.strftime('%d/%m/%Y')} - {fecha_fin.strftime('%d/%m/%Y')}")
+        filtros_aplicados.append(f"📅 Período: {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}")
 
     # MOSTRAR RESULTADOS
     st.header("📈 Resultados del Análisis")
@@ -643,7 +666,7 @@ def admin_panel():
         st.info("### 📋 Muestra de datos disponibles (sin filtros):")
         muestra_df = df.head(10).copy()
         if 'Fecha' in muestra_df.columns:
-            # CORRECCIÓN 2: Formato de fecha sin hora
+            # CORRECCIÓN: Formato de fecha sin hora
             muestra_df['Fecha'] = muestra_df['Fecha'].dt.strftime('%d/%m/%Y')
         st.dataframe(muestra_df, use_container_width=True)
         
@@ -739,7 +762,7 @@ def admin_panel():
     # Preparar datos para mostrar
     datos_mostrar = datos_filtrados.copy()
     
-    # CORRECCIÓN 2: Formatear fechas para mostrar SIN HORA
+    # CORRECCIÓN: Formatear fechas para mostrar SIN HORA
     if 'Fecha' in datos_mostrar.columns:
         # Crear columna formateada solo con fecha (sin hora)
         datos_mostrar['Fecha_Formateada'] = datos_mostrar['Fecha'].apply(
@@ -815,7 +838,7 @@ def admin_panel():
                     total_asistencias,
                     total_ausencias,
                     f"{porcentaje_asistencia:.1f}%",
-                    f"{fecha_inicio.strftime('%d/%m/%Y')} - {fecha_fin.strftime('%d/%m/%Y')}"
+                    f"{st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}"
                 ]
             }
             pd.DataFrame(resumen_data).to_excel(writer, index=False, sheet_name='Resumen')
