@@ -476,19 +476,6 @@ def admin_panel():
     # Cargar datos
     df = load_all_asistencia()
     
-    # DIAGNÓSTICO INICIAL
-    with st.expander("🔍 Diagnóstico de Datos Cargados", expanded=True):
-        if df.empty:
-            st.error("❌ El DataFrame está VACÍO")
-            return
-        else:
-            st.success(f"✅ DataFrame cargado con {len(df)} registros")
-            st.write("**Columnas:**", list(df.columns))
-            
-            if 'Fecha' in df.columns:
-                st.write("**Muestra de fechas (texto original):**")
-                st.write(df['Fecha'].head(10))
-    
     if df.empty:
         st.warning("No hay datos de asistencia aún.")
         return
