@@ -144,28 +144,55 @@ def load_emails():
     try:
         client = get_client()
         if not client:
+            st.warning("❌ No se pudo conectar a Google Sheets")
             return {}, {}
+        
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
+        
         if "MAILS" not in sheet_names:
+            st.warning("❌ No se encontró la hoja 'MAILS'")
             return {}, {}
 
         mails_sheet = asistencia_sheet.worksheet("MAILS")
         data = mails_sheet.get_all_records()
+        
+        if not data:
+            st.warning("❌ La hoja 'MAILS' está vacía")
+            return {}, {}
+            
         emails = {}
         nombres_apoderados = {}
-        for row in data:
+        
+        st.info(f"📋 Procesando {len(data)} registros de la hoja MAILS")
+        
+        for i, row in enumerate(data):
             nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
             nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
             mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
-            email_to_use = mail_apoderado
-            if email_to_use and nombre_estudiante:
-                emails[nombre_estudiante] = email_to_use
+            
+            if not nombre_estudiante:
+                continue
+                
+            if mail_apoderado:
+                emails[nombre_estudiante] = mail_apoderado
                 nombres_apoderados[nombre_estudiante] = nombre_apoderado
+                st.write(f"✅ Registro {i+1}: {nombre_estudiante} → {mail_apoderado}")
+            else:
+                st.write(f"⚠️ Registro {i+1}: {nombre_estudiante} - SIN EMAIL")
+        
+        st.success(f"✅ Se cargaron {len(emails)} emails válidos")
         return emails, nombres_apoderados
+        
     except Exception as e:
-        st.warning(f"Error loading emails: {e}")
+        st.error(f"❌ Error cargando emails: {e}")
         return {}, {}
+
+
+
+
+
+
 
 @st.cache_data(ttl=3600)
 def load_all_asistencia():
@@ -472,12 +499,21 @@ def enviar_resumen_asistencia(datos_filtrados):
     
     st.info("🔄 Cargando información de apoderados...")
     
+    # Limpiar cache para forzar recarga
+    st.cache_data.clear()
+    
     # Cargar emails y nombres de apoderados
     emails, nombres_apoderados = load_emails()
     
     if not emails:
         st.error("❌ No se encontraron emails de apoderados en la hoja 'MAILS'")
-        st.info("💡 Verifica que la hoja 'MAILS' exista y tenga los datos correctos")
+        st.info("""
+        💡 **Verifica lo siguiente:**
+        1. La hoja se llama exactamente **MAILS** (en mayúsculas)
+        2. Tiene las columnas: **NOMBRE ESTUDIANTE**, **NOMBRE APODERADO**, **MAIL APODERADO**
+        3. Los nombres de estudiantes coinciden exactamente con los registros de asistencia
+        4. Los emails están completos y en formato válido
+        """)
         return
     
     st.success(f"✅ Se cargaron {len(emails)} emails de apoderados")
@@ -485,6 +521,11 @@ def enviar_resumen_asistencia(datos_filtrados):
     # Obtener estudiantes únicos de los datos filtrados
     estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
     st.info(f"📊 Se encontraron {len(estudiantes_filtrados)} estudiantes en los datos filtrados")
+    
+    # Mostrar algunos estudiantes para debugging
+    with st.expander("🔍 Estudiantes en datos filtrados (primeros 10)"):
+        for estudiante in estudiantes_filtrados[:10]:
+            st.write(f"- {estudiante}")
     
     # Contar emails que se enviarán
     emails_a_enviar = 0
@@ -501,16 +542,22 @@ def enviar_resumen_asistencia(datos_filtrados):
     
     # Mostrar estudiantes sin email para debugging
     if estudiantes_sin_email:
-        with st.expander("⚠️ Estudiantes sin email registrado"):
+        with st.expander("⚠️ Estudiantes sin email registrado (primeros 10)"):
             st.write("Los siguientes estudiantes no tienen email registrado en la hoja MAILS:")
-            for est in estudiantes_sin_email[:10]:  # Mostrar solo los primeros 10
-                st.write(f"- {est}")
+            for est in estudiantes_sin_email[:10]:
+                nombre_lower = est.strip().lower()
+                st.write(f"- '{est}' (buscado como: '{nombre_lower}')")
             if len(estudiantes_sin_email) > 10:
                 st.write(f"... y {len(estudiantes_sin_email) - 10} más")
     
     if emails_a_enviar == 0:
         st.error("❌ No se encontraron emails para los estudiantes filtrados")
-        st.info("💡 Verifica que los nombres en la hoja MAILS coincidan exactamente con los nombres en los registros de asistencia")
+        st.info("""
+        💡 **Posibles soluciones:**
+        1. Verifica que los nombres en la hoja MAILS coincidan **exactamente** con los nombres en los registros de asistencia
+        2. Los nombres se comparan en minúsculas y sin espacios extras
+        3. Ejemplo: Si en asistencia está 'Juan Pérez', en MAILS debe estar 'juan pérez' (minúsculas)
+        """)
         return
     
     # Mostrar confirmación con más detalles
@@ -611,17 +658,17 @@ Preuniversitario CIMMA 2026"""
             
             st.write(f"**Resultados:** {exitosos} exitosos, {fallidos} fallidos")
             
-            st.subheader("✅ Emails enviados exitosamente:")
-            for resultado in resultados:
-                if resultado['exito']:
-                    st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
+            if exitosos > 0:
+                st.subheader("✅ Emails enviados exitosamente:")
+                for resultado in resultados:
+                    if resultado['exito']:
+                        st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
             
             if fallidos > 0:
                 st.subheader("❌ Emails con error:")
                 for resultado in resultados:
                     if not resultado['exito']:
                         st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
-
 
 
 
