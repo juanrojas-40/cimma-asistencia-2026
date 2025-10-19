@@ -400,6 +400,7 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
+    # Mapear profesores y asignaturas desde cursos
     courses = load_courses()
     curso_to_prof = {k: v['profesor'] for k, v in courses.items()}
     df['Profesor'] = df['Curso'].map(curso_to_prof)
@@ -418,8 +419,10 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        min_date = df["Fecha"].min().date() if not df["Fecha"].empty else datetime.today().date()
-        max_date = df["Fecha"].max().date() if not df["Fecha"].empty else datetime.today().date()
+        # Manejo seguro de fechas mínimas y máximas
+        valid_dates = df["Fecha"].dropna()
+        min_date = valid_dates.min().date() if not valid_dates.empty else datetime.today().date()
+        max_date = valid_dates.max().date() if not valid_dates.empty else datetime.today().date()
         start_date, end_date = st.date_input("Rango de fechas", [min_date, max_date])
 
     # Aplicar filtros
@@ -430,7 +433,11 @@ def admin_panel():
         filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
     if prof_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
-    filtered_df = filtered_df[(filtered_df["Fecha"].dt.date >= start_date) & (filtered_df["Fecha"].dt.date <= end_date)]
+    filtered_df = filtered_df[
+        (filtered_df["Fecha"].dt.date >= start_date) & 
+        (filtered_df["Fecha"].dt.date <= end_date) & 
+        (filtered_df["Fecha"].notna())
+    ]
 
     if filtered_df.empty:
         st.info("No hay datos que coincidan con los filtros seleccionados.")
@@ -452,47 +459,81 @@ def admin_panel():
     st.subheader("📈 Análisis por Curso/Asignatura")
     asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['mean', 'count'])
     asist_curso['Porcentaje'] = asist_curso['mean'] * 100
-    fig_curso = px.bar(asist_curso.reset_index(), x="Curso", y="Porcentaje",
-                       hover_data=['count'], title="Porcentaje de Asistencia por Curso/Asignatura",
-                       color="Porcentaje", color_continuous_scale="Blues")
+    fig_curso = px.bar(
+        asist_curso.reset_index(), 
+        x="Curso", 
+        y="Porcentaje",
+        hover_data=['count'], 
+        title="Porcentaje de Asistencia por Curso/Asignatura",
+        color="Porcentaje", 
+        color_continuous_scale="Blues"
+    )
     st.plotly_chart(fig_curso)
 
     st.subheader("👤 Análisis por Alumno")
     asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['mean', 'count'])
     asist_est['Porcentaje'] = asist_est['mean'] * 100
     asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
-    fig_est = px.bar(asist_est_sorted, x="Estudiante", y="Porcentaje",
-                     hover_data=['count'], title="Porcentaje de Asistencia por Alumno (Ordenado)",
-                     color="Porcentaje", color_continuous_scale="Greens")
+    fig_est = px.bar(
+        asist_est_sorted, 
+        x="Estudiante", 
+        y="Porcentaje",
+        hover_data=['count'], 
+        title="Porcentaje de Asistencia por Alumno (Ordenado)",
+        color="Porcentaje", 
+        color_continuous_scale="Greens"
+    )
     st.plotly_chart(fig_est)
 
     st.subheader("🧑‍🏫 Análisis por Profesor")
     asist_prof = filtered_df.groupby("Profesor")["Asistencia"].agg(['mean', 'count'])
     asist_prof['Porcentaje'] = asist_prof['mean'] * 100
-    fig_prof = px.pie(asist_prof.reset_index(), values="Porcentaje", names="Profesor",
-                      title="Distribución de Asistencia por Profesor",
-                      color_discrete_sequence=px.colors.qualitative.Pastel)
+    fig_prof = px.pie(
+        asist_prof.reset_index(), 
+        values="Porcentaje", 
+        names="Profesor",
+        title="Distribución de Asistencia por Profesor",
+        color_discrete_sequence=px.colors.qualitative.Pastel
+    )
     st.plotly_chart(fig_prof)
 
     st.subheader("📅 Tendencia de Asistencia por Rango de Fechas")
     asist_time = filtered_df.groupby("Fecha")["Asistencia"].agg(['mean', 'count'])
     asist_time['Porcentaje'] = asist_time['mean'] * 100
-    fig_time = px.line(asist_time.reset_index(), x="Fecha", y="Porcentaje",
-                       hover_data=['count'], title="Tendencia de Asistencia a lo Largo del Tiempo",
-                       markers=True)
+    fig_time = px.line(
+        asist_time.reset_index(), 
+        x="Fecha", 
+        y="Porcentaje",
+        hover_data=['count'], 
+        title="Tendencia de Asistencia a lo Largo del Tiempo",
+        markers=True
+    )
     st.plotly_chart(fig_time)
 
-    # Mapa de calor para asistencia por alumno y fecha (para visualización avanzada)
+    # Mapa de calor
     st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha")
-    pivot_table = filtered_df.pivot_table(index="Estudiante", columns="Fecha", values="Asistencia", aggfunc="mean")
-    fig_heatmap = px.imshow(pivot_table, color_continuous_scale="RdYlGn",
-                            title="Mapa de Calor de Asistencia (1: Asistió, 0: Ausente)",
-                            aspect="auto")
+    pivot_table = filtered_df.pivot_table(
+        index="Estudiante", 
+        columns="Fecha", 
+        values="Asistencia", 
+        aggfunc="mean"
+    )
+    fig_heatmap = px.imshow(
+        pivot_table, 
+        color_continuous_scale="RdYlGn",
+        title="Mapa de Calor de Asistencia (1: Asistió, 0: Ausente)",
+        aspect="auto"
+    )
     st.plotly_chart(fig_heatmap)
 
-    # Tabla detallada interactiva
+    # Tabla detallada interactiva con formato robusto para fechas
     st.subheader("📋 Registro Detallado")
-    st.dataframe(filtered_df.style.format({"Fecha": lambda x: x.strftime("%Y-%m-%d") if pd.notnull(x) else ""}))
+    # Crear una copia para mostrar con formato de fecha seguro
+    display_df = filtered_df.copy()
+    display_df["Fecha"] = display_df["Fecha"].apply(
+        lambda x: x.strftime("%Y-%m-%d") if pd.notna(x) else "Sin fecha"
+    )
+    st.dataframe(display_df)
 
     # Opciones de descarga
     col_dl1, col_dl2 = st.columns(2)
@@ -521,6 +562,9 @@ def admin_panel():
         st.write(f"**Asistencia Promedio en el Rango:** {avg_asist:.2f}%")
         if avg_asist < 70:
             st.warning("⚠️ La asistencia promedio es baja. Considerar acciones correctivas.")
+
+
+
 
 
 
