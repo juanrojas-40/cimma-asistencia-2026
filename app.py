@@ -496,6 +496,12 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
 
             if not correo_destino:
                 st.warning(f"⚠️ No se encontró email para {estudiante}")
+                resultados.append({
+                    'estudiante': estudiante,
+                    'apoderado': nombre_apoderado,
+                    'email': correo_destino,
+                    'exito': False
+                })
                 continue
 
             datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
@@ -526,9 +532,9 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                 fecha_fin=fecha_fin.strftime('%d/%m/%Y')
             )
 
-            with st.expander(f"📝 Preview email para {estudiante}"):
+            with st.expander(f"📝 Preview email para {estudiante}", expanded=False):
                 st.write(f"**Asunto:** {subject}")
-                st.text_area("Cuerpo (texto plano):", body, height=150)
+                st.text_area("Cuerpo (texto plano):", body, height=150, key=f"preview_{estudiante}")
 
             exito = send_email(correo_destino, subject, body)
             if exito:
@@ -545,7 +551,12 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
             })
             progress_bar.progress((i + 1) / len(estudiantes_con_email))
 
-        st.success(f"✅ Proceso completado: {emails_enviados}/{len(estudiantes_con_email)} emails enviados.")
+        # Mensaje final de confirmación
+        if emails_enviados == len(estudiantes_con_email):
+            st.success(f"🎉 Todos los correos ({emails_enviados}/{len(estudiantes_con_email)}) fueron enviados exitosamente.")
+        else:
+            st.warning(f"⚠️ Proceso completado: {emails_enviados}/{len(estudiantes_con_email)} correos enviados exitosamente.")
+        
         with st.expander("📋 Detalles del envío"):
             exitosos = sum(1 for r in resultados if r['exito'])
             fallidos = len(resultados) - exitosos
