@@ -420,7 +420,6 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
     st.info("🔄 Cargando información de apoderados...")
     st.cache_data.clear()
     emails, nombres_apoderados = load_emails()
-    
     if not emails:
         st.error("❌ No se encontraron emails de apoderados en la hoja 'MAILS'")
         st.info("""
@@ -434,25 +433,27 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
 
     estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
     st.info(f"📊 Se encontraron {len(estudiantes_filtrados)} estudiantes en los datos filtrados")
-    
+
     with st.expander("🔍 Estudiantes en datos filtrados"):
         for estudiante in estudiantes_filtrados[:10]:
             st.write(f"- {estudiante}")
         if len(estudiantes_filtrados) > 10:
             st.write(f"... y {len(estudiantes_filtrados) - 10} más")
 
+    # --- Ajuste 1: Obtener fechas desde st.session_state con fallback seguro ---
+    fecha_inicio = st.session_state.get('fecha_inicio', date.today())
+    fecha_fin = st.session_state.get('fecha_fin', date.today())
+
     emails_a_enviar = 0
     estudiantes_con_email = []
     estudiantes_sin_email = []
     estudiantes_porcentaje_alto = []
-
     for estudiante in estudiantes_filtrados:
         nombre_lower = estudiante.strip().lower()
         datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
         total_clases = len(datos_estudiante)
         asistencias = datos_estudiante['Asistencia'].sum()
         porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
-        
         if nombre_lower in emails:
             if min_porcentaje is None or min_porcentaje == 0 or porcentaje_asistencia <= min_porcentaje:
                 emails_a_enviar += 1
@@ -481,7 +482,7 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
 
     if emails_a_enviar == 0:
         st.error("❌ No se encontraron estudiantes que cumplan los criterios para enviar emails")
-        st.info("""
+        st.info(f"""
         💡 **Posibles soluciones:**
         1. Verifica que los nombres en la hoja MAILS coincidan con los de asistencia
         2. Reduce el porcentaje mínimo de asistencia ({min_porcentaje}%)
@@ -491,7 +492,6 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
         return
 
     st.success(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
-    
     with st.expander("👀 Ver estudiantes que recibirán el resumen"):
         for estudiante, porcentaje in estudiantes_con_email:
             nombre_lower = estudiante.strip().lower()
@@ -504,16 +504,14 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
         progress_bar = st.progress(0)
         resultados = []
         emails_enviados = 0
-        
         for i, (estudiante, porcentaje_asistencia) in enumerate(estudiantes_con_email):
             nombre_lower = estudiante.strip().lower()
             correo_destino = emails.get(nombre_lower)
             nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
-            
             if not correo_destino:
                 st.warning(f"⚠️ No se encontró email para {estudiante}")
                 continue
-            
+
             datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
             total_clases = len(datos_estudiante)
             asistencias = datos_estudiante['Asistencia'].sum()
@@ -526,8 +524,9 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 asistencias_curso = datos_curso['Asistencia'].sum()
                 porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
                 resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
-            
+
             subject = f"Resumen de Asistencia - {estudiante}"
+            # --- Ajuste 2: Corregir el uso de .format() con salto de línea ---
             body = email_template.format(
                 nombre_apoderado=nombre_apoderado,
                 estudiante=estudiante,
@@ -536,34 +535,30 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 ausencias=ausencias,
                 porcentaje_asistencia=porcentaje_asistencia,
                 resumen_cursos="\n".join(resumen_cursos),
-                fecha_inicio=st.session_state.fecha_inicio.strftime('%d/%m/%Y'),
-                fecha_fin=st.session_state.fecha_fin.strftime('%d/%m/%Y')
+                fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
+                fecha_fin=fecha_fin.strftime('%d/%m/%Y')
             )
-            
+
             with st.expander(f"📝 Preview email para {estudiante}"):
                 st.write(f"**Asunto:** {subject}")
                 st.write(f"**Cuerpo:**")
                 st.text(body)
-            
+
             exito = send_email(correo_destino, subject, body)
-            
             if exito:
                 emails_enviados += 1
                 st.success(f"✅ Email enviado a {nombre_apoderado} ({correo_destino})")
             else:
                 st.error(f"❌ Error al enviar email a {correo_destino}")
-            
             resultados.append({
                 'estudiante': estudiante,
                 'apoderado': nombre_apoderado,
                 'email': correo_destino,
                 'exito': exito
             })
-            
             progress_bar.progress((i + 1) / len(estudiantes_con_email))
-        
+
         st.success(f"✅ Proceso de envío completado: {emails_enviados}/{len(estudiantes_con_email)} emails enviados exitosamente")
-        
         with st.expander("📋 Ver detalles completos del envío"):
             exitosos = sum(1 for r in resultados if r['exito'])
             fallidos = len(resultados) - exitosos
@@ -578,6 +573,18 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 for resultado in resultados:
                     if not resultado['exito']:
                         st.write(f"- {resultado['estudiante']} → {resultado['apoderado']} ({resultado['email']})")
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ==============================
 # PANEL ADMINISTRATIVO
