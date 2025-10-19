@@ -400,8 +400,11 @@ def admin_panel():
         st.warning("No hay datos de asistencia aún.")
         return
 
-    # Asegurar que 'Fecha' sea datetime
+    # --- Asegurar que 'Fecha' sea datetime (con manejo de errores) ---
     df["Fecha"] = pd.to_datetime(df["Fecha"], errors="coerce")
+    # Si hay fechas con zona horaria, eliminarla
+    if df["Fecha"].dt.tz is not None:
+        df["Fecha"] = df["Fecha"].dt.tz_localize(None)
 
     if st.button("🧹 Limpiar caché"):
         st.cache_data.clear()
@@ -411,13 +414,17 @@ def admin_panel():
     col1, col2, col3 = st.columns(3)
 
     with col1:
-        # Normalizar cursos para evitar problemas de espacios
-        cursos = ["Todos"] + sorted(df["Curso"].dropna().astype(str).str.strip().unique().tolist())
+        # Normalizar cursos (eliminar espacios, convertir a string)
+        cursos = ["Todos"] + sorted(
+            df["Curso"].dropna().astype(str).str.strip().unique().tolist()
+        )
         curso_sel = st.selectbox("Curso", cursos, key="curso_filter")
 
     with col2:
         # Normalizar estudiantes
-        estudiantes = ["Todos"] + sorted(df["Estudiante"].dropna().astype(str).str.strip().unique().tolist())
+        estudiantes = ["Todos"] + sorted(
+            df["Estudiante"].dropna().astype(str).str.strip().unique().tolist()
+        )
         estudiante_sel = st.selectbox("Estudiante", estudiantes, key="estudiante_filter")
 
     with col3:
@@ -482,16 +489,15 @@ def admin_panel():
             filtered_df["Estudiante"].astype(str).str.strip() == estudiante_sel
         ]
 
-    # === FILTRO DE FECHAS SEGURO (SIN .dt.date) ===
-    filtered_df["Fecha"] = pd.to_datetime(filtered_df["Fecha"], errors="coerce")
-
-    # Eliminar zona horaria si existe (clave para evitar TypeError)
-    if not filtered_df.empty and filtered_df["Fecha"].dt.tz is not None:
-        filtered_df["Fecha"] = filtered_df["Fecha"].dt.tz_localize(None)
-
+    # === FILTRO DE FECHAS SEGURO ===
     # Convertir las fechas seleccionadas a datetime (sin hora)
     start_dt = pd.Timestamp(start_date)
     end_dt = pd.Timestamp(end_date) + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)  # Incluir todo el día final
+
+    # Asegurar que Fecha sea datetime (por si acaso)
+    filtered_df["Fecha"] = pd.to_datetime(filtered_df["Fecha"], errors="coerce")
+    if filtered_df["Fecha"].dt.tz is not None:
+        filtered_df["Fecha"] = filtered_df["Fecha"].dt.tz_localize(None)
 
     mask_fecha = (
         filtered_df["Fecha"].notna() &
@@ -503,6 +509,9 @@ def admin_panel():
     # === VALIDAR RESULTADO ===
     if filtered_df.empty:
         st.warning("No hay datos que coincidan con los filtros seleccionados.")
+        # Opcional: mostrar un vistazo de los datos originales para depurar
+        # st.write("📌 Datos cargados (primeras 5 filas):")
+        # st.dataframe(df.head())
         return
 
     # === RESUMEN ===
