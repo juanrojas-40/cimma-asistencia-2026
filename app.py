@@ -420,9 +420,10 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        # Fechas específicas para 2026
-        start_date = st.date_input("Fecha de inicio", datetime(2026, 1, 1))
-        end_date = st.date_input("Fecha de término", datetime(2026, 12, 31))
+        # Fechas específicas para 2026 con conversión a datetime64[ns]
+        chile_tz = pytz.timezone("America/Santiago")
+        start_date = st.date_input("Fecha de inicio", datetime(2026, 1, 1)).replace(tzinfo=chile_tz)
+        end_date = st.date_input("Fecha de término", datetime(2026, 12, 31)).replace(tzinfo=chile_tz)
 
     # Aplicar filtros
     filtered_df = df.copy()
@@ -432,9 +433,10 @@ def admin_panel():
         filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
     if prof_sel != "Todos":
         filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
+    # Convertir fechas a datetime64[ns] para comparación consistente
     filtered_df = filtered_df[
-        (filtered_df["Fecha"].dt.date >= start_date) & 
-        (filtered_df["Fecha"].dt.date <= end_date) & 
+        (filtered_df["Fecha"] >= pd.Timestamp(start_date)) & 
+        (filtered_df["Fecha"] <= pd.Timestamp(end_date)) & 
         (filtered_df["Fecha"].notna())
     ]
 
