@@ -540,7 +540,7 @@ def admin_panel():
     
     # Lista de cursos
     cursos = ["Todos"] + sorted(df['Curso'].unique().tolist())
-    curso_seleccionado = st.sidebar.selectbox("Seleccionar Curso", cursos)
+    curso_seleccionado = st.sidebar.selectbox("Seleccionar Curso", cursos, key="curso_select")
     
     # Lista de estudiantes (filtrada por curso si se selecciona uno)
     if curso_seleccionado != "Todos":
@@ -549,7 +549,7 @@ def admin_panel():
     else:
         estudiantes = ["Todos"] + sorted(df['Estudiante'].unique().tolist())
     
-    estudiante_seleccionado = st.sidebar.selectbox("Seleccionar Estudiante", estudiantes)
+    estudiante_seleccionado = st.sidebar.selectbox("Seleccionar Estudiante", estudiantes, key="estudiante_select")
     
     # Fechas - usar el rango real de los datos después de la conversión
     if 'Fecha' in df.columns and df['Fecha'].notna().any():
@@ -561,9 +561,9 @@ def admin_panel():
     
     col1, col2 = st.sidebar.columns(2)
     with col1:
-        fecha_inicio = st.date_input("Desde", value=fecha_min, min_value=fecha_min, max_value=fecha_max)
+        fecha_inicio = st.date_input("Desde", value=fecha_min, min_value=fecha_min, max_value=fecha_max, key="fecha_inicio")
     with col2:
-        fecha_fin = st.date_input("Hasta", value=fecha_max, min_value=fecha_min, max_value=fecha_max)
+        fecha_fin = st.date_input("Hasta", value=fecha_max, min_value=fecha_min, max_value=fecha_max, key="fecha_fin")
 
     # Aplicar filtros progresivamente
     datos_filtrados = df.copy()
@@ -587,8 +587,17 @@ def admin_panel():
         ]
         filtros_aplicados.append(f"📅 Período: {fecha_inicio.strftime('%d/%m/%Y')} - {fecha_fin.strftime('%d/%m/%Y')}")
     
-    # Botón para limpiar filtros
-    if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True):
+    # CORRECCIÓN 1: Botón para limpiar filtros - usa session_state para resetear
+    if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True, key="limpiar_filtros"):
+        # Limpiar los filtros en session_state
+        if "curso_select" in st.session_state:
+            st.session_state.curso_select = "Todos"
+        if "estudiante_select" in st.session_state:
+            st.session_state.estudiante_select = "Todos"
+        if "fecha_inicio" in st.session_state:
+            st.session_state.fecha_inicio = fecha_min
+        if "fecha_fin" in st.session_state:
+            st.session_state.fecha_fin = fecha_max
         st.rerun()
 
     # MOSTRAR RESULTADOS
@@ -623,7 +632,8 @@ def admin_panel():
         st.info("### 📋 Muestra de datos disponibles (sin filtros):")
         muestra_df = df.head(10).copy()
         if 'Fecha' in muestra_df.columns:
-            muestra_df['Fecha'] = muestra_df['Fecha'].dt.strftime('%Y-%m-%d %H:%M')
+            # CORRECCIÓN 2: Formato de fecha sin hora
+            muestra_df['Fecha'] = muestra_df['Fecha'].dt.strftime('%d/%m/%Y')
         st.dataframe(muestra_df, use_container_width=True)
         
         return
@@ -718,11 +728,11 @@ def admin_panel():
     # Preparar datos para mostrar
     datos_mostrar = datos_filtrados.copy()
     
-    # Formatear fechas para mostrar
+    # CORRECCIÓN 2: Formatear fechas para mostrar SIN HORA
     if 'Fecha' in datos_mostrar.columns:
-        # Crear columna formateada
+        # Crear columna formateada solo con fecha (sin hora)
         datos_mostrar['Fecha_Formateada'] = datos_mostrar['Fecha'].apply(
-            lambda x: x.strftime('%d/%m/%Y %H:%M') if pd.notna(x) else 'Sin fecha'
+            lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'Sin fecha'  # Solo fecha, sin hora
         )
     else:
         datos_mostrar['Fecha_Formateada'] = 'Columna no disponible'
@@ -760,8 +770,9 @@ def admin_panel():
         # Preparar CSV
         csv_df = datos_filtrados.copy()
         if 'Fecha' in csv_df.columns:
+            # En el CSV también usar solo fecha sin hora
             csv_df['Fecha'] = csv_df['Fecha'].apply(
-                lambda x: x.strftime('%Y-%m-%d %H:%M:%S') if pd.notna(x) else ''
+                lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ''  # Solo fecha en CSV también
             )
         
         csv = csv_df.to_csv(index=False).encode('utf-8')
@@ -778,6 +789,11 @@ def admin_panel():
         output = io.BytesIO()
         with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
             excel_df = datos_filtrados.copy()
+            if 'Fecha' in excel_df.columns:
+                # En Excel también usar solo fecha sin hora
+                excel_df['Fecha'] = excel_df['Fecha'].apply(
+                    lambda x: x.strftime('%Y-%m-%d') if pd.notna(x) else ''
+                )
             excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
             
             # Agregar hoja de resumen
@@ -814,7 +830,6 @@ def admin_panel():
     with col2:
         if st.button("📊 Ver Todos los Datos", use_container_width=True):
             st.rerun()
-
 
 
 
