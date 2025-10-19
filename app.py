@@ -256,69 +256,66 @@ def load_all_asistencia():
     # ✅ Convertir a DataFrame y luego transformar "Fecha" a datetime
     df = pd.DataFrame(all_data)
     if not df.empty:
-        # Configurar locale en español para parsear fechas en español
-        try:
-            import locale
-            locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
-        except:
-            try:
-                locale.setlocale(locale.LC_TIME, 'Spanish_Spain.1252')
-            except:
-                st.warning("No se pudo configurar locale español, usando conversión manual")
-        
-        def convertir_fecha_espanol(fecha_str):
-            if not fecha_str or pd.isna(fecha_str):
+        # Diccionario completo de meses en español
+        meses_espanol = {
+            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+            'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
+            'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+        }
+
+        def convertir_fecha_manual(fecha_str):
+            if not fecha_str or pd.isna(fecha_str) or fecha_str.strip() == "":
                 return pd.NaT
+            
+            fecha_str = str(fecha_str).strip().lower()
+            
             try:
-                # Intentar con parser multilingüe
-                return pd.to_datetime(fecha_str, format='%d de %B de %Y', errors='coerce')
-            except:
-                return pd.NaT
-        
-        # Intentar conversión directa con formato español
-        df["Fecha"] = pd.to_datetime(df["Fecha"], format='%d de %B de %Y', errors='coerce')
-        
-        # Si hay fechas que no se pudieron convertir, intentar método alternativo
-        if df["Fecha"].isna().any():
-            # Método alternativo: usar dateparser si está disponible
-            try:
-                import dateparser
-                mask_na = df["Fecha"].isna()
-                df.loc[mask_na, "Fecha"] = df.loc[mask_na, "Fecha"].apply(
-                    lambda x: pd.to_datetime(dateparser.parse(x, languages=['es'])) if pd.notna(x) else pd.NaT
-                )
-            except ImportError:
-                # Si dateparser no está disponible, usar conversión manual básica
-                meses_espanol = {
-                    'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
-                    'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
-                    'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12'
-                }
-                
-                def convertir_manual(fecha_str):
-                    if not fecha_str or pd.isna(fecha_str):
-                        return pd.NaT
-                    try:
+                # Caso 1: Formato "6 de abril de 2026"
+                if ' de ' in fecha_str:
+                    partes = fecha_str.split(' de ')
+                    if len(partes) == 3:
+                        dia = partes[0].strip().zfill(2)  # Asegurar 2 dígitos
+                        mes_str = partes[1].strip()
+                        año = partes[2].strip()
+                        
+                        # Buscar el mes en el diccionario
                         for mes_es, mes_num in meses_espanol.items():
-                            if mes_es in fecha_str.lower():
-                                # Reemplazar formato "6 de abril de 2026" por "06/04/2026"
-                                partes = fecha_str.split(' de ')
-                                if len(partes) == 3:
-                                    dia = partes[0].zfill(2)
-                                    año = partes[2]
-                                    fecha_standard = f"{dia}/{mes_num}/{año}"
-                                    return pd.to_datetime(fecha_standard, format='%d/%m/%Y', errors='coerce')
-                    except:
-                        pass
-                    return pd.NaT
+                            if mes_es in mes_str:
+                                fecha_iso = f"{año}-{mes_num}-{dia}"
+                                return pd.to_datetime(fecha_iso, format='%Y-%m-%d', errors='coerce')
                 
-                mask_na = df["Fecha"].isna()
-                df.loc[mask_na, "Fecha"] = df.loc[mask_na, "Fecha"].apply(convertir_manual)
+                # Caso 2: Formato "6/4/2026" o "06/04/2026"
+                elif '/' in fecha_str:
+                    return pd.to_datetime(fecha_str, format='%d/%m/%Y', errors='coerce')
+                
+                # Caso 3: Formato "2026-04-06" (ISO)
+                elif '-' in fecha_str and len(fecha_str) == 10:
+                    return pd.to_datetime(fecha_str, format='%Y-%m-%d', errors='coerce')
+                
+                # Caso 4: Intentar cualquier otro formato con pandas
+                return pd.to_datetime(fecha_str, errors='coerce')
+                
+            except Exception:
+                return pd.NaT
+
+        # Aplicar la conversión
+        df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
         
         # Verificar resultados
+        fechas_convertidas = df["Fecha"].notna().sum()
+        fechas_totales = len(df)
+        
+        st.success(f"✅ {fechas_convertidas} de {fechas_totales} fechas convertidas exitosamente")
+        
         if df["Fecha"].isna().any():
-            num_fechas_invalidas = df["Fecha"].isna().sum()
-            st.warning(f"⚠️ {num_fechas_invalidas} fechas no pudieron ser convertidas correctamente")
+            fechas_problematicas = df[df["Fecha"].isna()]["Fecha"].unique()
+            st.warning(f"⚠️ {df['Fecha'].isna().sum()} fechas no pudieron ser convertidas")
+            
+            # Mostrar ejemplos de fechas problemáticas para debugging
+            fechas_originales_problematicas = df[df["Fecha"].isna()]["Fecha_Original"].unique() if "Fecha_Original" in df.columns else df[df["Fecha"].isna()]["Fecha"].unique()
+            st.info(f"📋 Ejemplos de fechas problemáticas: {list(fechas_originales_problematicas[:5])}")
     
     return df
 
