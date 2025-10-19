@@ -446,6 +446,43 @@ Preuniversitario CIMMA"""
 
 
 def enviar_resumen_asistencia(datos_filtrados, email_template):
+
+    """Envía un resumen de asistencia a TODOS los apoderados con email registrado."""
+    
+    st.info("🔄 Cargando información de apoderados...")
+    st.cache_data.clear()  # ⚠️ ESTO PUEDE CAUSAR PROBLEMAS
+    
+    # VERIFICACIÓN CRÍTICA: ¿Los datos filtrados tienen contenido?
+    if datos_filtrados.empty:
+        st.error("❌ Los datos filtrados están VACÍOS - no hay nada para enviar")
+        st.info("""
+        💡 **Posibles causas:**
+        1. Los filtros aplicados no coinciden con ningún dato
+        2. Las fechas seleccionadas no tienen registros
+        3. El curso/estudiante seleccionado no existe
+        """)
+        return
+    
+    st.success(f"📊 Datos filtrados cargados: {len(datos_filtrados)} registros")
+    
+    emails, nombres_apoderados = load_emails()
+    if not emails:
+        st.error("❌ No se encontraron emails de apoderados")
+        return
+
+    # DIAGNÓSTICO DETALLADO
+    with st.expander("🔍 Diagnóstico Detallado"):
+        st.write("### Emails cargados:")
+        st.write(f"- Total emails: {len(emails)}")
+        st.write(f"- Primeros 3: {list(emails.items())[:3]}")
+        
+        st.write("### Datos filtrados:")
+        st.write(f"- Estudiantes únicos: {datos_filtrados['Estudiante'].unique()}")
+        st.write(f"- Cursos: {datos_filtrados['Curso'].unique()}")
+        st.write(f"- Rango fechas: {datos_filtrados['Fecha'].min()} a {datos_filtrados['Fecha'].max()}")
+
+
+
     """Envía un resumen de asistencia a TODOS los apoderados con email registrado."""
     st.info("🔍 Verificando configuración de email...")
     try:
