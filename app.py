@@ -49,7 +49,6 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         msg["To"] = to_email
         msg["Subject"] = subject
         msg["Date"] = formatdate(localtime=True)
-        # --- ✅ CAMBIO CRÍTICO: enviar como HTML ---
         msg.attach(MIMEText(body, "plain"))
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
         try:
@@ -323,8 +322,13 @@ def main():
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
                             body = f"""Estimado/a {nombre},
-Su código de verificación para acceder al sistema es: {code}
+
+Su código de verificación para acceder al sistema es: 
+
+{code}
+
 Este código es válido por 10 minutos.
+
 Saludos,
 Preuniversitario CIMMA"""
                             if send_email(email, subject, body):
@@ -404,8 +408,8 @@ Preuniversitario CIMMA"""
 
 
 
-def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=None):
-    """Envía un resumen de asistencia a los apoderados de los estudiantes filtrados"""
+def enviar_resumen_asistencia(datos_filtrados, email_template):
+    """Envía un resumen de asistencia a los apoderados de TODOS los estudiantes con email registrado."""
     st.info("🔍 Verificando configuración de email...")
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
@@ -442,7 +446,7 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
         if len(estudiantes_filtrados) > 10:
             st.write(f"... y {len(estudiantes_filtrados) - 10} más")
 
-    # --- Ajuste: Obtener fechas desde st.session_state con fallback seguro ---
+    # --- Fechas con fallback seguro ---
     fecha_inicio = st.session_state.get('fecha_inicio', date.today())
     fecha_fin = st.session_state.get('fecha_fin', date.today())
 
@@ -452,14 +456,9 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
 
     for estudiante in estudiantes_filtrados:
         nombre_lower = estudiante.strip().lower()
-        datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
-        total_clases = len(datos_estudiante)
-        asistencias = datos_estudiante['Asistencia'].sum()
-        porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
         if nombre_lower in emails:
-            # ✅ Incluir SIEMPRE si tiene email, sin importar el porcentaje
             emails_a_enviar += 1
-            estudiantes_con_email.append((estudiante, porcentaje_asistencia))
+            estudiantes_con_email.append(estudiante)
         else:
             estudiantes_sin_email.append(estudiante)
 
@@ -472,43 +471,41 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
             if len(estudiantes_sin_email) > 10:
                 st.write(f"... y {len(estudiantes_sin_email) - 10} más")
 
-    # ✅ Eliminado el bloque "estudiantes_porcentaje_alto" porque ya no se filtra
-
     if emails_a_enviar == 0:
         st.error("❌ No se encontraron estudiantes con email registrado para enviar resúmenes")
-        st.info("""
-        💡 **Verifica lo siguiente:**
-        1. La hoja **MAILS** contiene emails válidos
-        2. Los nombres coinciden exactamente con los de asistencia
-        3. El formato de los correos es correcto
-        """)
         return
 
     st.success(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
     with st.expander("👀 Ver estudiantes que recibirán el resumen"):
-        for estudiante, porcentaje in estudiantes_con_email:
+        for estudiante in estudiantes_con_email:
             nombre_lower = estudiante.strip().lower()
             email = emails.get(nombre_lower, "No encontrado")
             apoderado = nombres_apoderados.get(nombre_lower, "No especificado")
-            st.write(f"- **{estudiante}** (Asistencia: {porcentaje:.1f}%) → {apoderado} ({email})")
+            st.write(f"- **{estudiante}** → {apoderado} ({email})")
 
     if st.button("✅ Confirmar envío de resúmenes", key="confirmar_envio_resumen"):
         st.info("🚀 Iniciando envío de resúmenes...")
         progress_bar = st.progress(0)
         resultados = []
         emails_enviados = 0
-        for i, (estudiante, porcentaje_asistencia) in enumerate(estudiantes_con_email):
+
+        for i, estudiante in enumerate(estudiantes_con_email):
             nombre_lower = estudiante.strip().lower()
             correo_destino = emails.get(nombre_lower)
             nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
+
             if not correo_destino:
                 st.warning(f"⚠️ No se encontró email para {estudiante}")
                 continue
 
+            # Calcular métricas del estudiante
             datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
             total_clases = len(datos_estudiante)
             asistencias = datos_estudiante['Asistencia'].sum()
             ausencias = total_clases - asistencias
+            porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
+
+            # Resumen por curso
             cursos_estudiante = datos_estudiante['Curso'].unique()
             resumen_cursos = []
             for curso in cursos_estudiante:
@@ -518,7 +515,7 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
                 resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
 
-            subject = f"Resumen de Asistencia - {estudiante}"
+            # Formatear cuerpo del correo en texto plano
             body = email_template.format(
                 nombre_apoderado=nombre_apoderado,
                 estudiante=estudiante,
@@ -531,17 +528,20 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 fecha_fin=fecha_fin.strftime('%d/%m/%Y')
             )
 
+            subject = f"Resumen de Asistencia - {estudiante}"
+
             with st.expander(f"📝 Preview email para {estudiante}"):
                 st.write(f"**Asunto:** {subject}")
-                st.write(f"**Cuerpo:**")
-                st.text(body)
+                st.text_area("Cuerpo del correo (texto plano):", body, height=200)
 
+            # Enviar usando la función que ya funciona
             exito = send_email(correo_destino, subject, body)
             if exito:
                 emails_enviados += 1
                 st.success(f"✅ Email enviado a {nombre_apoderado} ({correo_destino})")
             else:
                 st.error(f"❌ Error al enviar email a {correo_destino}")
+
             resultados.append({
                 'estudiante': estudiante,
                 'apoderado': nombre_apoderado,
