@@ -324,7 +324,10 @@ def main():
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
                             body = f"""Estimado/a {nombre},
-Su código de verificación para acceder al sistema es: {code}
+Su código de verificación para acceder al sistema es: 
+<div align="center" style="font-size: 20px; color: black; font-weight: bold; margin: 10px 0;">
+{code}
+</div>
 Este código es válido por 10 minutos.
 Saludos,
 Preuniversitario CIMMA"""
@@ -408,50 +411,107 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
     except KeyError as e:
         st.error(f"❌ Configuración de EMAIL incompleta en secrets: {e}")
         return
+
     with st.expander("🧪 Probar Configuración de Email"):
         probar_configuracion_email()
+
+    st.info("🔄 Cargando información de apoderados...")
     st.cache_data.clear()
     emails, nombres_apoderados = load_emails()
+    
     if not emails:
         st.error("❌ No se encontraron emails de apoderados en la hoja 'MAILS'")
+        st.info("""
+        💡 **Verifica lo siguiente:**
+        1. La hoja se llama exactamente **MAILS** (en mayúsculas)
+        2. Tiene las columnas: **NOMBRE ESTUDIANTE**, **NOMBRE APODERADO**, **MAIL APODERADO**
+        3. Los nombres de estudiantes coinciden exactamente con los registros de asistencia
+        4. Los emails están completos y en formato válido
+        """)
         return
+
     estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
+    st.info(f"📊 Se encontraron {len(estudiantes_filtrados)} estudiantes en los datos filtrados")
+    
+    with st.expander("🔍 Estudiantes en datos filtrados"):
+        for estudiante in estudiantes_filtrados[:10]:
+            st.write(f"- {estudiante}")
+        if len(estudiantes_filtrados) > 10:
+            st.write(f"... y {len(estudiantes_filtrados) - 10} más")
+
     emails_a_enviar = 0
     estudiantes_con_email = []
     estudiantes_sin_email = []
+    estudiantes_porcentaje_alto = []
+
     for estudiante in estudiantes_filtrados:
         nombre_lower = estudiante.strip().lower()
+        datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
+        total_clases = len(datos_estudiante)
+        asistencias = datos_estudiante['Asistencia'].sum()
+        porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
+        
         if nombre_lower in emails:
-            datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
-            total_clases = len(datos_estudiante)
-            asistencias = datos_estudiante['Asistencia'].sum()
-            porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
-            if min_porcentaje is None or porcentaje_asistencia <= min_porcentaje:
+            if min_porcentaje is None or min_porcentaje == 0 or porcentaje_asistencia <= min_porcentaje:
                 emails_a_enviar += 1
                 estudiantes_con_email.append((estudiante, porcentaje_asistencia))
             else:
-                estudiantes_sin_email.append(estudiante)
+                estudiantes_porcentaje_alto.append((estudiante, porcentaje_asistencia))
         else:
             estudiantes_sin_email.append(estudiante)
+
+    if estudiantes_sin_email:
+        with st.expander("⚠️ Estudiantes sin email registrado"):
+            st.write("Los siguientes estudiantes no tienen email registrado en la hoja MAILS:")
+            for est in estudiantes_sin_email[:10]:
+                nombre_lower = est.strip().lower()
+                st.write(f"- '{est}' (buscado como: '{nombre_lower}')")
+            if len(estudiantes_sin_email) > 10:
+                st.write(f"... y {len(estudiantes_sin_email) - 10} más")
+
+    if estudiantes_porcentaje_alto:
+        with st.expander("ℹ️ Estudiantes excluidos por porcentaje alto"):
+            st.write(f"Los siguientes estudiantes tienen asistencia mayor a {min_porcentaje}%:")
+            for est, porc in estudiantes_porcentaje_alto[:10]:
+                st.write(f"- {est} ({porc:.1f}%)")
+            if len(estudiantes_porcentaje_alto) > 10:
+                st.write(f"... y {len(estudiantes_porcentaje_alto) - 10} más")
+
     if emails_a_enviar == 0:
-        st.error("❌ No se encontraron emails para los estudiantes filtrados o no cumplen con el criterio de porcentaje")
+        st.error("❌ No se encontraron estudiantes que cumplan los criterios para enviar emails")
+        st.info("""
+        💡 **Posibles soluciones:**
+        1. Verifica que los nombres en la hoja MAILS coincidan con los de asistencia
+        2. Reduce el porcentaje mínimo de asistencia ({min_porcentaje}%)
+        3. Amplía los filtros de curso, estudiante o fechas
+        4. Revisa los datos en la hoja MAILS
+        """)
         return
+
     st.success(f"📧 Se enviarán resúmenes a {emails_a_enviar} apoderados")
+    
     with st.expander("👀 Ver estudiantes que recibirán el resumen"):
         for estudiante, porcentaje in estudiantes_con_email:
             nombre_lower = estudiante.strip().lower()
             email = emails.get(nombre_lower, "No encontrado")
             apoderado = nombres_apoderados.get(nombre_lower, "No especificado")
             st.write(f"- **{estudiante}** (Asistencia: {porcentaje:.1f}%) → {apoderado} ({email})")
+
     if st.button("✅ Confirmar envío de resúmenes", key="confirmar_envio_resumen"):
         st.info("🚀 Iniciando envío de resúmenes...")
         progress_bar = st.progress(0)
         resultados = []
         emails_enviados = 0
+        
         for i, (estudiante, porcentaje_asistencia) in enumerate(estudiantes_con_email):
             nombre_lower = estudiante.strip().lower()
             correo_destino = emails.get(nombre_lower)
             nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
+            
+            if not correo_destino:
+                st.warning(f"⚠️ No se encontró email para {estudiante}")
+                continue
+            
             datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
             total_clases = len(datos_estudiante)
             asistencias = datos_estudiante['Asistencia'].sum()
@@ -464,6 +524,7 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 asistencias_curso = datos_curso['Asistencia'].sum()
                 porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
                 resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
+            
             subject = f"Resumen de Asistencia - {estudiante}"
             body = email_template.format(
                 nombre_apoderado=nombre_apoderado,
@@ -476,24 +537,31 @@ def enviar_resumen_asistencia(datos_filtrados, email_template, min_porcentaje=No
                 fecha_inicio=st.session_state.fecha_inicio.strftime('%d/%m/%Y'),
                 fecha_fin=st.session_state.fecha_fin.strftime('%d/%m/%Y')
             )
+            
             with st.expander(f"📝 Preview email para {estudiante}"):
                 st.write(f"**Asunto:** {subject}")
                 st.write(f"**Cuerpo:**")
                 st.text(body)
+            
             exito = send_email(correo_destino, subject, body)
+            
             if exito:
                 emails_enviados += 1
                 st.success(f"✅ Email enviado a {nombre_apoderado} ({correo_destino})")
             else:
                 st.error(f"❌ Error al enviar email a {correo_destino}")
+            
             resultados.append({
                 'estudiante': estudiante,
                 'apoderado': nombre_apoderado,
                 'email': correo_destino,
                 'exito': exito
             })
+            
             progress_bar.progress((i + 1) / len(estudiantes_con_email))
+        
         st.success(f"✅ Proceso de envío completado: {emails_enviados}/{len(estudiantes_con_email)} emails enviados exitosamente")
+        
         with st.expander("📋 Ver detalles completos del envío"):
             exitosos = sum(1 for r in resultados if r['exito'])
             fallidos = len(resultados) - exitosos
@@ -997,7 +1065,7 @@ Preuniversitario CIMMA 2026"""
             except gspread.exceptions.WorksheetNotFound:
                 mejoras_sheet = sheet.add_worksheet("MEJORAS", 100, 3)
                 mejoras_sheet.append_row(["Fecha", "Sugerencia", "Usuario"])
-            mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%Y %H:%M"), mejora, st.session_state["user_name"]])
+            mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
