@@ -648,29 +648,6 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
 
 def admin_panel():
 
-# En la sección de email del admin_panel(), agrega:
-st.subheader("📧 Enviar Notificaciones a Apoderados")
-
-with st.expander("🔧 DIAGNÓSTICO RÁPIDO", expanded=True):
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("🔍 Verificar Datos Actuales"):
-            st.write("### Datos Filtrados Actuales:")
-            st.write(f"- Registros: {len(datos_filtrados)}")
-            st.write(f"- Estudiantes: {len(datos_filtrados['Estudiante'].unique())}")
-            st.write(f"- Cursos: {list(datos_filtrados['Curso'].unique())}")
-            
-            emails, _ = load_emails()
-            st.write("### Emails Cargados:")
-            st.write(f"- Apoderados registrados: {len(emails)}")
-            
-    with col2:
-        if st.button("🔄 Recargar Todo"):
-            st.cache_data.clear()
-            st.rerun()
-
-
     # Verificar que los secrets de email existan
     try:
         required_keys = ['smtp_server', 'smtp_port', 'sender_email', 'sender_password']
