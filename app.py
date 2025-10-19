@@ -710,7 +710,15 @@ def admin_panel():
                          title='Porcentaje de Asistencia por Curso',
                          color='Porcentaje',
                          color_continuous_scale='Blues',
-                         hover_data=['sum', 'count'])
+                         hover_data=['sum', 'count'],
+                         text='Porcentaje')
+
+            # AGREGAR ESTAS LÍNEAS PARA FORMATEAR EL TEXTO
+            fig1.update_traces(texttemplate='%{text:.1f}%', 
+                            textposition='inside')  # 'inside', 'outside', 'auto', etc.
+            fig1.update_layout(uniformtext_minsize=8, 
+                            uniformtext_mode='hide')
+
             st.plotly_chart(fig1, use_container_width=True)
         except Exception as e:
             st.error(f"Error en gráfico de cursos: {e}")
