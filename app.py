@@ -830,7 +830,7 @@ Preuniversitario CIMMA 2026""",
             height=300
         )
         if st.button("📧 Preparar Envío de Emails", use_container_width=True):
-            enviar_resumen_asistencia(datos_filtrados, email_template, None)
+            enviar_resumen_asistencia(datos_filtrados, email_template)
     st.subheader("📤 Exportar Datos")
     col1, col2 = st.columns(2)
     with col1:
