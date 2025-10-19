@@ -420,16 +420,65 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        # Solo fecha de término para 2026
+        # RANGO DE FECHAS DINÁMICO
+        st.subheader("📅 Rango de Fechas")
+        
         chile_tz = pytz.timezone("America/Santiago")
-        end_date = st.date_input("Fecha de término", datetime(2026, 12, 31).date())
+        current_year = datetime.now().year
+        
+        # Fechas límite del sistema (1 de abril a 1 de diciembre)
+        system_start = datetime(current_year, 4, 1).date()  # 1 de abril
+        system_end = datetime(current_year, 12, 1).date()   # 1 de diciembre
+        
+        # Obtener el rango real de fechas disponibles en los datos
+        if not df.empty and df["Fecha"].notna().any():
+            min_date_data = df["Fecha"].min().date()
+            max_date_data = df["Fecha"].max().date()
+            
+            # Usar el rango más restrictivo entre datos disponibles y sistema
+            actual_min_date = max(system_start, min_date_data)
+            actual_max_date = min(system_end, max_date_data)
+        else:
+            actual_min_date = system_start
+            actual_max_date = system_end
+        
+        # Selectores de fecha con límites dinámicos
+        col_fecha1, col_fecha2 = st.columns(2)
+        with col_fecha1:
+            start_date = st.date_input(
+                "Fecha de inicio", 
+                value=actual_min_date,
+                min_value=actual_min_date,
+                max_value=actual_max_date,
+                key="start_date"
+            )
+        
+        with col_fecha2:
+            end_date = st.date_input(
+                "Fecha de término", 
+                value=actual_max_date,
+                min_value=actual_min_date,
+                max_value=actual_max_date,
+                key="end_date"
+            )
+        
+        # Validar que la fecha de inicio no sea mayor que la de término
+        if start_date > end_date:
+            st.error("❌ La fecha de inicio no puede ser mayor que la fecha de término")
+            st.session_state['apply_filters'] = False
+        
+        # Convertir a timestamp con timezone
+        start_datetime = pd.Timestamp(start_date).tz_localize(chile_tz).replace(hour=0, minute=0, second=0)
         end_datetime = pd.Timestamp(end_date).tz_localize(chile_tz).replace(hour=23, minute=59, second=59)
 
         # Botón para aplicar filtros
-        if st.button("Aplicar Filtros", width='stretch'):
+        if st.button("Aplicar Filtros", use_container_width=True):
             st.session_state['apply_filters'] = True
         else:
             st.session_state['apply_filters'] = st.session_state.get('apply_filters', False)
+
+        # Mostrar información del rango disponible
+        st.caption(f"📅 Período académico: {system_start.strftime('%d/%m/%Y')} - {system_end.strftime('%d/%m/%Y')}")
 
     # Aplicar filtros solo al presionar el botón
     filtered_df = df.copy()
@@ -440,135 +489,225 @@ def admin_panel():
             filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
         if prof_sel != "Todos":
             filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
-        # Filtrar solo por fecha de término (hasta el final del día)
+        
+        # Filtrar por rango de fechas completo
         filtered_df = filtered_df[
+            (filtered_df["Fecha"] >= start_datetime) & 
             (filtered_df["Fecha"] <= end_datetime) & 
             (filtered_df["Fecha"].notna())
         ]
 
+    # Mostrar información del rango de fechas aplicado
+    if 'apply_filters' in st.session_state and st.session_state['apply_filters'] and not filtered_df.empty:
+        st.success(f"📊 **Rango de fechas aplicado:** {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
+        
+        # Calcular días del período seleccionado
+        dias_periodo = (end_date - start_date).days + 1
+        st.caption(f"Período de {dias_periodo} día{'s' if dias_periodo > 1 else ''}")
+
     if filtered_df.empty:
         st.info("No hay datos que coincidan con los filtros seleccionados.")
+        
+        # Mostrar sugerencia si no hay datos pero hay datos en el rango completo
+        if not df.empty:
+            total_records = len(df)
+            date_range_info = f"Rango completo de datos: {df['Fecha'].min().strftime('%d/%m/%Y')} - {df['Fecha'].max().strftime('%d/%m/%Y')}"
+            st.caption(f"ℹ️ {date_range_info}")
+            st.caption("💡 Prueba ajustar las fechas o filtros para ver datos")
         return
 
-    # Métricas clave basadas en asistencia
-    col1, col2, col3 = st.columns(3)
+    # Métricas clave basadas en asistencia - TOTALMENTE DINÁMICAS
+    col1, col2, col3, col4 = st.columns(4)
+    
     total_registros = len(filtered_df)
     total_asistencias = filtered_df["Asistencia"].sum()
     total_ausencias = total_registros - total_asistencias
     porc_asistencia = (total_asistencias / total_registros * 100) if total_registros > 0 else 0
+    
+    # Calcular días únicos con clases en el período seleccionado
+    dias_con_clases = filtered_df["Fecha"].dt.date.nunique()
+    total_dias_periodo = (end_date - start_date).days + 1
+    
     with col1:
         st.metric("Porcentaje de Asistencia", f"{porc_asistencia:.2f}%")
     with col2:
         st.metric("Total Asistencias", total_asistencias)
     with col3:
         st.metric("Total Ausencias", total_ausencias)
+    with col4:
+        st.metric("Días con clases", f"{dias_con_clases}/{total_dias_periodo}")
 
-    # Gráficos avanzados
+    # Gráficos avanzados con títulos dinámicos
     st.subheader("📈 Análisis por Curso/Asignatura")
-    asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
-    asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
-    fig_curso = px.bar(
-        asist_curso.reset_index(), 
-        x="Curso", 
-        y="Porcentaje",
-        hover_data=['sum', 'count'], 
-        title="Porcentaje de Asistencia por Curso/Asignatura",
-        color="Porcentaje", 
-        color_continuous_scale="Blues"
-    )
-    st.plotly_chart(fig_curso)
+    if not filtered_df.empty:
+        asist_curso = filtered_df.groupby("Curso")["Asistencia"].agg(['sum', 'count'])
+        asist_curso['Porcentaje'] = (asist_curso['sum'] / asist_curso['count'] * 100)
+        fig_curso = px.bar(
+            asist_curso.reset_index(), 
+            x="Curso", 
+            y="Porcentaje",
+            hover_data=['sum', 'count'], 
+            title=f"Asistencia por Curso/Asignatura ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            color="Porcentaje", 
+            color_continuous_scale="Blues"
+        )
+        st.plotly_chart(fig_curso)
 
     st.subheader("👤 Análisis por Alumno")
-    asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
-    asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
-    asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
-    fig_est = px.bar(
-        asist_est_sorted, 
-        x="Estudiante", 
-        y="Porcentaje",
-        hover_data=['sum', 'count'], 
-        title="Porcentaje de Asistencia por Alumno (Ordenado)",
-        color="Porcentaje", 
-        color_continuous_scale="Greens"
-    )
-    st.plotly_chart(fig_est)
+    if not filtered_df.empty:
+        asist_est = filtered_df.groupby("Estudiante")["Asistencia"].agg(['sum', 'count'])
+        asist_est['Porcentaje'] = (asist_est['sum'] / asist_est['count'] * 100)
+        asist_est_sorted = asist_est.sort_values("Porcentaje", ascending=False).reset_index()
+        fig_est = px.bar(
+            asist_est_sorted, 
+            x="Estudiante", 
+            y="Porcentaje",
+            hover_data=['sum', 'count'], 
+            title=f"Asistencia por Alumno ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            color="Porcentaje", 
+            color_continuous_scale="Greens"
+        )
+        fig_est.update_layout(xaxis_tickangle=-45)
+        st.plotly_chart(fig_est)
 
     st.subheader("🧑‍🏫 Análisis por Profesor")
-    asist_prof = filtered_df.groupby("Profesor")["Asistencia"].agg(['sum', 'count'])
-    asist_prof['Porcentaje'] = (asist_prof['sum'] / asist_prof['count'] * 100)
-    fig_prof = px.pie(
-        asist_prof.reset_index(), 
-        values="Porcentaje", 
-        names="Profesor",
-        title="Distribución de Asistencia por Profesor",
-        color_discrete_sequence=px.colors.qualitative.Pastel
-    )
-    st.plotly_chart(fig_prof)
+    if not filtered_df.empty:
+        asist_prof = filtered_df.groupby("Profesor")["Asistencia"].agg(['sum', 'count'])
+        asist_prof['Porcentaje'] = (asist_prof['sum'] / asist_prof['count'] * 100)
+        fig_prof = px.pie(
+            asist_prof.reset_index(), 
+            values="Porcentaje", 
+            names="Profesor",
+            title=f"Distribución de Asistencia por Profesor ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            color_discrete_sequence=px.colors.qualitative.Pastel
+        )
+        st.plotly_chart(fig_prof)
 
-    st.subheader("📅 Tendencia de Asistencia hasta Fecha de Término")
-    asist_time = filtered_df.groupby(filtered_df["Fecha"].dt.date)["Asistencia"].agg(['sum', 'count'])
-    asist_time['Porcentaje'] = (asist_time['sum'] / asist_time['count'] * 100)
-    fig_time = px.line(
-        asist_time.reset_index(), 
-        x="Fecha", 
-        y="Porcentaje",
-        hover_data=['sum', 'count'], 
-        title="Tendencia de Asistencia hasta la Fecha de Término",
-        markers=True
-    )
-    st.plotly_chart(fig_time)
+    st.subheader("📅 Tendencia de Asistencia Diaria")
+    if not filtered_df.empty:
+        asist_time = filtered_df.groupby(filtered_df["Fecha"].dt.date)["Asistencia"].agg(['sum', 'count'])
+        asist_time['Porcentaje'] = (asist_time['sum'] / asist_time['count'] * 100)
+        fig_time = px.line(
+            asist_time.reset_index(), 
+            x="Fecha", 
+            y="Porcentaje",
+            hover_data=['sum', 'count'], 
+            title=f"Tendencia de Asistencia Diaria ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+            markers=True
+        )
+        fig_time.update_layout(xaxis_title="Fecha", yaxis_title="Porcentaje de Asistencia (%)")
+        st.plotly_chart(fig_time)
 
     # Mapa de calor
     st.subheader("🌡️ Mapa de Calor: Asistencia por Alumno y Fecha")
-    pivot_table = filtered_df.pivot_table(
-        index="Estudiante", 
-        columns=filtered_df["Fecha"].dt.date, 
-        values="Asistencia", 
-        aggfunc="mean"
-    )
-    fig_heatmap = px.imshow(
-        pivot_table, 
-        color_continuous_scale="RdYlGn",
-        title="Mapa de Calor de Asistencia (1: Asistió, 0: Ausente)",
-        aspect="auto"
-    )
-    st.plotly_chart(fig_heatmap)
+    if not filtered_df.empty:
+        try:
+            pivot_table = filtered_df.pivot_table(
+                index="Estudiante", 
+                columns=filtered_df["Fecha"].dt.date, 
+                values="Asistencia", 
+                aggfunc="mean",
+                fill_value=0
+            )
+            fig_heatmap = px.imshow(
+                pivot_table, 
+                color_continuous_scale="RdYlGn",
+                title=f"Mapa de Calor de Asistencia ({start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')})",
+                aspect="auto"
+            )
+            st.plotly_chart(fig_heatmap)
+        except Exception as e:
+            st.warning("No se pudo generar el mapa de calor con los datos filtrados")
 
-    # Tabla detallada interactiva con formato robusto para fechas
+    # Tabla detallada interactiva
     st.subheader("📋 Registro Detallado")
     display_df = filtered_df.copy()
     display_df["Fecha"] = display_df["Fecha"].apply(
-        lambda x: x.strftime("%Y-%m-%d") if pd.notna(x) else "Sin fecha"
+        lambda x: x.strftime("%Y-%m-%d %H:%M") if pd.notna(x) else "Sin fecha"
     )
-    st.dataframe(display_df)
+    st.dataframe(display_df, use_container_width=True)
 
     # Opciones de descarga
+    st.subheader("📤 Exportar Datos")
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
-        if st.button("📤 Descargar como CSV", width='stretch'):
-            csv = filtered_df.to_csv(index=False).encode('utf-8')
-            st.download_button("Descargar CSV", csv, "asistencia_filtrada.csv", "text/csv")
+        csv = filtered_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            "📥 Descargar como CSV", 
+            csv, 
+            f"asistencia_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv", 
+            "text/csv",
+            use_container_width=True
+        )
     with col_dl2:
-        if st.button("📤 Descargar como XLSX", width='stretch'):
-            output = io.BytesIO()
-            with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
-                filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
-            excel_data = output.getvalue()
-            st.download_button("Descargar XLSX", excel_data, "asistencia_filtrada.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
+            
+            # Agregar hoja con resumen
+            summary_data = {
+                'Métrica': ['Período', 'Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia'],
+                'Valor': [
+                    f"{start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}",
+                    total_registros,
+                    total_asistencias,
+                    total_ausencias,
+                    f"{porc_asistencia:.2f}%"
+                ]
+            }
+            pd.DataFrame(summary_data).to_excel(writer, index=False, sheet_name='Resumen')
+            
+        excel_data = output.getvalue()
+        st.download_button(
+            "📥 Descargar como Excel", 
+            excel_data, 
+            f"asistencia_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.xlsx", 
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            use_container_width=True
+        )
 
-    # Insights adicionales
+    # Insights adicionales DINÁMICOS
     st.subheader("🔍 Insights Avanzados")
     if not filtered_df.empty:
+        # Mejor y peor alumno
         top_est = asist_est_sorted.iloc[0]["Estudiante"] if not asist_est_sorted.empty else "N/A"
         top_porc = asist_est_sorted.iloc[0]["Porcentaje"] if not asist_est_sorted.empty else 0
         low_est = asist_est_sorted.iloc[-1]["Estudiante"] if not asist_est_sorted.empty else "N/A"
         low_porc = asist_est_sorted.iloc[-1]["Porcentaje"] if not asist_est_sorted.empty else 0
-        st.write(f"**Mejor Alumno:** {top_est} con {top_porc:.2f}% de asistencia.")
-        st.write(f"**Alumno con Menor Asistencia:** {low_est} con {low_porc:.2f}% de asistencia.")
-        avg_asist = filtered_df["Asistencia"].mean() * 100
-        st.write(f"**Asistencia Promedio hasta la Fecha:** {avg_asist:.2f}%")
-        if avg_asist < 70:
-            st.warning("⚠️ La asistencia promedio es baja. Considerar acciones correctivas.")
+        
+        # Curso con mejor asistencia
+        mejor_curso = asist_curso.loc[asist_curso['Porcentaje'].idxmax()] if not asist_curso.empty else None
+        peor_curso = asist_curso.loc[asist_curso['Porcentaje'].idxmin()] if not asist_curso.empty else None
+        
+        col_insight1, col_insight2 = st.columns(2)
+        
+        with col_insight1:
+            st.write("**👥 Rendimiento por Alumno:**")
+            st.write(f"• **Mejor alumno:** {top_est} ({top_porc:.1f}%)")
+            st.write(f"• **Alumno con menor asistencia:** {low_est} ({low_porc:.1f}%)")
+            st.write(f"• **Asistencia promedio:** {porc_asistencia:.1f}%")
+            
+        with col_insight2:
+            st.write("**📚 Rendimiento por Curso:**")
+            if mejor_curso is not None:
+                st.write(f"• **Mejor curso:** {mejor_curso.name} ({mejor_curso['Porcentaje']:.1f}%)")
+            if peor_curso is not None:
+                st.write(f"• **Curso con menor asistencia:** {peor_curso.name} ({peor_curso['Porcentaje']:.1f}%)")
+            st.write(f"• **Días con clases:** {dias_con_clases}")
+        
+        # Alertas basadas en el porcentaje dinámico
+        if porc_asistencia < 70:
+            st.error("⚠️ **Alerta:** La asistencia promedio es menor al 70%. Considerar acciones correctivas.")
+        elif porc_asistencia < 80:
+            st.warning("📋 **Atención:** La asistencia promedio está entre 70-80%. Monitorear situación.")
+        else:
+            st.success("✅ **Excelente:** La asistencia promedio es mayor al 80%.")
+
+        # Estadísticas adicionales
+        st.write(f"**📊 Estadísticas del período seleccionado:**")
+        st.write(f"• Período analizado: {start_date.strftime('%d/%m/%Y')} - {end_date.strftime('%d/%m/%Y')}")
+        st.write(f"• Total de registros: {total_registros}")
+        st.write(f"• Ratio asistencia/ausencia: {total_asistencias}:{total_ausencias}")
 
 
 
