@@ -479,10 +479,7 @@ def admin_panel():
     if df.empty:
         st.warning("No hay datos de asistencia aún.")
         return
-
-    # CONVERSIÓN DE FECHAS - ESPAÑOL A DATETIME
-    st.info("🔄 Procesando fechas en formato español...")
-    
+ 
     # Diccionario de meses en español
     meses_espanol = {
         'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
