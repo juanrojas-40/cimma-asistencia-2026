@@ -38,29 +38,66 @@ def get_chile_time():
     chile_tz = pytz.timezone("America/Santiago")
     return datetime.now(chile_tz)
 
+# Modifica la función send_email para mejor diagnóstico:
 def send_email(to_email: str, subject: str, body: str) -> bool:
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
         smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
         sender_email = st.secrets["EMAIL"]["sender_email"]
         sender_password = st.secrets["EMAIL"]["sender_password"]
+        
+        st.info(f"🔧 Conectando a {smtp_server}:{smtp_port}")
+        
         msg = MIMEMultipart()
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
         msg["Date"] = formatdate(localtime=True)
         msg.attach(MIMEText(body, "plain"))
+        
+        # Agrega más logs de diagnóstico
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-        try:
-            server.starttls()
-            server.login(sender_email, sender_password)
-            server.send_message(msg)
-            return True
-        finally:
-            server.quit()
+        server.set_debuglevel(1)  # 👈 Esto muestra logs detallados
+        
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        
+        st.success("✅ Email enviado exitosamente")
+        return True
+        
     except Exception as e:
-        st.error(f"❌ Error sending email: {str(e)}")
+        st.error(f"❌ Error enviando email: {str(e)}")
+        st.error(f"🔍 Traceback: {traceback.format_exc()}")
         return False
+
+
+
+# Agrega esta función de prueba de conectividad
+def test_smtp_connection():
+    try:
+        smtp_server = st.secrets["EMAIL"]["smtp_server"]
+        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
+        
+        # Test de conexión básica
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(5)
+        result = sock.connect_ex((smtp_server, smtp_port))
+        sock.close()
+        
+        if result == 0:
+            st.success(f"✅ Puerto {smtp_port} accesible en {smtp_server}")
+            return True
+        else:
+            st.error(f"❌ No se puede conectar a {smtp_server}:{smtp_port}")
+            st.info("💡 Verifica firewall y configuración de red")
+            return False
+    except Exception as e:
+        st.error(f"❌ Error de conexión: {e}")
+        return False
+
+
 
 def generate_2fa_code():
     return ''.join(random.choices(string.digits, k=6))
@@ -890,6 +927,38 @@ Preuniversitario CIMMA 2026""",
     with col2:
         if st.button("📊 Ver Todos los Datos", use_container_width=True):
             st.rerun()
+    
+    st.subheader("🛠️ Diagnóstico de Email")
+    with st.expander("🔧 Herramientas de Diagnóstico"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🔍 Probar Conexión SMTP"):
+                test_smtp_connection()
+        
+        with col2:
+            if st.button("📧 Probar Configuración Email"):
+                probar_configuracion_email()
+        
+        # Test de envío específico
+        st.markdown("---")
+        st.subheader("🧪 Test de Envío Personalizado")
+        test_email = st.text_input("Email para test:", "test@example.com")
+        if st.button("🚀 Enviar Email de Prueba"):
+            if test_smtp_connection():
+                subject = "Test Admin Panel - Preuniversitario CIMMA"
+                body = f"""
+                Este es un email de prueba del panel administrativo.
+                
+                Hora de envío: {get_chile_time().strftime('%d/%m/%Y %H:%M')}
+                Usuario: {st.session_state['user_name']}
+                
+                Si recibes este email, la configuración SMTP está funcionando correctamente.
+                """
+                if send_email(test_email, subject, body):
+                    st.success("🎉 ¡Email de prueba enviado exitosamente!")
+                else:
+                    st.error("❌ Falló el envío del email de prueba")            
 
 # ==============================
 # APP PRINCIPAL (PROFESOR)
