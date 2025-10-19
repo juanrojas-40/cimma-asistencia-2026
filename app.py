@@ -12,6 +12,9 @@ import random
 import string
 import io
 from datetime import date
+import socket
+from email.utils import formatdate
+import traceback
 
 import plotly.express as px
 
@@ -47,33 +50,124 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
         st.write(f"👤 Remitente: {sender_email}")
 
+        # Crear mensaje
         msg = MIMEMultipart()
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
+        msg["Date"] = formatdate(localtime=True)
         msg.attach(MIMEText(body, "plain"))
 
-        st.write(f"📤 Conectando al servidor SMTP...")
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
+        st.write("📤 Conectando al servidor SMTP...")
+        
+        # Aumentar timeout y agregar más debugging
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+        
+        try:
+            st.write("📨 Información del servidor:")
+            st.write(server.ehlo())
+            
             st.write("🔐 Iniciando TLS...")
             server.starttls()
             
+            st.write("🔄 EHLO después de TLS:")
+            st.write(server.ehlo())
+            
             st.write("🔑 Iniciando sesión...")
             server.login(sender_email, sender_password)
+            st.success("✅ Login exitoso")
             
             st.write("🚀 Enviando mensaje...")
             server.send_message(msg)
+            st.success(f"✅ Mensaje aceptado por el servidor para: {to_email}")
             
-        st.success(f"✅ Email enviado exitosamente a {to_email}")
-        return True
-        
+            return True
+            
+        except smtplib.SMTPException as e:
+            st.error(f"❌ Error SMTP: {e}")
+            # Intentar obtener más información del error
+            if hasattr(e, 'smtp_code'):
+                st.write(f"Código SMTP: {e.smtp_code}")
+            if hasattr(e, 'smtp_error'):
+                st.write(f"Error SMTP: {e.smtp_error}")
+            return False
+            
+        finally:
+            try:
+                server.quit()
+                st.write("🔌 Conexión cerrada")
+            except:
+                pass
+                
+    except socket.gaierror as e:
+        st.error(f"❌ Error de conexión/DNS: {e}")
+        return False
+    except socket.timeout as e:
+        st.error(f"❌ Timeout de conexión: {e}")
+        return False
     except Exception as e:
-        st.error(f"❌ Error detallado al enviar correo a {to_email}: {str(e)}")
+        st.error(f"❌ Error inesperado: {str(e)}")
+        import traceback
+        st.write("📋 Traceback completo:")
+        st.code(traceback.format_exc())
         return False
 
 def generate_2fa_code():
     """Generate a random 6-digit 2FA code."""
     return ''.join(random.choices(string.digits, k=6))
+
+
+
+
+
+
+
+
+
+def probar_configuracion_email():
+    """Función para probar la configuración de email"""
+    st.subheader("🧪 Probar Configuración de Email")
+    
+    try:
+        smtp_server = st.secrets["EMAIL"]["smtp_server"]
+        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
+        sender_email = st.secrets["EMAIL"]["sender_email"]
+        sender_password = st.secrets["EMAIL"]["sender_password"]
+        
+        st.success("✅ Secrets de email cargados correctamente")
+        st.write(f"📧 Servidor: {smtp_server}:{smtp_port}")
+        st.write(f"👤 Remitente: {sender_email}")
+        
+        # Email de prueba
+        test_email = st.text_input("Email para prueba:", "test@example.com")
+        
+        if st.button("🧪 Probar Envío de Email"):
+            st.info("Enviando email de prueba...")
+            
+            subject_test = "📧 Prueba de Email - Preuniversitario CIMMA"
+            body_test = f"""Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
+
+Si recibes este email, la configuración SMTP está funcionando correctamente.
+
+Saludos,
+Sistema de Asistencia Preuniversitario CIMMA"""
+            
+            resultado = send_email(test_email, subject_test, body_test)
+            
+            if resultado:
+                st.success("🎉 ¡Email de prueba enviado exitosamente!")
+                st.info("💡 Si no recibes el email, revisa:")
+                st.write("1. 📧 Carpeta de spam/no deseado")
+                st.write("2. 🔄 Espera unos minutos (puede haber delay)")
+                st.write("3. 📱 Verifica que el email esté correcto")
+            else:
+                st.error("❌ Falló el envío del email de prueba")
+                
+    except Exception as e:
+        st.error(f"❌ Error en la configuración: {e}")
+
+
+
 
 # ==============================
 # CARGA DE DATOS
@@ -537,6 +631,11 @@ EMAIL:
         st.error(f"❌ Error verificando configuración: {e}")
         return
     
+    # Agregar opción para probar configuración
+    with st.expander("🧪 Probar Configuración de Email"):
+        probar_configuracion_email()
+
+
     st.info("🔄 Cargando información de apoderados...")
     
     # Limpiar cache para forzar recarga
