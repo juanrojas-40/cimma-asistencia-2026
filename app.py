@@ -274,120 +274,118 @@ def load_all_asistencia():
 # MENÚ LATERAL Y AUTENTICACIÓN
 # ==============================
 
+
 def main():
     st.set_page_config(
         page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
         page_icon="✅",
         layout="centered"
     )
+
+    # Initialize session state
+    if "user_type" not in st.session_state:
+        st.session_state.update({
+            "user_type": None,
+            "user_name": None,
+            "2fa_code": None,
+            "2fa_email": None,
+            "awaiting_2fa": False,
+            "2fa_user_name": None,
+            "2fa_time": None,
+            "2fa_attempts": 0
+        })
+
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.title("🔐 Acceso")
-        if "user_type" not in st.session_state:
-            st.session_state["user_type"] = None
-            st.session_state["user_name"] = None
-            st.session_state["2fa_code"] = None
-            st.session_state["2fa_email"] = None
-            st.session_state["awaiting_2fa"] = False
-            st.session_state["2fa_user_name"] = None
-            st.session_state["2fa_time"] = None
-            st.session_state["2fa_attempts"] = 0
-        if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
-            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
-            if user_type == "Profesor":
-                profesores = st.secrets.get("profesores", {})
-                if profesores:
-                    nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
-                    clave = st.text_input("Clave", type="password", key="prof_pass")
-                    if st.button("Ingresar como Profesor"):
-                        if profesores.get(nombre) == clave:
-                            st.session_state["user_type"] = "profesor"
-                            st.session_state["user_name"] = nombre
-                            st.rerun()
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay profesores configurados en Secrets.")
-            else:
-                try:
-                    admins = st.secrets.get("administradores", {})
-                    admin_emails = st.secrets.get("admin_emails", {})
-                except KeyError:
-                    st.error("Configuración de administradores no encontrada en Secrets.")
-                    return
-                if admins and admin_emails:
-                    nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
-                    clave = st.text_input("Clave", type="password", key="admin_pass")
-                    if st.button("Ingresar como Admin"):
-                        if admins.get(nombre) == clave:
-                            code = generate_2fa_code()
-                            email = admin_emails.get(nombre, "profereport@gmail.com")
-                            subject = "Código de Verificación - Preuniversitario CIMMA"
-                            body = f"""Estimado/a {nombre},<br><br>
 
-                                    Su código de verificación para acceder al sistema es:<br>
-                                    <center><span style="font-size: 20px; color: black; font-weight: bold;">{code}</span></center><br>
-
-                                    Este código es válido por 10 minutos.<br><br>
-
-                                    Saludos,<br>
-                                    Preuniversitario CIMMA
-                                    """
-                            if send_email(email, subject, body):
-                                st.session_state["2fa_code"] = code
-                                st.session_state["2fa_email"] = email
-                                st.session_state["awaiting_2fa"] = True
-                                st.session_state["2fa_user_name"] = nombre
-                                st.session_state["2fa_time"] = get_chile_time()
-                                st.session_state["2fa_attempts"] = 0
-                                st.rerun()
-                            else:
-                                st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay administradores o correos configurados en Secrets.")
+        if st.session_state["user_type"]:
+            st.success(f"👤 {st.session_state['user_name']}")
+            if st.button("Cerrar sesión"):
+                st.session_state.clear()
+                st.rerun()
         elif st.session_state["awaiting_2fa"]:
             st.subheader("🔐 Verificación en dos pasos")
             st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
             time_remaining = 600 - (get_chile_time() - st.session_state["2fa_time"]).total_seconds()
             if time_remaining > 0:
                 st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
+            else:
+                st.error("❌ El código ha expirado. Por favor, intenta iniciar sesión de nuevo.")
+                st.session_state.update({"awaiting_2fa": False, "2fa_code": None, "2fa_email": None, "2fa_attempts": 0})
+                st.rerun()
+
             code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
             if st.button("Verificar código"):
                 if not code_input.isdigit() or len(code_input) != 6:
                     st.error("El código debe ser un número de 6 dígitos")
-                elif (get_chile_time() - st.session_state["2fa_time"]).total_seconds() > 600:
-                    st.error("❌ El código ha expirado. Por favor, intenta iniciar sesión de nuevo.")
-                    st.session_state["awaiting_2fa"] = False
-                    st.session_state["2fa_code"] = None
-                    st.session_state["2fa_email"] = None
-                    st.session_state["2fa_attempts"] = 0
-                    st.rerun()
                 elif st.session_state["2fa_attempts"] >= 3:
                     st.error("❌ Demasiados intentos fallidos. Intenta iniciar sesión de nuevo.")
-                    st.session_state["awaiting_2fa"] = False
-                    st.session_state["2fa_code"] = None
-                    st.session_state["2fa_email"] = None
-                    st.session_state["2fa_attempts"] = 0
+                    st.session_state.update({"awaiting_2fa": False, "2fa_code": None, "2fa_email": None, "2fa_attempts": 0})
                     st.rerun()
                 elif code_input == st.session_state["2fa_code"]:
-                    st.session_state["user_type"] = "admin"
-                    st.session_state["user_name"] = st.session_state["2fa_user_name"]
-                    st.session_state["awaiting_2fa"] = False
-                    st.session_state["2fa_code"] = None
-                    st.session_state["2fa_email"] = None
-                    st.session_state["2fa_attempts"] = 0
-                    st.session_state["2fa_time"] = None
+                    st.session_state.update({
+                        "user_type": "admin",
+                        "user_name": st.session_state["2fa_user_name"],
+                        "awaiting_2fa": False,
+                        "2fa_code": None,
+                        "2fa_email": None,
+                        "2fa_attempts": 0,
+                        "2fa_time": None
+                    })
                     st.rerun()
                 else:
                     st.session_state["2fa_attempts"] += 1
                     st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
         else:
-            st.success(f"👤 {st.session_state['user_name']}")
-            if st.button("Cerrar sesión"):
-                st.session_state.clear()
-                st.rerun()
+            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
+            if user_type == "Profesor":
+                profesores = st.secrets.get("profesores", {})
+                if not profesores:
+                    st.error("No hay profesores configurados en Secrets.")
+                    return
+                nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
+                clave = st.text_input("Clave", type="password", key="prof_pass")
+                if st.button("Ingresar como Profesor"):
+                    if profesores.get(nombre) == clave:
+                        st.session_state.update({"user_type": "profesor", "user_name": nombre})
+                        st.rerun()
+                    else:
+                        st.error("❌ Clave incorrecta")
+            else:
+                admins = st.secrets.get("administradores", {})
+                admin_emails = st.secrets.get("admin_emails", {})
+                if not admins or not admin_emails:
+                    st.error("No hay administradores o correos configurados en Secrets.")
+                    return
+                nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
+                clave = st.text_input("Clave", type="password", key="admin_pass")
+                if st.button("Ingresar como Admin"):
+                    if admins.get(nombre) == clave:
+                        code = generate_2fa_code()
+                        email = admin_emails.get(nombre, "profereport@gmail.com")
+                        subject = "Código de Verificación - Preuniversitario CIMMA"
+                        body = f"""Estimado/a {nombre},<br><br>
+                            Su código de verificación para acceder al sistema es:<br>
+                            <center><span style="font-size: 20px; color: black; font-weight: bold;">{code}</span></center><br>
+                            Este código es válido por 10 minutos.<br><br>
+                            Saludos,<br>
+                            Preuniversitario CIMMA"""
+                        if send_email(email, subject, body):
+                            st.session_state.update({
+                                "2fa_code": code,
+                                "2fa_email": email,
+                                "awaiting_2fa": True,
+                                "2fa_user_name": nombre,
+                                "2fa_time": get_chile_time(),
+                                "2fa_attempts": 0
+                            })
+                            st.rerun()
+                        else:
+                            st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
+                    else:
+                        st.error("❌ Clave incorrecta")
+
     if st.session_state["user_type"] is None:
         st.title("📱 Registro de Asistencia")
         st.subheader("Preuniversitario CIMMA 2026")
@@ -397,6 +395,21 @@ def main():
         admin_panel()
     else:
         main_app()
+
+if __name__ == "__main__":
+    main()
+
+
+
+
+
+
+
+
+
+
+
+
 
 # ==============================
 # FUNCIÓN PARA ENVIAR RESUMEN DE ASISTENCIA
