@@ -420,28 +420,33 @@ def admin_panel():
         profesores = ["Todos"] + sorted(df["Profesor"].dropna().unique())
         prof_sel = st.selectbox("Profesor", profesores)
 
-        # Fechas específicas para 2026 con conversión adecuada a datetime
+        # Fechas específicas para 2026 con conversión adecuada a datetime64[ns]
         chile_tz = pytz.timezone("America/Santiago")
         start_date = st.date_input("Fecha de inicio", datetime(2026, 1, 1).date())
         end_date = st.date_input("Fecha de término", datetime(2026, 12, 31).date())
-        # Convertir a datetime con timezone
-        start_datetime = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=chile_tz)
-        end_datetime = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=chile_tz)
+        start_datetime = pd.Timestamp(datetime.combine(start_date, datetime.min.time()).replace(tzinfo=chile_tz))
+        end_datetime = pd.Timestamp(datetime.combine(end_date, datetime.max.time()).replace(tzinfo=chile_tz))
 
-    # Aplicar filtros
+        # Botón para aplicar filtros
+        if st.button("Aplicar Filtros", width='stretch'):
+            st.session_state['apply_filters'] = True
+        else:
+            st.session_state['apply_filters'] = st.session_state.get('apply_filters', False)
+
+    # Aplicar filtros solo al presionar el botón
     filtered_df = df.copy()
-    if curso_sel != "Todos":
-        filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
-    if est_sel != "Todos":
-        filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
-    if prof_sel != "Todos":
-        filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
-    # Convertir fechas a datetime64[ns] para comparación consistente
-    filtered_df = filtered_df[
-        (filtered_df["Fecha"] >= pd.Timestamp(start_datetime)) & 
-        (filtered_df["Fecha"] <= pd.Timestamp(end_datetime)) & 
-        (filtered_df["Fecha"].notna())
-    ]
+    if 'apply_filters' in st.session_state and st.session_state['apply_filters']:
+        if curso_sel != "Todos":
+            filtered_df = filtered_df[filtered_df["Curso"] == curso_sel]
+        if est_sel != "Todos":
+            filtered_df = filtered_df[filtered_df["Estudiante"] == est_sel]
+        if prof_sel != "Todos":
+            filtered_df = filtered_df[filtered_df["Profesor"] == prof_sel]
+        filtered_df = filtered_df[
+            (filtered_df["Fecha"] >= start_datetime) & 
+            (filtered_df["Fecha"] <= end_datetime) & 
+            (filtered_df["Fecha"].notna())
+        ]
 
     if filtered_df.empty:
         st.info("No hay datos que coincidan con los filtros seleccionados.")
@@ -541,11 +546,11 @@ def admin_panel():
     # Opciones de descarga
     col_dl1, col_dl2 = st.columns(2)
     with col_dl1:
-        if st.button("📤 Descargar como CSV"):
+        if st.button("📤 Descargar como CSV", width='stretch'):
             csv = filtered_df.to_csv(index=False).encode('utf-8')
             st.download_button("Descargar CSV", csv, "asistencia_filtrada.csv", "text/csv")
     with col_dl2:
-        if st.button("📤 Descargar como XLSX"):
+        if st.button("📤 Descargar como XLSX", width='stretch'):
             output = io.BytesIO()
             with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
                 filtered_df.to_excel(writer, index=False, sheet_name='Asistencia')
