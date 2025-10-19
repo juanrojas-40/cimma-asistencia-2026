@@ -324,15 +324,12 @@ def main():
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
                             body = f"""Estimado/a {nombre},<br><br>
-
-                                    Su código de verificación para acceder al sistema es:<br>
-                                    <center><span style="font-size: 20px; color: black; font-weight: bold;">{code}</span></center><br>
-
-                                    Este código es válido por 10 minutos.<br><br>
-
-                                    Saludos,<br>
-                                    Preuniversitario CIMMA
-                                    """
+Su código de verificación para acceder al sistema es:<br>
+<center><span style="font-size: 24px; font-weight: bold; color: #000000;">{code}</span></center><br>
+Este código es válido por <strong>10 minutos</strong>.<br><br>
+Saludos cordiales,<br>
+<strong>Preuniversitario CIMMA</strong>
+"""
                             if send_email(email, subject, body):
                                 st.session_state["2fa_code"] = code
                                 st.session_state["2fa_email"] = email
