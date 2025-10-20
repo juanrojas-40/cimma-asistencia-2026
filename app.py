@@ -593,8 +593,8 @@ def main():
     
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.title("🔐 Acceso")
+        st.markdown('<div class="card" style="background: linear-gradient(135deg, #1A3B8F, #2D4FA8); color: white;">', unsafe_allow_html=True)
+        st.markdown('<h2 style="color: white; margin-bottom: 1rem;">🔐 Acceso</h2>', unsafe_allow_html=True)
         
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
@@ -664,11 +664,11 @@ Preuniversitario CIMMA"""
                 else:
                     st.error("No hay administradores o correos configurados en Secrets.")
         elif st.session_state["awaiting_2fa"]:
-            st.subheader("🔐 Verificación en dos pasos")
+            st.markdown('<h3 style="color: white;">🔐 Verificación en dos pasos</h3>', unsafe_allow_html=True)
             st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
             time_remaining = 600 - (get_chile_time() - st.session_state["2fa_time"]).total_seconds()
             if time_remaining > 0:
-                st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
+                st.markdown(f'<p style="color: white;">Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos</p>', unsafe_allow_html=True)
             code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
             if boton_moderno("Verificar código", "primario", "🔒", "verify_2fa"):
                 if not code_input.isdigit() or len(code_input) != 6:
@@ -702,10 +702,13 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_attempts"] += 1
                     st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
         else:
-            st.success(f"👤 {st.session_state['user_name']}")
+            st.markdown(f'<div style="background: #10B981; color: white; padding: 0.5rem 1rem; border-radius: 8px; text-align: center; margin: 1rem 0;">', unsafe_allow_html=True)
+            st.markdown(f'<h4 style="color: white; margin: 0;">👤 {st.session_state["user_name"]}</h4>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
                 st.session_state.clear()
                 st.rerun()
+        
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Implementar temporizador si hay sesión activa
@@ -713,25 +716,128 @@ Preuniversitario CIMMA"""
         implementar_temporizador_seguridad()
     
     if st.session_state["user_type"] is None:
+        # PANTALLA DE BIENVENIDA CON MEJOR CONTRASTE
         st.markdown("""
-        <div style="text-align: center; padding: 4rem 2rem;">
-            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA</h1>
-            <h2 style="color: #6B7280; font-size: 1.5rem; margin-bottom: 2rem;">Sistema de Gestión de Asistencia 2026</h2>
-            <div class="card" style="max-width: 600px; margin: 0 auto;">
-                <h3 style="color: #1A3B8F;">👋 ¡Bienvenido!</h3>
-                <p>Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
-                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <p style="margin: 0; color: #1A3B8F;"><strong>💡 Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.</p>
+        <div style="text-align: center; padding: 4rem 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border-radius: 20px; margin: 2rem 0;">
+            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem; font-weight: 700;">🎓 Preuniversitario CIMMA</h1>
+            <h2 style="color: #4B5563; font-size: 1.5rem; margin-bottom: 3rem; font-weight: 500;">Sistema de Gestión de Asistencia 2026</h2>
+            <div style="max-width: 600px; margin: 0 auto; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border-left: 4px solid #F59E0B;">
+                <h3 style="color: #1A3B8F; margin-bottom: 1rem; font-size: 1.5rem;">👋 ¡Bienvenido!</h3>
+                <p style="color: #4B5563; font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
+                    Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.
+                </p>
+                <div style="background: #F0F4FF; padding: 1rem; border-radius: 12px; margin: 1.5rem 0; border-left: 4px solid #1A3B8F;">
+                    <p style="margin: 0; color: #1A3B8F; font-weight: 600; font-size: 0.95rem;">
+                        💡 <strong>Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.
+                    </p>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        # Información adicional sobre el sistema
+        st.markdown("""
+        <div style="margin: 3rem 0;">
+            <h3 style="color: #1A3B8F; text-align: center; margin-bottom: 2rem;">Características del Sistema</h3>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            st.markdown("""
+            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📊</div>
+                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Análisis Completo</h4>
+                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
+                    Dashboard interactivo con métricas de asistencia en tiempo real y reportes detallados
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col2:
+            st.markdown("""
+            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📧</div>
+                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Notificaciones Automáticas</h4>
+                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
+                    Comunicación automática con apoderados y profesores vía email
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col3:
+            st.markdown("""
+            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📱</div>
+                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Acceso Multiplataforma</h4>
+                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
+                    Interfaz optimizada para todos los dispositivos móviles y desktop
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Segunda fila de características
+        col4, col5, col6 = st.columns(3)
+        
+        with col4:
+            st.markdown("""
+            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">🔒</div>
+                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Seguridad Avanzada</h4>
+                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
+                    Autenticación de dos factores y temporizador de seguridad
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col5:
+            st.markdown("""
+            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📈</div>
+                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Reportes Gráficos</h4>
+                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
+                    Gráficos interactivos y visualizaciones de datos en tiempo real
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        with col6:
+            st.markdown("""
+            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
+                <div style="font-size: 2.5rem; margin-bottom: 1rem;">⚡</div>
+                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Rendimiento Óptimo</h4>
+                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
+                    Sistema rápido y eficiente con carga optimizada de datos
+                </p>
+            </div>
+            """, unsafe_allow_html=True)
+        
+        # Footer informativo
+        st.markdown("""
+        <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: #1A3B8F; border-radius: 12px; color: white;">
+            <h4 style="color: white; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA 2026</h4>
+            <p style="color: #E5E7EB; margin: 0; font-size: 0.9rem;">
+                Sistema desarrollado para la gestión eficiente de asistencia académica
+            </p>
+        </div>
+        """, unsafe_allow_html=True)
+        
         return
     
+    # Redirigir según el tipo de usuario
     if st.session_state["user_type"] == "admin":
         admin_panel_mejorado()
     else:
         main_app_mejorada()
+
+
+
+
+
+
+
+
 
 # ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
