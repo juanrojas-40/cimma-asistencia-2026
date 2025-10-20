@@ -959,7 +959,11 @@ def admin_panel_mejorado():
     
     st.markdown('<h2 class="section-header">📊 Panel Administrativo - Análisis de Asistencia</h2>', unsafe_allow_html=True)
     st.markdown(f'<div class="card"><h3>👋 Bienvenido/a, {st.session_state["user_name"]}</h3></div>', unsafe_allow_html=True)
-    
+    st.markdown(f'<div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="margin: 0; color: #1A3B8F;">👋 Bienvenido/a, {st.session_state["user_name"]}</p>
+                </div>, unsafe_allow_html=True )
+
+
     # Configuración de temporizador
     st.subheader("⏳ Configuración de Temporizador de Sesión")
     options_min = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300]
