@@ -19,6 +19,325 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 
 # ==============================
+# CONFIGURACIÓN DE TEMA Y ESTILOS
+# ==============================
+
+def aplicar_tema_moderno():
+    """Aplica un tema visual moderno y consistente"""
+    
+    # Paleta de colores institucional
+    colores_institucionales = {
+        "primario": "#1A3B8F",      # Azul institucional
+        "secundario": "#10B981",    # Verde éxito
+        "accent": "#F59E0B",        # Amarillo/naranja
+        "neutral": "#6B7280",       # Gris
+        "peligro": "#EF4444",       # Rojo
+        "fondo": "#F8FAFC"          # Fondo claro
+    }
+    
+    st.markdown(f"""
+    <style>
+    /* FUENTES Y TIPOGRAFÍA */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * {{
+        font-family: 'Inter', sans-serif;
+    }}
+    
+    /* HEADERS MODERNOS */
+    .main-header {{
+        color: {colores_institucionales["primario"]};
+        font-weight: 700;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 3px solid {colores_institucionales["primario"]};
+        padding-bottom: 0.5rem;
+    }}
+    
+    .section-header {{
+        color: {colores_institucionales["primario"]};
+        font-weight: 600;
+        font-size: 1.5rem;
+        margin: 2rem 0 1rem 0;
+    }}
+    
+    /* BOTONES MODERNOS */
+    .stButton > button {{
+        border-radius: 12px !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    }}
+    
+    .stButton > button:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    }}
+    
+    /* BOTÓN PRIMARIO */
+    div[data-testid="stButton"] button[kind="primary"] {{
+        background: linear-gradient(135deg, {colores_institucionales["primario"]}, #2D4FA8) !important;
+        color: white !important;
+    }}
+    
+    /* BOTÓN SECUNDARIO */
+    div[data-testid="stButton"] button[kind="secondary"] {{
+        background: white !important;
+        color: {colores_institucionales["primario"]} !important;
+        border: 2px solid {colores_institucionales["primario"]} !important;
+    }}
+    
+    /* TARJETAS Y CONTENEDORES */
+    .card {{
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid #E5E7EB;
+        margin: 1rem 0;
+    }}
+    
+    /* SIDEBAR MODERNO */
+    .css-1d391kg {{
+        background: linear-gradient(180deg, {colores_institucionales["primario"]}, #2D4FA8);
+    }}
+    
+    .sidebar .sidebar-content {{
+        background: linear-gradient(180deg, {colores_institucionales["primario"]}, #2D4FA8);
+    }}
+    
+    /* ANIMACIONES SUAVES */
+    .element-container {{
+        transition: all 0.3s ease;
+    }}
+    
+    /* MEJORAS ESPECÍFICAS PARA MÓVIL */
+    @media (max-width: 768px) {{
+        .main-header {{
+            font-size: 2rem;
+        }}
+        
+        .stButton > button {{
+            padding: 1rem 1.5rem !important;
+            font-size: 1.1rem !important;
+        }}
+    }}
+    
+    /* BARRAS DE PROGRESO MEJORADAS */
+    .stProgress > div > div > div {{
+        background: linear-gradient(90deg, {colores_institucionales["secundario"]}, #34D399);
+        border-radius: 10px;
+    }}
+    
+    /* GRID RESPONSIVO PARA MÉTRICAS */
+    .metricas-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }}
+    
+    /* TABLAS RESPONSIVAS */
+    .dataframe {{
+        width: 100% !important;
+    }}
+    
+    @media (max-width: 768px) {{
+        .dataframe {{
+            font-size: 0.8rem !important;
+        }}
+        
+        /* Scroll horizontal para tablas en móvil */
+        .dataframe-container {{
+            overflow-x: auto;
+        }}
+    }}
+    
+    </style>
+    """, unsafe_allow_html=True)
+
+def crear_header_moderno():
+    """Crea un header moderno con logo y título"""
+    col1, col2, col3 = st.columns([1, 3, 1])
+    with col2:
+        st.markdown('<h1 class="main-header">🎓 Preuniversitario CIMMA</h1>', unsafe_allow_html=True)
+        st.markdown('<p style="text-align: center; color: #6B7280; font-size: 1.1rem;">Sistema de Gestión de Asistencia 2026</p>', unsafe_allow_html=True)
+
+def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
+    """Crea una tarjeta de métricas moderna"""
+    return f"""
+    <div class="card" style="border-left: 4px solid {color};">
+        <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
+            <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icono}</span>
+            <h3 style="margin: 0; color: {color}; font-weight: 600;">{titulo}</h3>
+        </div>
+        <div style="font-size: 2rem; font-weight: 700; color: {color};">{valor}</div>
+        <div style="color: #6B7280; font-size: 0.9rem;">{subtitulo}</div>
+    </div>
+    """
+
+def boton_moderno(texto, tipo="primario", icono="", key=None):
+    """Crea un botón moderno con icono"""
+    colores = {
+        "primario": "#1A3B8F",
+        "secundario": "#6B7280", 
+        "exito": "#10B981",
+        "peligro": "#EF4444"
+    }
+    
+    color = colores.get(tipo, "#1A3B8F")
+    icono_html = f"<span style='margin-right: 0.5rem;'>{icono}</span>" if icono else ""
+    
+    st.markdown(f"""
+    <style>
+    .boton-{key} {{
+        background: {color} !important;
+        color: white !important;
+        border-radius: 12px !important;
+        padding: 0.75rem 1.5rem !important;
+        border: none !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }}
+    .boton-{key}:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+    }}
+    </style>
+    """, unsafe_allow_html=True)
+    
+    return st.button(f"{icono} {texto}", key=key, use_container_width=True)
+
+# ==============================
+# COMPONENTES DE UI MEJORADOS
+# ==============================
+
+def crear_dashboard_metricas_principales(df):
+    """Dashboard moderno con métricas clave"""
+    
+    st.markdown('<h2 class="section-header">📊 Dashboard de Asistencia</h2>', unsafe_allow_html=True)
+    
+    # Métricas principales
+    total_estudiantes = df['Estudiante'].nunique()
+    total_clases = len(df)
+    tasa_asistencia = (df['Asistencia'].sum() / total_clases * 100) if total_clases > 0 else 0
+    estudiantes_perfectos = len(df[df['Asistencia'] == 1].groupby('Estudiante').filter(lambda x: x['Asistencia'].mean() == 1))
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.markdown(crear_tarjeta_metricas(
+            "Total Estudiantes", 
+            f"{total_estudiantes:,}", 
+            "Estudiantes únicos", "👥", "#1A3B8F"
+        ), unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(crear_tarjeta_metricas(
+            "Clases Registradas", 
+            f"{total_clases:,}", 
+            "Total de clases", "📚", "#10B981"
+        ), unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(crear_tarjeta_metricas(
+            "Tasa Asistencia", 
+            f"{tasa_asistencia:.1f}%", 
+            "Promedio general", "✅", "#F59E0B"
+        ), unsafe_allow_html=True)
+    
+    with col4:
+        st.markdown(crear_tarjeta_metricas(
+            "Asistencia Perfecta", 
+            f"{estudiantes_perfectos}", 
+            "100% de asistencia", "⭐", "#8B5CF6"
+        ), unsafe_allow_html=True)
+
+def crear_grafico_asistencia_interactivo(df, tipo="tendencia"):
+    """Crea gráficos interactivos modernos con Plotly"""
+    
+    if tipo == "tendencia" and 'Fecha' in df.columns and 'Porcentaje' in df.columns:
+        fig = px.line(df, 
+                     x='Fecha', 
+                     y='Porcentaje',
+                     title='📈 Tendencia de Asistencia - Evolución Temporal',
+                     color='Curso' if 'Curso' in df.columns else None,
+                     template='plotly_white')
+        
+        fig.update_layout(
+            plot_bgcolor='rgba(0,0,0,0)',
+            paper_bgcolor='rgba(0,0,0,0)',
+            font=dict(family="Inter", size=12),
+            hoverlabel=dict(
+                bgcolor="white",
+                font_size=12,
+                font_family="Inter"
+            ),
+            xaxis=dict(
+                gridcolor='#E5E7EB',
+                title=dict(text="Fecha", font=dict(size=14))
+            ),
+            yaxis=dict(
+                gridcolor='#E5E7EB', 
+                title=dict(text="Porcentaje de Asistencia (%)", font=dict(size=14)),
+                range=[0, 100]
+            )
+        )
+        
+        # Añadir animación
+        fig.update_traces(
+            line=dict(width=3),
+            marker=dict(size=8),
+            hovertemplate='<b>%{x}</b><br>Asistencia: %{y:.1f}%<extra></extra>'
+        )
+        return fig
+        
+    elif tipo == "barras" and 'Estudiante' in df.columns and 'Porcentaje' in df.columns:
+        fig = px.bar(df,
+                    x='Estudiante',
+                    y='Porcentaje',
+                    title='👤 Asistencia por Estudiante',
+                    color='Porcentaje',
+                    color_continuous_scale=['#EF4444', '#F59E0B', '#10B981'],
+                    template='plotly_white')
+        
+        fig.update_layout(
+            xaxis_tickangle=-45,
+            coloraxis_showscale=False,
+            showlegend=False
+        )
+        
+        fig.update_traces(
+            hovertemplate='<b>%{x}</b><br>Asistencia: %{y:.1f}%<extra></extra>'
+        )
+        return fig
+    
+    return None
+
+def implementar_temporizador_seguridad():
+    """Implementa un temporizador de seguridad en tiempo real"""
+    
+    if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
+        tiempo_restante = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
+        if tiempo_restante > 0:
+            minutos = int(tiempo_restante // 60)
+            segundos = int(tiempo_restante % 60)
+            
+            color = "#1A3B8F"
+            if tiempo_restante < 300:  # 5 minutos
+                color = "#EF4444"
+            elif tiempo_restante < 600:  # 10 minutos
+                color = "#F59E0B"
+            
+            st.markdown(f"""
+            <div style="position: sticky; top: 1rem; background: {color}; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; margin-bottom: 1rem;">
+                ⏱️ Tiempo restante: {minutos:02d}:{segundos:02d}
+            </div>
+            """, unsafe_allow_html=True)
+
+# ==============================
 # CONFIGURACIÓN Y CONEXIONES
 # ==============================
 
@@ -39,7 +358,6 @@ def get_chile_time():
     chile_tz = pytz.timezone("America/Santiago")
     return datetime.now(chile_tz)
 
-# Modifica la función send_email para mejor diagnóstico:
 def send_email(to_email: str, subject: str, body: str) -> bool:
     """Envía email con mejor feedback de diagnóstico"""
     try:
@@ -74,9 +392,6 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         st.error(error_msg)
         return False
 
-
-
-# Agrega esta función de prueba de conectividad
 def test_smtp_connection():
     try:
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
@@ -98,8 +413,6 @@ def test_smtp_connection():
     except Exception as e:
         st.error(f"❌ Error de conexión: {e}")
         return False
-
-
 
 def generate_2fa_code():
     return ''.join(random.choices(string.digits, k=6))
@@ -314,12 +627,20 @@ def load_all_asistencia():
 def main():
     st.set_page_config(
         page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
-        page_icon="✅",
-        layout="centered"
+        page_icon="🎓",
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
+    
+    # Aplicar tema moderno
+    aplicar_tema_moderno()
+    crear_header_moderno()
+    
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
         st.title("🔐 Acceso")
+        
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
             st.session_state["user_name"] = None
@@ -329,6 +650,7 @@ def main():
             st.session_state["2fa_user_name"] = None
             st.session_state["2fa_time"] = None
             st.session_state["2fa_attempts"] = 0
+        
         if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
             user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
             if user_type == "Profesor":
@@ -336,12 +658,12 @@ def main():
                 if profesores:
                     nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
                     clave = st.text_input("Clave", type="password", key="prof_pass")
-                    if st.button("Ingresar como Profesor"):
+                    if boton_moderno("Ingresar como Profesor", "primario", "👨‍🏫", "prof_login"):
                         if profesores.get(nombre) == clave:
                             st.session_state["user_type"] = "profesor"
                             st.session_state["user_name"] = nombre
-                            st.session_state['login_time'] = time.time()  # Registra el tiempo de inicio
-                            st.session_state['timeout_duration'] = 5 * 60  # 5 minutos en segundos
+                            st.session_state['login_time'] = time.time()
+                            st.session_state['timeout_duration'] = 5 * 60  # 5 minutos
                             st.rerun()
                         else:
                             st.error("❌ Clave incorrecta")
@@ -357,7 +679,7 @@ def main():
                 if admins and admin_emails:
                     nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
                     clave = st.text_input("Clave", type="password", key="admin_pass")
-                    if st.button("Ingresar como Admin"):
+                    if boton_moderno("Ingresar como Admin", "primario", "👨‍💼", "admin_login"):
                         if admins.get(nombre) == clave:
                             code = generate_2fa_code()
                             email = admin_emails.get(nombre, "profereport@gmail.com")
@@ -393,7 +715,7 @@ Preuniversitario CIMMA"""
             if time_remaining > 0:
                 st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
             code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
-            if st.button("Verificar código"):
+            if boton_moderno("Verificar código", "primario", "🔒", "verify_2fa"):
                 if not code_input.isdigit() or len(code_input) != 6:
                     st.error("El código debe ser un número de 6 dígitos")
                 elif (get_chile_time() - st.session_state["2fa_time"]).total_seconds() > 600:
@@ -418,242 +740,176 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
                     st.session_state["2fa_time"] = None
-                    st.session_state['login_time'] = time.time()  # Registra el tiempo de inicio
-                    st.session_state['timeout_duration'] = 30 * 60  # Duración por defecto: 30 minutos en segundos
+                    st.session_state['login_time'] = time.time()
+                    st.session_state['timeout_duration'] = 30 * 60  # 30 minutos
                     st.rerun()
                 else:
                     st.session_state["2fa_attempts"] += 1
                     st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
         else:
             st.success(f"👤 {st.session_state['user_name']}")
-            if st.button("Cerrar sesión"):
+            if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
                 st.session_state.clear()
                 st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Implementar temporizador si hay sesión activa
+    if st.session_state.get("user_type"):
+        implementar_temporizador_seguridad()
+    
     if st.session_state["user_type"] is None:
-        st.title("📱 Registro de Asistencia")
-        st.subheader("Preuniversitario CIMMA 2026")
-        st.info("Por favor, inicia sesión desde el menú lateral izquierdo, que se despliega al hacer clic en el emoji »» .")
+        st.markdown("""
+        <div style="text-align: center; padding: 4rem 2rem;">
+            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA</h1>
+            <h2 style="color: #6B7280; font-size: 1.5rem; margin-bottom: 2rem;">Sistema de Gestión de Asistencia 2026</h2>
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
+                <h3 style="color: #1A3B8F;">👋 ¡Bienvenido!</h3>
+                <p>Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
+                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="margin: 0; color: #1A3B8F;"><strong>💡 Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
         return
+    
     if st.session_state["user_type"] == "admin":
-        admin_panel()
+        admin_panel_mejorado()
     else:
-        main_app()
+        main_app_mejorada()
 
-
-
-
-
-
-
-
-
-
-
-
+# ==============================
+# FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
+# ==============================
 
 def enviar_resumen_asistencia(datos_filtrados, email_template):
-    """Envía un resumen de asistencia a TODOS los apoderados con email registrado - VERSIÓN MEJORADA"""
+    """Envía un resumen de asistencia a TODOS los apoderados con email registrado"""
     
-    # CONTENEDORES PARA FEEDBACK EN TIEMPO REAL
     progress_placeholder = st.empty()
     status_placeholder = st.empty()
-    results_placeholder = st.empty()
     
     progress_placeholder.info("🚀 INICIANDO PROCESO DE ENVÍO DE RESUMENES...")
     
     try:
-        # 1. VERIFICAR DATOS DE ENTRADA
         if datos_filtrados.empty:
             progress_placeholder.error("❌ ERROR: Los datos filtrados están VACÍOS")
-            st.info("""
-            💡 **Solución:**
-            - Verifica que los filtros aplicados coincidan con datos reales
-            - Prueba con un rango de fechas más amplio
-            - Selecciona 'Todos' en curso y estudiante
-            """)
             return False
         
         progress_placeholder.success(f"✅ Datos recibidos: {len(datos_filtrados)} registros")
         
-        # 2. CARGAR EMAILS
         status_placeholder.info("🔄 Cargando información de apoderados...")
         emails, nombres_apoderados = load_emails()
         
         if not emails:
-            progress_placeholder.error("❌ ERROR: No se encontraron emails de apoderados en la hoja 'MAILS'")
-            st.info("""
-            🔍 **Verifica lo siguiente:**
-            1. La hoja se llama exactamente **MAILS** (en mayúsculas)
-            2. Tiene las columnas: **NOMBRE ESTUDIANTE**, **NOMBRE APODERADO**, **MAIL APODERADO**
-            3. Los nombres de estudiantes coinciden exactamente con los registros de asistencia
-            """)
+            progress_placeholder.error("❌ ERROR: No se encontraron emails de apoderados")
             return False
         
-        progress_placeholder.success(f"✅ Emails cargados: {len(emails)} apoderados registrados")
-        
-        # 3. IDENTIFICAR ESTUDIANTES EN DATOS FILTRADOS
         estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
-        status_placeholder.info(f"📋 Identificando estudiantes en datos filtrados: {len(estudiantes_filtrados)} encontrados")
-        
-        # 4. CRUCE DE INFORMACIÓN - MÁS ROBUSTO
         estudiantes_con_email = []
         estudiantes_sin_email = []
         
         for estudiante in estudiantes_filtrados:
-            # Múltiples formas de buscar coincidencias
             nombre_variantes = [
                 estudiante.strip().lower(),
                 estudiante.strip(),
                 estudiante.lower(),
-                estudiante  # original
+                estudiante
             ]
             
             email_encontrado = None
-            nombre_encontrado = None
-            
             for variante in nombre_variantes:
                 if variante in emails:
                     email_encontrado = emails[variante]
-                    nombre_encontrado = variante
                     break
             
             if email_encontrado:
                 estudiantes_con_email.append({
                     'nombre_original': estudiante,
-                    'nombre_busqueda': nombre_encontrado,
                     'email': email_encontrado,
-                    'apoderado': nombres_apoderados.get(nombre_encontrado, "Apoderado")
+                    'apoderado': nombres_apoderados.get(variante, "Apoderado")
                 })
             else:
                 estudiantes_sin_email.append(estudiante)
         
-        # 5. REPORTE DE CRUCE
-        progress_placeholder.info(f"🔗 **Resultado del cruce:** {len(estudiantes_con_email)} con email, {len(estudiantes_sin_email)} sin email")
-        
         if not estudiantes_con_email:
-            progress_placeholder.error("🚫 No hay NINGÚN estudiante con email registrado para los datos filtrados")
-            with st.expander("📋 Lista de estudiantes sin email"):
-                for est in estudiantes_sin_email[:20]:
-                    st.write(f"- {est}")
+            progress_placeholder.error("🚫 No hay estudiantes con email registrado")
             return False
         
-        # 6. MOSTRAR DETALLES ANTES DEL ENVÍO
         with st.expander("👀 VER DETALLES DE ENVÍO PROGRAMADO", expanded=True):
             st.success(f"📧 **ENVÍO PROGRAMADO:** {len(estudiantes_con_email)} emails a enviar")
             
-            st.write("### 📋 Estudiantes que recibirán resumen:")
-            for i, est_data in enumerate(estudiantes_con_email[:10]):
-                st.write(f"{i+1}. **{est_data['nombre_original']}** → {est_data['apoderado']} ({est_data['email']})")
-            
-            if len(estudiantes_con_email) > 10:
-                st.write(f"📊 ... y {len(estudiantes_con_email) - 10} más")
-            
             if estudiantes_sin_email:
-                st.write("### ⚠️ Estudiantes SIN email (no recibirán resumen):")
-                for est in estudiantes_sin_email[:10]:
-                    st.write(f"- {est}")
+                st.warning(f"⚠️ {len(estudiantes_sin_email)} estudiantes sin email registrado")
         
-        # 7. OBTENER FECHAS DE FORMA SEGURA
-        try:
-            fecha_inicio = st.session_state.get('fecha_inicio', date.today())
-            fecha_fin = st.session_state.get('fecha_fin', date.today())
-        except:
-            fecha_inicio = date.today()
-            fecha_fin = date.today()
+        fecha_inicio = st.session_state.get('fecha_inicio', date.today())
+        fecha_fin = st.session_state.get('fecha_fin', date.today())
         
-        # 8. CONFIRMACIÓN FINAL ANTES DEL ENVÍO
-        progress_placeholder.warning(f"📤 **LISTO PARA ENVIAR:** {len(estudiantes_con_email)} resúmenes de asistencia")
-        
-        # 9. EJECUTAR ENVÍO MASIVO
-        if st.button("🚀 EJECUTAR ENVÍO DE RESUMENES", type="primary", primary=True, key="envio_masivo_final"):
+        if boton_moderno("🚀 EJECUTAR ENVÍO DE RESUMENES", "exito", "📧", "execute_email_send"):
             progress_bar = st.progress(0)
             resultados = []
-            individual_results = st.progress(0)
+            emails_enviados = 0
             
-            with individual_results:
-                st.subheader("📄 Progreso de Envío")
-            
-            st.markdown_progress = st.progress(0)
-            
-            # CONTENEDOR PARA RESULTADOS INDIVIDUALES
-            individual_results = st.container()
-            
-            with individual_results:
-                st.subheader("📄 Progreso de Envío")
+            for i, est_data in enumerate(estudiantes_con_email):
+                estudiante = est_data['nombre_original']
+                correo_destino = est_data['email']
+                nombre_apoderado = est_data['apoderado']
                 
-                for i, est_data in enumerate(estudiantes_con_email):
-                    estudiante = est_data['nombre_original']
-                    correo_destino = est_data['email']
-                    nombre_apoderado = est_data['apoderado']
-                    
-                    # ACTUALIZAR ESTADO
-                    status_placeholder.info(f"📨 Enviando {i+1}/{len(estudiantes_con_email)}: {estudiante}")
-                    
-                    # CALCULAR ESTADÍSTICAS PARA ESTE ESTUDIANT
-                    datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
-                    
-                    if datos_estudiante.empty:
-                        st.warning(f"⚠️ No hay datos para {estudiante} - Saltando")
-                        continue
-                    
-                    total_clases = len(datos_estudiante)
-                    asistencias = datos_estudiante['Asistencia'].sum()
-                    ausencias = total_clases - asistencias
-                    porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
-                    
-                    # RESUMEN POR CURSO
-                    cursos_estudiante = datos_estudiante['Curso'].unique()
-                    resumen_cursos = []
-                    
-                    for curso in cursos_estudiante:
-                        datos_curso = datos_estudiante[datos_estudiante['Curso'] == curso]
-                        total_curso = len(datos_curso)
-                        asistencias_curso = datos_curso['Asistencia'].sum()
-                        porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
-                        resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
-                    
-                    # PREPARAR EMAIL
-                    subject = f"Resumen de Asistencia - {estudiante} - Preuniversitario CIMMA"
-                    
-                    body = email_template.format(
-                        nombre_apoderado=nombre_apoderado,
-                        estudiante=estudiante,
-                        total_clases=total_clases,
-                        asistencias=asistencias,
-                        ausencias=ausencias,
-                        porcentaje_asistencia=porcentaje_asistencia,
-                        resumen_cursos="\n".join(resumen_cursos),
-                        fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
-                        fecha_fin=fecha_fin.strftime('%d/%m/%Y')
-                    )
-                    
-                    # ENVIAR EMAIL CON FEEDBACK VISUAL
-                    with st.spinner(f"Enviando a {estudiante}..."):
-                        exito = send_email(correo_destino, subject, body)
-                    
-                    # MOSTRAR RESULTADO INDIVIDUAL
-                    if exito:
-                        emails_enviados += 1
-                        st.success(f"✅ **{i+1}/{len(estudiantes_con_email)}:** Email enviado a {estudiante} → {correo_destino}")
-                    else:
-                        st.error(f"❌ **{i+1}/{len(estudiantes_con_email)}:** Falló envío a {estudiante} → {correo_destino}")
-                    
-                    resultados.append({
-                        'estudiante': estudiante,
-                        'apoderado': nombre_apoderado,
-                        'email': correo_destino,
-                        'exito': exito
-                    })
-                    
-                    # ACTUALIZAR BARRA DE PROGRESO
-                    progress_bar.progress((i + 1) / len(estudiantes_con_email))
+                status_placeholder.info(f"📨 Enviando {i+1}/{len(estudiantes_con_email)}: {estudiante}")
+                
+                datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
+                
+                if datos_estudiante.empty:
+                    continue
+                
+                total_clases = len(datos_estudiante)
+                asistencias = datos_estudiante['Asistencia'].sum()
+                ausencias = total_clases - asistencias
+                porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
+                
+                cursos_estudiante = datos_estudiante['Curso'].unique()
+                resumen_cursos = []
+                
+                for curso in cursos_estudiante:
+                    datos_curso = datos_estudiante[datos_estudiante['Curso'] == curso]
+                    total_curso = len(datos_curso)
+                    asistencias_curso = datos_curso['Asistencia'].sum()
+                    porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
+                    resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
+                
+                subject = f"Resumen de Asistencia - {estudiante} - Preuniversitario CIMMA"
+                
+                body = email_template.format(
+                    nombre_apoderado=nombre_apoderado,
+                    estudiante=estudiante,
+                    total_clases=total_clases,
+                    asistencias=asistencias,
+                    ausencias=ausencias,
+                    porcentaje_asistencia=porcentaje_asistencia,
+                    resumen_cursos="\n".join(resumen_cursos),
+                    fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
+                    fecha_fin=fecha_fin.strftime('%d/%m/%Y')
+                )
+                
+                with st.spinner(f"Enviando a {estudiante}..."):
+                    exito = send_email(correo_destino, subject, body)
+                
+                if exito:
+                    emails_enviados += 1
+                    st.success(f"✅ **{i+1}/{len(estudiantes_con_email)}:** Email enviado a {estudiante}")
+                else:
+                    st.error(f"❌ **{i+1}/{len(estudiantes_con_email)}:** Falló envío a {estudiante}")
+                
+                resultados.append({
+                    'estudiante': estudiante,
+                    'exito': exito
+                })
+                
+                progress_bar.progress((i + 1) / len(estudiantes_con_email))
             
-            # LIMPIAR CONTENEDORES TEMPORALES
             progress_placeholder.empty()
             status_placeholder.empty()
             progress_bar.empty()
             
-            # REPORTE FINAL
             st.markdown("---")
             st.subheader("📊 RESULTADO FINAL DEL ENVÍO")
             
@@ -671,7 +927,7 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
             
             if exitosos == len(resultados):
                 st.balloons()
-                st.success(f"🎉 **¡ÉXITO TOTAL!** Todos los {exitosos} emails fueron enviados exitosamente")
+                st.success(f"🎉 **¡ÉXITO TOTAL!** Todos los {exitosos} emails fueron enviados")
                 st.session_state.email_status = f"🎉 ¡ÉXITO! {exitosos} emails enviados"
             elif exitosos > 0:
                 st.warning(f"⚠️ **ENVÍO PARCIALMENTE EXITOSO:** {exitosos} de {len(resultados)} emails enviados")
@@ -680,81 +936,49 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                 st.error("❌ **FALLO TOTAL:** No se pudo enviar ningún email")
                 st.session_state.email_status = "❌ Falló el envío de emails"
             
-            # DETALLES ADICIONALES
-            with st.expander("📋 VER DETALLES COMPLETOS DEL ENVÍO"):
-                if exitosos > 0:
-                    st.subheader("✅ Emails Enviados Exitosamente:")
-                    for r in resultados:
-                        if r['exito']:
-                            st.write(f"- **{r['estudiante']}** → {r['apoderado']} ({r['email']})")
-                
-                if fallidos > 0:
-                    st.subheader("❌ Emails que Fallaron:")
-                    for r in resultados:
-                        if not r['exito']:
-                            st.write(f"- **{r['estudiante']}** → {r['apoderado']} ({r['email']})")
-            
             return exitosos > 0
             
     except Exception as e:
         progress_placeholder.error(f"❌ ERROR CRÍTICO en el proceso: {str(e)}")
-        st.error(f"🔍 Detalles del error: {traceback.format_exc()}")
         st.session_state.email_status = f"❌ Error crítico: {str(e)}"
         return False
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ==============================
-# PANEL ADMINISTRATIVO
+# PANEL ADMINISTRATIVO MEJORADO
 # ==============================
 
-def admin_panel():
+def admin_panel_mejorado():
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
         if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo.")
-            st.session_state.clear()  # Limpia la sesión
-            st.rerun()  # Reinicia la app
-            return  # Detiene la ejecución
-    st.title("📊 Panel Administrativo - Análisis de Asistencia")
-    st.subheader(f"Bienvenido/a, {st.session_state['user_name']}")
+            st.session_state.clear()
+            st.rerun()
+            return
+    
+    st.markdown('<h2 class="section-header">📊 Panel Administrativo - Análisis de Asistencia</h2>', unsafe_allow_html=True)
+    st.markdown(f'<div class="card"><h3>👋 Bienvenido/a, {st.session_state["user_name"]}</h3></div>', unsafe_allow_html=True)
+    
+    # Configuración de temporizador
     st.subheader("⏳ Configuración de Temporizador de Sesión")
-    # Opciones: 30 min a 5 horas (300 min), en bloques de 30 min
     options_min = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300]
     current_duration = int(st.session_state['timeout_duration'] / 60) if 'timeout_duration' in st.session_state else 30
-    selected_min = st.selectbox("Selecciona duración de sesión (minutos)", options_min, index=options_min.index(current_duration) if current_duration in options_min else 0)
+    selected_min = st.selectbox("Selecciona duración de sesión (minutos)", options_min, 
+                               index=options_min.index(current_duration) if current_duration in options_min else 0)
     
     col1, col2 = st.columns(2)
     with col1:
-        if st.button("Aplicar duración"):
-            st.session_state['timeout_duration'] = selected_min * 60  # Convierte a segundos
-            st.session_state['login_time'] = time.time()  # Reinicia el temporizador
-            st.success(f"✅ Duración aplicada: {selected_min} minutos. Temporizador reiniciado.")
+        if boton_moderno("Aplicar duración", "primario", "⚙️", "apply_duration"):
+            st.session_state['timeout_duration'] = selected_min * 60
+            st.session_state['login_time'] = time.time()
+            st.success(f"✅ Duración aplicada: {selected_min} minutos")
             st.rerun()
     with col2:
-        if st.button("Mantener sesión abierta"):
-            st.session_state['login_time'] = time.time()  # Solo reinicia el temporizador, sin cambiar duración
-            st.success("✅ Sesión mantenida abierta. Temporizador reiniciado.")
+        if boton_moderno("Mantener sesión abierta", "secundario", "🔄", "keep_alive"):
+            st.session_state['login_time'] = time.time()
+            st.success("✅ Sesión mantenida abierta")
             st.rerun()
     
-    # Muestra tiempo restante (opcional)
-    remaining = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
-    if remaining > 0:
-        st.info(f"⏳ Tiempo restante: {int(remaining // 60)} minutos y {int(remaining % 60)} segundos.")
-    else:
-        st.warning("⚠️ Sesión expirada o a punto de expirar.")
-    st.divider()  # Separador visual
-    st.subheader(f"Bienvenido/a, {st.session_state['user_name']}")
+    st.divider()
     
     # ==============================
     # INICIALIZACIÓN DE ESTADOS
@@ -776,40 +1000,7 @@ def admin_panel():
     
     if df.empty:
         st.error("❌ No se pudieron cargar los datos de asistencia.")
-        st.info("""
-        **💡 Posibles soluciones:**
-        - Verifica la conexión a Internet
-        - Revisa que la hoja de cálculo esté accesible
-        - Confirma que existan registros de asistencia
-        """)
         return
-    
-    # ==============================
-    # PROCESAMIENTO DE FECHAS
-    # ==============================
-    
-    meses_espanol = {
-        'enero': 1, 'febrero': 2, 'marzo': 3, 'abril': 4, 'mayo': 5, 'junio': 6,
-        'julio': 7, 'agosto': 8, 'septiembre': 9, 'octubre': 10, 'noviembre': 11, 'diciembre': 12
-    }
-    
-    def convertir_fecha_espanol(fecha_texto):
-        if pd.isna(fecha_texto) or fecha_texto == '':
-            return pd.NaT
-        try:
-            partes = fecha_texto.lower().split(' de ')
-            if len(partes) == 3:
-                dia = int(partes[0].strip())
-                mes = meses_espanol[partes[1].strip()]
-                año = int(partes[2].strip())
-                return datetime(año, mes, dia)
-        except Exception as e:
-            st.warning(f"Error convirtiendo fecha: {fecha_texto} - {e}")
-        return pd.NaT
-    
-    if 'Fecha' in df.columns and df['Fecha'].dtype == 'object':
-        df['Fecha'] = df['Fecha'].apply(convertir_fecha_espanol)
-        st.success(f"✅ Fechas convertidas: {df['Fecha'].notna().sum()} fechas válidas")
     
     # ==============================
     # BARRA LATERAL - FILTROS
@@ -821,13 +1012,6 @@ def admin_panel():
     if not df.empty:
         st.sidebar.write(f"**Cursos encontrados:** {len(df['Curso'].unique())}")
         st.sidebar.write(f"**Estudiantes únicos:** {len(df['Estudiante'].unique())}")
-        
-        if 'Fecha' in df.columns and df['Fecha'].notna().any():
-            fechas_validas = df[df['Fecha'].notna()]['Fecha']
-            st.sidebar.write(f"**Rango de fechas:**")
-            st.sidebar.write(f"{fechas_validas.min().strftime('%d/%m/%Y')} - {fechas_validas.max().strftime('%d/%m/%Y')}")
-        else:
-            st.sidebar.write("**❌ No hay fechas válidas**")
     
     st.sidebar.header("🔍 Filtros de Datos")
     
@@ -888,7 +1072,7 @@ def admin_panel():
         st.session_state.fecha_fin = fecha_fin
     
     # Botón limpiar filtros
-    if st.sidebar.button("🧹 Limpiar Filtros", use_container_width=True):
+    if boton_moderno("🧹 Limpiar Filtros", "secundario", "🧹", "clear_filters"):
         st.session_state.curso_seleccionado = "Todos"
         st.session_state.estudiante_seleccionado = "Todos"
         st.session_state.fecha_inicio = fecha_min
@@ -918,7 +1102,7 @@ def admin_panel():
         filtros_aplicados.append(f"📅 Período: {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}")
     
     # ==============================
-    # PANEL DE ESTADO DE EMAIL
+    # DASHBOARD PRINCIPAL
     # ==============================
     
     if st.session_state.email_status:
@@ -929,136 +1113,61 @@ def admin_panel():
         else:
             st.error(f"📢 **Estado del sistema:** {st.session_state.email_status}")
     
-    # ==============================
-    # VERIFICACIÓN DE DATOS FILTRADOS
-    # ==============================
-    
     if datos_filtrados.empty:
         st.error("🚫 No se encontraron datos con los filtros seleccionados")
-        
-        with st.expander("🔍 Diagnóstico - ¿Por qué no hay datos?"):
-            st.write("### Datos originales disponibles:")
-            st.write(f"- **Total de registros:** {len(df):,}")
-            st.write(f"- **Cursos:** {', '.join(sorted(df['Curso'].unique()))}")
-            st.write(f"- **Estudiantes:** {len(df['Estudiante'].unique())} estudiantes")
-            
-            if df['Fecha'].notna().any():
-                fechas = df[df['Fecha'].notna()]['Fecha']
-                st.write(f"- **Rango de fechas real:** {fechas.min().strftime('%d/%m/%Y')} - {fechas.max().strftime('%d/%m/%Y')}")
-            else:
-                st.write("- **❌ No hay fechas válidas**")
-            
-            st.write("### Filtros aplicados:")
-            for filtro in filtros_aplicados:
-                st.write(f"- {filtro}")
-            
-            st.write("### 💡 Sugerencias:")
-            st.write("1. **Verifica las fechas** - Asegúrate de que el rango incluía datos existentes")
-            st.write("2. **Prueba con 'Todos'** - Selecciona 'Todos' en curso o estudiante")
-            st.write("3. **Revisa los datos** - Los filtros pueden estar muy restrictivos")
-        
-        st.info("### 📋 Muestra de datos disponibles (sin filtros):")
-        muestra_df = df.head(10).copy()
-        if 'Fecha' in muestra_df.columns:
-            muestra_df['Fecha'] = muestra_df['Fecha'].dt.strftime('%d/%m/%Y')
-        st.dataframe(muestra_df, use_container_width=True)
         return
-    
-    # ==============================
-    # MÉTRICAS PRINCIPALES
-    # ==============================
     
     st.success(f"✅ Encontrados {len(datos_filtrados):,} registros")
     if filtros_aplicados:
         st.info(" | ".join(filtros_aplicados))
     
-    st.subheader("📊 Métricas de Asistencia")
-    
-    total_registros = len(datos_filtrados)
-    total_asistencias = datos_filtrados['Asistencia'].sum()
-    total_ausencias = total_registros - total_asistencias
-    porcentaje_asistencia = (total_asistencias / total_registros * 100) if total_registros > 0 else 0
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("Total Registros", f"{total_registros:,}")
-    
-    with col2:
-        st.metric("Asistencias", f"{total_asistencias:,}")
-    
-    with col3:
-        st.metric("Ausencias", f"{total_ausencias:,}")
-    
-    with col4:
-        st.metric("% Asistencia", f"{porcentaje_asistencia:.1f}%")
+    # Dashboard de métricas
+    crear_dashboard_metricas_principales(datos_filtrados)
     
     # ==============================
-    # GRÁFICOS DE ANÁLISIS
+    # GRÁFICOS INTERACTIVOS
     # ==============================
     
-    st.subheader("📈 Análisis Visual")
+    st.markdown('<h2 class="section-header">📈 Análisis Visual Interactivo</h2>', unsafe_allow_html=True)
     
-    # Gráfico 1: Asistencia por curso (si hay múltiples cursos)
+    # Preparar datos para gráficos
     if len(datos_filtrados['Curso'].unique()) > 1:
-        try:
-            asistencia_por_curso = datos_filtrados.groupby('Curso')['Asistencia'].agg(['sum', 'count']).reset_index()
-            asistencia_por_curso['Porcentaje'] = (asistencia_por_curso['sum'] / asistencia_por_curso['count'] * 100)
-            
-            fig1 = px.bar(asistencia_por_curso, x='Curso', y='Porcentaje',
-                         title='📚 Porcentaje de Asistencia por Curso',
-                         color='Porcentaje',
-                         color_continuous_scale='Blues',
-                         hover_data=['sum', 'count'],
-                         text='Porcentaje')
-            
-            fig1.update_traces(texttemplate='%{text:.1f}%', textposition='inside', textfont_size=16)
-            fig1.update_layout(uniformtext_minsize=8, uniformtext_mode='hide')
-            st.plotly_chart(fig1, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"❌ Error en gráfico de cursos: {e}")
-    else:
-        curso_actual = datos_filtrados['Curso'].iloc[0] if len(datos_filtrados) > 0 else "N/A"
-        st.info(f"📚 Mostrando datos del curso: **{curso_actual}**")
+        asistencia_por_curso = datos_filtrados.groupby('Curso')['Asistencia'].agg(['sum', 'count']).reset_index()
+        asistencia_por_curso['Porcentaje'] = (asistencia_por_curso['sum'] / asistencia_por_curso['count'] * 100)
+        
+        fig_curso = crear_grafico_asistencia_interactivo(asistencia_por_curso, "barras")
+        if fig_curso:
+            st.plotly_chart(fig_curso, use_container_width=True)
     
-    # Gráfico 2: Asistencia por estudiante (si hay múltiples estudiantes)
     if len(datos_filtrados['Estudiante'].unique()) > 1:
-        try:
-            asistencia_por_estudiante = datos_filtrados.groupby('Estudiante')['Asistencia'].agg(['sum', 'count']).reset_index()
-            asistencia_por_estudiante['Porcentaje'] = (asistencia_por_estudiante['sum'] / asistencia_por_estudiante['count'] * 100)
-            asistencia_por_estudiante = asistencia_por_estudiante.sort_values('Porcentaje', ascending=False)
-            
-            fig2 = px.bar(asistencia_por_estudiante, x='Estudiante', y='Porcentaje',
-                         title='👤 Asistencia por Estudiante',
-                         color='Porcentaje',
-                         color_continuous_scale='Greens',
-                         hover_data=['sum', 'count'])
-            
-            fig2.update_layout(xaxis_tickangle=-45)
-            st.plotly_chart(fig2, use_container_width=True)
-            
-        except Exception as e:
-            st.error(f"❌ Error en gráfico de estudiantes: {e}")
-    else:
-        if len(datos_filtrados) > 0:
-            estudiante_actual = datos_filtrados['Estudiante'].iloc[0]
-            st.info(f"👤 Mostrando datos del estudiante: **{estudiante_actual}**")
+        asistencia_por_estudiante = datos_filtrados.groupby('Estudiante')['Asistencia'].agg(['sum', 'count']).reset_index()
+        asistencia_por_estudiante['Porcentaje'] = (asistencia_por_estudiante['sum'] / asistencia_por_estudiante['count'] * 100)
+        asistencia_por_estudiante = asistencia_por_estudiante.sort_values('Porcentaje', ascending=False)
+        
+        fig_estudiante = crear_grafico_asistencia_interactivo(asistencia_por_estudiante, "barras")
+        if fig_estudiante:
+            st.plotly_chart(fig_estudiante, use_container_width=True)
     
-    # Gráfico 3: Tendencia temporal (si hay suficientes datos)
+    # Gráfico de tendencia temporal
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any() and len(datos_filtrados) > 1:
         try:
             asistencia_diaria = datos_filtrados.groupby(datos_filtrados['Fecha'].dt.date)['Asistencia'].agg(['sum', 'count']).reset_index()
             asistencia_diaria['Porcentaje'] = (asistencia_diaria['sum'] / asistencia_diaria['count'] * 100)
             asistencia_diaria['Fecha'] = pd.to_datetime(asistencia_diaria['Fecha'])
             
-            fig3 = px.line(asistencia_diaria, x='Fecha', y='Porcentaje',
-                          title='📈 Tendencia de Asistencia Diaria',
-                          markers=True,
-                          hover_data=['sum', 'count'])
+            fig_tendencia = px.line(asistencia_diaria, x='Fecha', y='Porcentaje',
+                                  title='📈 Tendencia de Asistencia Diaria',
+                                  markers=True,
+                                  template='plotly_white')
             
-            fig3.update_layout(xaxis_title='Fecha', yaxis_title='Porcentaje de Asistencia (%)')
-            st.plotly_chart(fig3, use_container_width=True)
+            fig_tendencia.update_layout(
+                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor='rgba(0,0,0,0)',
+                xaxis_title='Fecha',
+                yaxis_title='Porcentaje de Asistencia (%)'
+            )
+            
+            st.plotly_chart(fig_tendencia, use_container_width=True)
             
         except Exception as e:
             st.error(f"❌ Error en gráfico de tendencia: {e}")
@@ -1067,15 +1176,13 @@ def admin_panel():
     # TABLA DE DATOS DETALLADOS
     # ==============================
     
-    st.subheader("📋 Datos Detallados")
+    st.markdown('<h2 class="section-header">📋 Datos Detallados</h2>', unsafe_allow_html=True)
     
     datos_mostrar = datos_filtrados.copy()
     if 'Fecha' in datos_mostrar.columns:
         datos_mostrar['Fecha_Formateada'] = datos_mostrar['Fecha'].apply(
             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'Sin fecha'
         )
-    else:
-        datos_mostrar['Fecha_Formateada'] = 'Columna no disponible'
     
     columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Asistencia']
     columnas_extra = ['Hora Registro', 'Información']
@@ -1093,23 +1200,17 @@ def admin_panel():
     
     datos_tabla = datos_mostrar[columnas_finales].rename(columns=nombres_amigables)
     st.dataframe(datos_tabla, use_container_width=True, height=400)
-    st.caption(f"Mostrando {len(datos_tabla):,} registros")
     
     # ==============================
     # SECCIÓN DE EMAIL MEJORADA
     # ==============================
     
     st.markdown("---")
-    st.subheader("📧 Envío de Notificaciones a Apoderados")
+    st.markdown('<h2 class="section-header">📧 Envío de Notificaciones a Apoderados</h2>', unsafe_allow_html=True)
     
-    # CONTENEDOR PRINCIPAL DE ENVÍO DE RESUMENES
     with st.expander("📊 ENVÍO DE RESUMENES DE ASISTENCIA", expanded=True):
-        st.info("""
-        **📋 Esta función enviará un resumen de asistencia a TODOS los apoderados** 
-        cuyos estudiantes aparezcan en los datos actualmente filtrados.
-        """)
+        st.info("**📋 Esta función enviará un resumen de asistencia a TODOS los apoderados** cuyos estudiantes aparezcan en los datos actualmente filtrados.")
         
-        # PLANTILLA DE EMAIL
         email_template = st.text_area(
             "**✏️ Plantilla de Email:**",
             value="""Hola {nombre_apoderado},
@@ -1131,37 +1232,26 @@ Para consultas específicas, por favor contacte a la administración.
 
 Saludos cordiales,
 Preuniversitario CIMMA 2026""",
-            height=300,
-            help="Puedes personalizar este mensaje. Usa las variables entre llaves {} para datos dinámicos."
+            height=300
         )
         
-        # BOTÓN DE PREPARACIÓN MEJORADO
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            if st.button("🔍 PREPARAR ENVÍO DE RESUMENES", 
-                        use_container_width=True, 
-                        type="primary",
-                        help="Verifica los datos y prepara el envío masivo"):
-                
-                # LIMPIAR ESTADO ANTERIOR
+            if boton_moderno("🔍 PREPARAR ENVÍO DE RESUMENES", "primario", "🔍", "prepare_emails"):
                 st.session_state.email_status = ""
                 
-                # MOSTRAR PROGRESO
                 with st.spinner("🔄 Analizando datos y preparando envío..."):
                     try:
-                        # VERIFICAR DATOS ANTES DE PROCEDER
                         if datos_filtrados.empty:
                             st.session_state.email_status = "❌ No hay datos filtrados para enviar"
                             st.rerun()
                         
-                        # CARGAR EMAILS PARA VERIFICACIÓN
                         emails, _ = load_emails()
                         if not emails:
                             st.session_state.email_status = "❌ No se encontraron emails de apoderados"
                             st.rerun()
                         
-                        # CONTAR ESTUDIANTES CON EMAIL
                         estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
                         estudiantes_con_email = 0
                         
@@ -1173,7 +1263,6 @@ Preuniversitario CIMMA 2026""",
                             st.session_state.email_status = "❌ No hay estudiantes con email en los datos filtrados"
                             st.rerun()
                         
-                        # ÉXITO - PROCEDER CON ENVÍO
                         st.session_state.email_status = f"✅ Listo para enviar: {estudiantes_con_email} resúmenes"
                         st.rerun()
                         
@@ -1182,24 +1271,19 @@ Preuniversitario CIMMA 2026""",
                         st.rerun()
         
         with col2:
-            if st.button("🔄 LIMPIAR ESTADO", 
-                        use_container_width=True,
-                        help="Limpiar mensajes de estado"):
+            if boton_moderno("🔄 LIMPIAR ESTADO", "secundario", "🔄", "clear_status"):
                 st.session_state.email_status = ""
                 st.rerun()
         
-        # EJECUTAR LA FUNCIÓN DE ENVÍO (se llamará desde el botón dentro de la función)
         if "✅ Listo para enviar" in st.session_state.get('email_status', ''):
-            st.success("**✅ SISTEMA PREPARADO** - Puedes proceder con el envío usando el botón dentro de la función")
+            st.success("**✅ SISTEMA PREPARADO** - Puedes proceder con el envío")
             enviar_resumen_asistencia(datos_filtrados, email_template)
-    
-
     
     # ==============================
     # EXPORTACIÓN DE DATOS
     # ==============================
     
-    st.subheader("📤 Exportar Datos")
+    st.markdown('<h2 class="section-header">📤 Exportar Datos</h2>', unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1227,14 +1311,12 @@ Preuniversitario CIMMA 2026""",
                 )
             excel_df.to_excel(writer, index=False, sheet_name='Asistencia')
             
-            # Agregar hoja de resumen
             resumen_data = {
-                'Métrica': ['Total Registros', 'Asistencias', 'Ausencias', 'Porcentaje Asistencia', 'Período'],
+                'Métrica': ['Total Registros', 'Asistencias', 'Ausencias', 'Período'],
                 'Valor': [
-                    total_registros,
-                    total_asistencias,
-                    total_ausencias,
-                    f"{porcentaje_asistencia:.1f}%",
+                    len(datos_filtrados),
+                    datos_filtrados['Asistencia'].sum(),
+                    len(datos_filtrados) - datos_filtrados['Asistencia'].sum(),
                     f"{st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}"
                 ]
             }
@@ -1257,87 +1339,86 @@ Preuniversitario CIMMA 2026""",
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if st.button("🔄 RECARGAR DATOS", use_container_width=True):
+        if boton_moderno("🔄 RECARGAR DATOS", "primario", "🔄", "reload_data"):
             st.cache_data.clear()
             st.session_state.email_status = "🔄 Datos recargados"
             st.rerun()
     
     with col2:
-        if st.button("📊 ACTUALIZAR VISTA", use_container_width=True):
+        if boton_moderno("📊 ACTUALIZAR VISTA", "secundario", "📊", "refresh_view"):
             st.session_state.email_status = "📊 Vista actualizada"
             st.rerun()
     
     with col3:
-        if st.button("🧹 LIMPIAR TODO", use_container_width=True):
+        if boton_moderno("🧹 LIMPIAR TODO", "peligro", "🧹", "clear_all"):
             st.session_state.email_status = ""
             st.session_state.curso_seleccionado = "Todos"
             st.session_state.estudiante_seleccionado = "Todos"
             st.rerun()
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 # ==============================
-# APP PRINCIPAL (PROFESOR)
+# APP PRINCIPAL MEJORADA (PROFESOR)
 # ==============================
 
-def main_app():
+def main_app_mejorada():
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
         if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo (5 minutos).")
-            st.session_state.clear()  # Limpia la sesión
-            st.rerun()  # Reinicia la app
-            return  # Detiene la ejecución
-    st.title("📱 Registro de Asistencia")
-    st.subheader("Preuniversitario CIMMA 2026")
-    if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        remaining = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
-        if remaining > 0:
-            st.info(f"⏳ Tiempo restante en sesión: {int(remaining // 60)} minutos y {int(remaining % 60)} segundos.")
-        else:
-            st.warning("⚠️ Sesión a punto de expirar.")
+            st.session_state.clear()
+            st.rerun()
+            return
+    
+    st.markdown('<h2 class="section-header">📱 Registro de Asistencia en Tiempo Real</h2>', unsafe_allow_html=True)
+    
     courses = load_courses()
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
         st.stop()
+    
     cursos_filtrados = {
         k: v for k, v in courses.items()
         if v["profesor"] == st.session_state["user_name"]
     }
+    
     if not cursos_filtrados:
         st.warning("No tienes cursos asignados.")
         st.stop()
+    
+    # Selector de curso moderno
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()))
     data = cursos_filtrados[curso_seleccionado]
-    st.markdown(f"**🧑‍🏫 Profesor(a):** {data['profesor']}")
-    col1, col2 = st.columns(2)
+    
+    # Información del curso en tarjetas
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.markdown(f"**📅 Día:** {data['dia']}")
+        st.markdown(crear_tarjeta_metricas(
+            "Profesor", data['profesor'], "Responsable", "👨‍🏫", "#1A3B8F"
+        ), unsafe_allow_html=True)
     with col2:
-        st.markdown(f"**⏰ Horario:** {data['horario']}")
+        st.markdown(crear_tarjeta_metricas(
+            "Día", data['dia'], "Día de clase", "📅", "#10B981"
+        ), unsafe_allow_html=True)
+    with col3:
+        st.markdown(crear_tarjeta_metricas(
+            "Horario", data['horario'], "Horario", "⏰", "#F59E0B"
+        ), unsafe_allow_html=True)
+    
+    # Selección de realización de clase
+    st.markdown('<h3 class="section-header">✅ Estado de la Clase</h3>', unsafe_allow_html=True)
     clase_realizada = st.radio(
-        "✅ ¿Se realizó la clase?",
+        "¿Se realizó la clase?",
         ("Sí", "No"),
         index=0,
-        help="Selecciona 'No' en caso de feriado, suspensión o imprevisto."
+        horizontal=True
     )
+    
     if clase_realizada == "No":
         motivo = st.text_area(
             "📝 Motivo de la no realización",
             placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc."
         )
         fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", data["fechas"])
-        if st.button("💾 Registrar suspensión", use_container_width=True):
+        if boton_moderno("💾 Registrar suspensión", "peligro", "⏸️", "register_suspension"):
             try:
                 client = get_client()
                 if not client:
@@ -1363,54 +1444,41 @@ def main_app():
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
+    
+    # Si la clase se realizó, continuar con registro de asistencia
     fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
-    st.header("👥 Estudiantes")
+    
+    st.markdown('<h3 class="section-header">👥 Registro de Asistencia de Estudiantes</h3>', unsafe_allow_html=True)
+    
     estado_key = f"asistencia_estado_{curso_seleccionado}"
     if estado_key not in st.session_state:
         st.session_state[estado_key] = {est: True for est in data["estudiantes"]}
     asistencia_estado = st.session_state[estado_key]
-    st.markdown("""
-    <style>
-    div[data-testid="stButton"] button[kind="secondary"]:not([key="guardar_asistencia"]) {
-        background-color: #FF6B6B !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: bold !important;
-    }
-    div[data-testid="stButton"] button[kind="primary"]:not([key="guardar_asistencia"]) {
-        background-color: #1A3B8F !important;
-        color: white !important;
-        border: none !important;
-        border-radius: 8px !important;
-        font-weight: bold !important;
-    }
-    div[data-testid="stButton"] button[key="guardar_asistencia"] {
-        background-color: #10B981 !important;
-        color: white !important;
-        border: 2px solid #6c757d !important;
-        font-weight: bold !important;
-        border-radius: 8px !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
+    
+    # Grid de botones de asistencia
+    st.markdown("**Haz clic en cada estudiante para cambiar su estado de asistencia:**")
+    
     for est in data["estudiantes"]:
         key = f"btn_{curso_seleccionado}_{est}"
         estado_actual = asistencia_estado[est]
         if estado_actual:
-            if st.button(f"✅ {est} — ASISTIÓ", key=key, use_container_width=True, type="primary"):
+            if boton_moderno(f"✅ {est} — ASISTIÓ", "exito", "✅", key):
                 asistencia_estado[est] = False
                 st.rerun()
         else:
-            if st.button(f"❌ {est} — AUSENTE", key=key, use_container_width=True, type="secondary"):
+            if boton_moderno(f"❌ {est} — AUSENTE", "peligro", "❌", key):
                 asistencia_estado[est] = True
                 st.rerun()
+    
     asistencia = asistencia_estado
+    
     st.warning("📧 Al guardar, se enviará un reporte automático a los apoderados.")
-    st.markdown("<hr>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    # Botón de guardar
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if st.button("💾 Guardar Asistencia", key="guardar_asistencia", use_container_width=True, type="primary"):
+        if boton_moderno("💾 Guardar Asistencia", "exito", "💾", "guardar_asistencia"):
             try:
                 client = get_client()
                 if not client:
@@ -1455,10 +1523,12 @@ Preuniversitario CIMMA 2026"""
                     send_email(correo_destino, subject, body)
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
+    
+    # Sección de sugerencias
     st.divider()
-    st.caption("💡 ¿Tienes ideas para mejorar esta plataforma?")
-    mejora = st.text_area("Sugerencia:", placeholder="Ej: Agregar notificación por WhatsApp...")
-    if st.button("📤 Enviar sugerencia"):
+    st.markdown('<h3 class="section-header">💡 Sugerencias de Mejora</h3>', unsafe_allow_html=True)
+    mejora = st.text_area("Comparte tus ideas para mejorar esta plataforma:", placeholder="Ej: Agregar notificación por WhatsApp...")
+    if boton_moderno("📤 Enviar sugerencia", "secundario", "💡", "send_suggestion"):
         try:
             client = get_client()
             if not client:
