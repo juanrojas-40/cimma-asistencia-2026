@@ -956,9 +956,17 @@ def admin_panel_mejorado():
             return
     
     st.markdown('<h2 class="section-header">📊 Panel Administrativo - Análisis de Asistencia</h2>', unsafe_allow_html=True)
-    st.markdown(f'<div class="card"><h3>👋 Bienvenido/a, {st.session_state["user_name"]}</h3></div>', unsafe_allow_html=True)
     
-    # Configuración de temporizador
+    # CORREGIDO: Mejor contraste para el mensaje de bienvenida
+    st.markdown(
+        f'<div class="card" style="background: linear-gradient(135deg, #1A3B8F, #2D4FA8); color: white; border-left: 4px solid #F59E0B;">'
+        f'<h3 style="color: white; margin: 0;">👋 Bienvenido/a, {st.session_state["user_name"]}</h3>'
+        f'<p style="color: #E5E7EB; margin: 0.5rem 0 0 0;">Sistema de gestión de asistencia Preuniversitario CIMMA</p>'
+        f'</div>', 
+        unsafe_allow_html=True
+    )
+    
+    # Resto del código permanece igual...
     st.subheader("⏳ Configuración de Temporizador de Sesión")
     options_min = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300]
     current_duration = int(st.session_state['timeout_duration'] / 60) if 'timeout_duration' in st.session_state else 30
@@ -977,6 +985,7 @@ def admin_panel_mejorado():
             st.session_state['login_time'] = time.time()
             st.success("✅ Sesión mantenida abierta")
             st.rerun()
+    
     
     st.divider()
     
