@@ -23,7 +23,7 @@ import time  # Para manejar tiempos y temporizadores
 # ==============================
 
 def aplicar_tema_moderno():
-    """Aplica un tema visual moderno y consistente con mejor contraste"""
+    """Aplica un tema visual moderno y consistente"""
     
     # Paleta de colores institucional
     colores_institucionales = {
@@ -32,9 +32,7 @@ def aplicar_tema_moderno():
         "accent": "#F59E0B",        # Amarillo/naranja
         "neutral": "#6B7280",       # Gris
         "peligro": "#EF4444",       # Rojo
-        "fondo": "#F8FAFC",         # Fondo claro
-        "texto_oscuro": "#1F2937",  # Texto oscuro para mejor contraste
-        "texto_claro": "#FFFFFF"    # Texto claro para fondos oscuros
+        "fondo": "#F8FAFC"          # Fondo claro
     }
     
     st.markdown(f"""
@@ -46,7 +44,7 @@ def aplicar_tema_moderno():
         font-family: 'Inter', sans-serif;
     }}
     
-    /* HEADERS MODERNOS - MEJOR CONTRASTE */
+    /* HEADERS MODERNOS */
     .main-header {{
         color: {colores_institucionales["primario"]};
         font-weight: 700;
@@ -54,7 +52,6 @@ def aplicar_tema_moderno():
         margin-bottom: 1rem;
         border-bottom: 3px solid {colores_institucionales["primario"]};
         padding-bottom: 0.5rem;
-        text-shadow: 0 1px 2px rgba(0,0,0,0.1);
     }}
     
     .section-header {{
@@ -62,29 +59,6 @@ def aplicar_tema_moderno():
         font-weight: 600;
         font-size: 1.5rem;
         margin: 2rem 0 1rem 0;
-        text-shadow: 0 1px 1px rgba(0,0,0,0.05);
-    }}
-    
-    /* MEJOR CONTRASTE PARA TEXTO EN TARJETAS */
-    .card h3, .card h4, .card h5 {{
-        color: {colores_institucionales["texto_oscuro"]} !important;
-    }}
-    
-    .card p {{
-        color: {colores_institucionales["neutral"]} !important;
-    }}
-    
-    /* CONTRASTE MEJORADO PARA ELEMENTOS DE STREAMLIT */
-    .stTextInput > div > div > input {{
-        color: {colores_institucionales["texto_oscuro"]} !important;
-    }}
-    
-    .stSelectbox > div > div > select {{
-        color: {colores_institucionales["texto_oscuro"]} !important;
-    }}
-    
-    .stRadio > div {{
-        color: {colores_institucionales["texto_oscuro"]} !important;
     }}
     
     /* BOTONES MODERNOS */
@@ -105,7 +79,7 @@ def aplicar_tema_moderno():
     /* BOTÓN PRIMARIO */
     div[data-testid="stButton"] button[kind="primary"] {{
         background: linear-gradient(135deg, {colores_institucionales["primario"]}, #2D4FA8) !important;
-        color: {colores_institucionales["texto_claro"]} !important;
+        color: white !important;
     }}
     
     /* BOTÓN SECUNDARIO */
@@ -125,20 +99,6 @@ def aplicar_tema_moderno():
         margin: 1rem 0;
     }}
     
-    /* MEJOR CONTRASTE PARA TEXTO EN TARJETAS OSCURAS */
-    .card-oscuro {{
-        background: linear-gradient(135deg, {colores_institucionales["primario"]}, #2D4FA8) !important;
-        color: {colores_institucionales["texto_claro"]} !important;
-    }}
-    
-    .card-oscuro h3, .card-oscuro h4, .card-oscuro h5 {{
-        color: {colores_institucionales["texto_claro"]} !important;
-    }}
-    
-    .card-oscuro p {{
-        color: #E5E7EB !important;
-    }}
-    
     /* SIDEBAR MODERNO */
     .css-1d391kg {{
         background: linear-gradient(180deg, {colores_institucionales["primario"]}, #2D4FA8);
@@ -146,14 +106,6 @@ def aplicar_tema_moderno():
     
     .sidebar .sidebar-content {{
         background: linear-gradient(180deg, {colores_institucionales["primario"]}, #2D4FA8);
-    }}
-    
-    /* MEJOR CONTRASTE EN SIDEBAR */
-    .sidebar .stRadio label, 
-    .sidebar .stSelectbox label,
-    .sidebar .stTextInput label {{
-        color: {colores_institucionales["texto_claro"]} !important;
-        font-weight: 500 !important;
     }}
     
     /* ANIMACIONES SUAVES */
