@@ -166,14 +166,14 @@ def crear_header_moderno():
         st.markdown('<p style="text-align: center; color: #6B7280; font-size: 1.1rem;">Sistema de Gestión de Asistencia 2026</p>', unsafe_allow_html=True)
 
 def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
-    """Crea una tarjeta de métricas moderna"""
+    """Crea una tarjeta de métricas moderna con mejor contraste"""
     return f"""
-    <div class="card" style="border-left: 4px solid {color};">
+    <div class="card" style="border-left: 4px solid {color}; background: white;">
         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
             <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icono}</span>
             <h3 style="margin: 0; color: {color}; font-weight: 600;">{titulo}</h3>
         </div>
-        <div style="font-size: 2rem; font-weight: 700; color: {color};">{valor}</div>
+        <div style="font-size: 2rem; font-weight: 700; color: #1F2937;">{valor}</div>
         <div style="color: #6B7280; font-size: 0.9rem;">{subtitulo}</div>
     </div>
     """
