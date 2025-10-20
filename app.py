@@ -166,14 +166,14 @@ def crear_header_moderno():
         st.markdown('<p style="text-align: center; color: #6B7280; font-size: 1.1rem;">Sistema de Gestión de Asistencia 2026</p>', unsafe_allow_html=True)
 
 def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
-    """Crea una tarjeta de métricas moderna con mejor contraste"""
+    """Crea una tarjeta de métricas moderna"""
     return f"""
-    <div class="card" style="border-left: 4px solid {color}; background: white;">
+    <div class="card" style="border-left: 4px solid {color};">
         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
             <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icono}</span>
             <h3 style="margin: 0; color: {color}; font-weight: 600;">{titulo}</h3>
         </div>
-        <div style="font-size: 2rem; font-weight: 700; color: #1F2937;">{valor}</div>
+        <div style="font-size: 2rem; font-weight: 700; color: {color};">{valor}</div>
         <div style="color: #6B7280; font-size: 0.9rem;">{subtitulo}</div>
     </div>
     """
@@ -956,17 +956,9 @@ def admin_panel_mejorado():
             return
     
     st.markdown('<h2 class="section-header">📊 Panel Administrativo - Análisis de Asistencia</h2>', unsafe_allow_html=True)
+    st.markdown(f'<div class="card"><h3>👋 Bienvenido/a, {st.session_state["user_name"]}</h3></div>', unsafe_allow_html=True)
     
-    # CORREGIDO: Mejor contraste para el mensaje de bienvenida
-    st.markdown(
-        f'<div class="card" style="background: linear-gradient(135deg, #1A3B8F, #2D4FA8); color: white; border-left: 4px solid #F59E0B;">'
-        f'<h3 style="color: white; margin: 0;">👋 Bienvenido/a, {st.session_state["user_name"]}</h3>'
-        f'<p style="color: #E5E7EB; margin: 0.5rem 0 0 0;">Sistema de gestión de asistencia Preuniversitario CIMMA</p>'
-        f'</div>', 
-        unsafe_allow_html=True
-    )
-    
-    # Resto del código permanece igual...
+    # Configuración de temporizador
     st.subheader("⏳ Configuración de Temporizador de Sesión")
     options_min = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300]
     current_duration = int(st.session_state['timeout_duration'] / 60) if 'timeout_duration' in st.session_state else 30
@@ -985,7 +977,6 @@ def admin_panel_mejorado():
             st.session_state['login_time'] = time.time()
             st.success("✅ Sesión mantenida abierta")
             st.rerun()
-    
     
     st.divider()
     
