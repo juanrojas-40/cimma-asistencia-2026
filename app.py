@@ -764,7 +764,9 @@ Preuniversitario CIMMA"""
             <h2 style="color: #6B7280; font-size: 1.5rem; margin-bottom: 2rem;">Sistema de Gestión de Asistencia 2026</h2>
             <div class="card" style="max-width: 600px; margin: 0 auto;">
                 <h3 style="color: #1A3B8F;">👋 ¡Bienvenido!</h3>
-                <p>Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
+                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="margin: 0; color: #1A3B8F;">Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
+                </div>  
                 <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
                     <p style="margin: 0; color: #1A3B8F;"><strong>💡 Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.</p>
                 </div>
