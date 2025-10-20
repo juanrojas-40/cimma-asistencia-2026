@@ -23,93 +23,138 @@ import time  # Para manejar tiempos y temporizadores
 # ==============================
 
 def aplicar_tema_moderno():
-    """Aplica un tema visual moderno y consistente con mejor contraste"""
+    """Aplica un tema visual moderno y consistente"""
+    
+    # Paleta de colores institucional
+    colores_institucionales = {
+        "primario": "#1A3B8F",      # Azul institucional
+        "secundario": "#10B981",    # Verde éxito
+        "accent": "#F59E0B",        # Amarillo/naranja
+        "neutral": "#6B7280",       # Gris
+        "peligro": "#EF4444",       # Rojo
+        "fondo": "#F8FAFC"          # Fondo claro
+    }
     
     st.markdown(f"""
     <style>
-    /* ESTILOS BASE CON MEJOR CONTRASTE */
-    .main {{
-        color: #1F2937 !important;
+    /* FUENTES Y TIPOGRAFÍA */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    * {{
+        font-family: 'Inter', sans-serif;
     }}
     
-    /* HEADERS CON MEJOR CONTRASTE */
-    h1, h2, h3, h4, h5, h6 {{
-        color: #1A3B8F !important;
+    /* HEADERS MODERNOS */
+    .main-header {{
+        color: {colores_institucionales["primario"]};
+        font-weight: 700;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+        border-bottom: 3px solid {colores_institucionales["primario"]};
+        padding-bottom: 0.5rem;
     }}
     
-    /* TEXTO GENERAL CON MEJOR CONTRASTE */
-    p, div, span {{
-        color: #374151 !important;
+    .section-header {{
+        color: {colores_institucionales["primario"]};
+        font-weight: 600;
+        font-size: 1.5rem;
+        margin: 2rem 0 1rem 0;
     }}
     
-    /* CONTENEDORES PRINCIPALES */
-    .block-container {{
-        background-color: #F8FAFC;
+    /* BOTONES MODERNOS */
+    .stButton > button {{
+        border-radius: 12px !important;
+        padding: 0.75rem 1.5rem !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
     }}
     
-    /* MEJOR CONTRASTE PARA MENSAJES DE STREAMLIT */
-    .stAlert {{
-        color: #1F2937 !important;
+    .stButton > button:hover {{
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
     }}
     
-    .stInfo {{
-        background-color: #DBEAFE !important;
-        color: #1E40AF !important;
-        border: 1px solid #93C5FD !important;
+    /* BOTÓN PRIMARIO */
+    div[data-testid="stButton"] button[kind="primary"] {{
+        background: linear-gradient(135deg, {colores_institucionales["primario"]}, #2D4FA8) !important;
+        color: white !important;
     }}
     
-    .stSuccess {{
-        background-color: #D1FAE5 !important;
-        color: #065F46 !important;
-        border: 1px solid #A7F3D0 !important;
+    /* BOTÓN SECUNDARIO */
+    div[data-testid="stButton"] button[kind="secondary"] {{
+        background: white !important;
+        color: {colores_institucionales["primario"]} !important;
+        border: 2px solid {colores_institucionales["primario"]} !important;
     }}
     
-    .stWarning {{
-        background-color: #FEF3C7 !important;
-        color: #92400E !important;
-        border: 1px solid #FCD34D !important;
+    /* TARJETAS Y CONTENEDORES */
+    .card {{
+        background: white;
+        border-radius: 16px;
+        padding: 1.5rem;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        border: 1px solid #E5E7EB;
+        margin: 1rem 0;
     }}
     
-    .stError {{
-        background-color: #FEE2E2 !important;
-        color: #991B1B !important;
-        border: 1px solid #FCA5A5 !important;
+    /* SIDEBAR MODERNO */
+    .css-1d391kg {{
+        background: linear-gradient(180deg, {colores_institucionales["primario"]}, #2D4FA8);
     }}
     
-    /* MEJOR CONTRASTE PARA WIDGETS */
-    .stTextInput > div > div > input {{
-        color: #1F2937 !important;
-        background-color: white !important;
-    }}
-    
-    .stSelectbox > div > div > select {{
-        color: #1F2937 !important;
-        background-color: white !important;
-    }}
-    
-    .stTextArea > div > div > textarea {{
-        color: #1F2937 !important;
-        background-color: white !important;
-    }}
-    
-    .stRadio > div {{
-        color: #1F2937 !important;
-    }}
-    
-    .stCheckbox > div {{
-        color: #1F2937 !important;
-    }}
-    
-    /* RESTAURAR COLORES PARA ELEMENTOS ESPECÍFICOS QUE DEBEN SER CLAROS */
     .sidebar .sidebar-content {{
-        color: white !important;
+        background: linear-gradient(180deg, {colores_institucionales["primario"]}, #2D4FA8);
     }}
     
-    .sidebar h1, .sidebar h2, .sidebar h3, .sidebar p {{
-        color: white !important;
+    /* ANIMACIONES SUAVES */
+    .element-container {{
+        transition: all 0.3s ease;
     }}
     
-    /* ... resto del CSS existente ... */
+    /* MEJORAS ESPECÍFICAS PARA MÓVIL */
+    @media (max-width: 768px) {{
+        .main-header {{
+            font-size: 2rem;
+        }}
+        
+        .stButton > button {{
+            padding: 1rem 1.5rem !important;
+            font-size: 1.1rem !important;
+        }}
+    }}
+    
+    /* BARRAS DE PROGRESO MEJORADAS */
+    .stProgress > div > div > div {{
+        background: linear-gradient(90deg, {colores_institucionales["secundario"]}, #34D399);
+        border-radius: 10px;
+    }}
+    
+    /* GRID RESPONSIVO PARA MÉTRICAS */
+    .metricas-grid {{
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1rem;
+        margin: 1rem 0;
+    }}
+    
+    /* TABLAS RESPONSIVAS */
+    .dataframe {{
+        width: 100% !important;
+    }}
+    
+    @media (max-width: 768px) {{
+        .dataframe {{
+            font-size: 0.8rem !important;
+        }}
+        
+        /* Scroll horizontal para tablas en móvil */
+        .dataframe-container {{
+            overflow-x: auto;
+        }}
+    }}
+    
     </style>
     """, unsafe_allow_html=True)
 
@@ -593,8 +638,8 @@ def main():
     
     with st.sidebar:
         st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
-        st.markdown('<div class="card" style="background: linear-gradient(135deg, #1A3B8F, #2D4FA8); color: white;">', unsafe_allow_html=True)
-        st.markdown('<h2 style="color: white; margin-bottom: 1rem;">🔐 Acceso</h2>', unsafe_allow_html=True)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("🔐 Acceso")
         
         if "user_type" not in st.session_state:
             st.session_state["user_type"] = None
@@ -664,11 +709,11 @@ Preuniversitario CIMMA"""
                 else:
                     st.error("No hay administradores o correos configurados en Secrets.")
         elif st.session_state["awaiting_2fa"]:
-            st.markdown('<h3 style="color: white;">🔐 Verificación en dos pasos</h3>', unsafe_allow_html=True)
+            st.subheader("🔐 Verificación en dos pasos")
             st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
             time_remaining = 600 - (get_chile_time() - st.session_state["2fa_time"]).total_seconds()
             if time_remaining > 0:
-                st.markdown(f'<p style="color: white;">Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos</p>', unsafe_allow_html=True)
+                st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
             code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
             if boton_moderno("Verificar código", "primario", "🔒", "verify_2fa"):
                 if not code_input.isdigit() or len(code_input) != 6:
@@ -702,13 +747,10 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_attempts"] += 1
                     st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
         else:
-            st.markdown(f'<div style="background: #10B981; color: white; padding: 0.5rem 1rem; border-radius: 8px; text-align: center; margin: 1rem 0;">', unsafe_allow_html=True)
-            st.markdown(f'<h4 style="color: white; margin: 0;">👤 {st.session_state["user_name"]}</h4>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.success(f"👤 {st.session_state['user_name']}")
             if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
                 st.session_state.clear()
                 st.rerun()
-        
         st.markdown('</div>', unsafe_allow_html=True)
     
     # Implementar temporizador si hay sesión activa
@@ -716,128 +758,25 @@ Preuniversitario CIMMA"""
         implementar_temporizador_seguridad()
     
     if st.session_state["user_type"] is None:
-        # PANTALLA DE BIENVENIDA CON MEJOR CONTRASTE
         st.markdown("""
-        <div style="text-align: center; padding: 4rem 2rem; background: linear-gradient(135deg, #F8FAFC 0%, #EFF6FF 100%); border-radius: 20px; margin: 2rem 0;">
-            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem; font-weight: 700;">🎓 Preuniversitario CIMMA</h1>
-            <h2 style="color: #4B5563; font-size: 1.5rem; margin-bottom: 3rem; font-weight: 500;">Sistema de Gestión de Asistencia 2026</h2>
-            <div style="max-width: 600px; margin: 0 auto; background: white; padding: 2rem; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border-left: 4px solid #F59E0B;">
-                <h3 style="color: #1A3B8F; margin-bottom: 1rem; font-size: 1.5rem;">👋 ¡Bienvenido!</h3>
-                <p style="color: #4B5563; font-size: 1.1rem; line-height: 1.6; margin-bottom: 1.5rem;">
-                    Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.
-                </p>
-                <div style="background: #F0F4FF; padding: 1rem; border-radius: 12px; margin: 1.5rem 0; border-left: 4px solid #1A3B8F;">
-                    <p style="margin: 0; color: #1A3B8F; font-weight: 600; font-size: 0.95rem;">
-                        💡 <strong>Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.
-                    </p>
+        <div style="text-align: center; padding: 4rem 2rem;">
+            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA</h1>
+            <h2 style="color: #6B7280; font-size: 1.5rem; margin-bottom: 2rem;">Sistema de Gestión de Asistencia 2026</h2>
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
+                <h3 style="color: #1A3B8F;">👋 ¡Bienvenido!</h3>
+                <p>Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
+                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="margin: 0; color: #1A3B8F;"><strong>💡 Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.</p>
                 </div>
             </div>
         </div>
         """, unsafe_allow_html=True)
-        
-        # Información adicional sobre el sistema
-        st.markdown("""
-        <div style="margin: 3rem 0;">
-            <h3 style="color: #1A3B8F; text-align: center; margin-bottom: 2rem;">Características del Sistema</h3>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.markdown("""
-            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📊</div>
-                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Análisis Completo</h4>
-                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
-                    Dashboard interactivo con métricas de asistencia en tiempo real y reportes detallados
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col2:
-            st.markdown("""
-            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📧</div>
-                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Notificaciones Automáticas</h4>
-                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
-                    Comunicación automática con apoderados y profesores vía email
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col3:
-            st.markdown("""
-            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📱</div>
-                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Acceso Multiplataforma</h4>
-                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
-                    Interfaz optimizada para todos los dispositivos móviles y desktop
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Segunda fila de características
-        col4, col5, col6 = st.columns(3)
-        
-        with col4:
-            st.markdown("""
-            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">🔒</div>
-                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Seguridad Avanzada</h4>
-                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
-                    Autenticación de dos factores y temporizador de seguridad
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col5:
-            st.markdown("""
-            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">📈</div>
-                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Reportes Gráficos</h4>
-                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
-                    Gráficos interactivos y visualizaciones de datos en tiempo real
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        with col6:
-            st.markdown("""
-            <div style="text-align: center; padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border: 1px solid #E5E7EB; height: 100%;">
-                <div style="font-size: 2.5rem; margin-bottom: 1rem;">⚡</div>
-                <h4 style="color: #1A3B8F; margin: 0.5rem 0; font-size: 1.1rem;">Rendimiento Óptimo</h4>
-                <p style="color: #6B7280; font-size: 0.9rem; line-height: 1.5;">
-                    Sistema rápido y eficiente con carga optimizada de datos
-                </p>
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Footer informativo
-        st.markdown("""
-        <div style="text-align: center; margin-top: 3rem; padding: 2rem; background: #1A3B8F; border-radius: 12px; color: white;">
-            <h4 style="color: white; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA 2026</h4>
-            <p style="color: #E5E7EB; margin: 0; font-size: 0.9rem;">
-                Sistema desarrollado para la gestión eficiente de asistencia académica
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-        
         return
     
-    # Redirigir según el tipo de usuario
     if st.session_state["user_type"] == "admin":
         admin_panel_mejorado()
     else:
         main_app_mejorada()
-
-
-
-
-
-
-
-
 
 # ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
