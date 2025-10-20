@@ -16,6 +16,7 @@ import socket
 from email.utils import formatdate
 import traceback
 import plotly.express as px
+import time  # Para manejar tiempos y temporizadores
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -339,6 +340,8 @@ def main():
                         if profesores.get(nombre) == clave:
                             st.session_state["user_type"] = "profesor"
                             st.session_state["user_name"] = nombre
+                            st.session_state['login_time'] = time.time()  # Registra el tiempo de inicio
+                            st.session_state['timeout_duration'] = 5 * 60  # 5 minutos en segundos
                             st.rerun()
                         else:
                             st.error("❌ Clave incorrecta")
@@ -415,6 +418,8 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
                     st.session_state["2fa_time"] = None
+                    st.session_state['login_time'] = time.time()  # Registra el tiempo de inicio
+                    st.session_state['timeout_duration'] = 30 * 60  # Duración por defecto: 30 minutos en segundos
                     st.rerun()
                 else:
                     st.session_state["2fa_attempts"] += 1
@@ -560,16 +565,21 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
         progress_placeholder.warning(f"📤 **LISTO PARA ENVIAR:** {len(estudiantes_con_email)} resúmenes de asistencia")
         
         # 9. EJECUTAR ENVÍO MASIVO
-        if st.button("🚀 EJECUTAR ENVÍO DE RESUMENES", type="primary", key="envio_masivo_final"):
+        if st.button("🚀 EJECUTAR ENVÍO DE RESUMENES", type="primary", primary=True, key="envio_masivo_final"):
             progress_bar = st.progress(0)
             resultados = []
-            emails_enviados = 0
+            individual_results = st.progress(0)
+            
+            with individual_results:
+                st.subheader("📄 Progreso de Envío")
+            
+            st.markdown_progress = st.progress(0)
             
             # CONTENEDOR PARA RESULTADOS INDIVIDUALES
             individual_results = st.container()
             
             with individual_results:
-                st.subheader("📤 Progreso de Envío")
+                st.subheader("📄 Progreso de Envío")
                 
                 for i, est_data in enumerate(estudiantes_con_email):
                     estudiante = est_data['nombre_original']
@@ -579,13 +589,13 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                     # ACTUALIZAR ESTADO
                     status_placeholder.info(f"📨 Enviando {i+1}/{len(estudiantes_con_email)}: {estudiante}")
                     
-                    # CALCULAR ESTADÍSTICAS PARA ESTE ESTUDIANTE
+                    # CALCULAR ESTADÍSTICAS PARA ESTE ESTUDIANT
                     datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
                     
                     if datos_estudiante.empty:
                         st.warning(f"⚠️ No hay datos para {estudiante} - Saltando")
                         continue
-                        
+                    
                     total_clases = len(datos_estudiante)
                     asistencias = datos_estudiante['Asistencia'].sum()
                     ausencias = total_clases - asistencias
@@ -710,7 +720,40 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
 # ==============================
 
 def admin_panel():
+    if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
+        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+            st.error("❌ Sesión expirada por límite de tiempo.")
+            st.session_state.clear()  # Limpia la sesión
+            st.rerun()  # Reinicia la app
+            return  # Detiene la ejecución
     st.title("📊 Panel Administrativo - Análisis de Asistencia")
+    st.subheader(f"Bienvenido/a, {st.session_state['user_name']}")
+    st.subheader("⏳ Configuración de Temporizador de Sesión")
+    # Opciones: 30 min a 5 horas (300 min), en bloques de 30 min
+    options_min = [30, 60, 90, 120, 150, 180, 210, 240, 270, 300]
+    current_duration = int(st.session_state['timeout_duration'] / 60) if 'timeout_duration' in st.session_state else 30
+    selected_min = st.selectbox("Selecciona duración de sesión (minutos)", options_min, index=options_min.index(current_duration) if current_duration in options_min else 0)
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("Aplicar duración"):
+            st.session_state['timeout_duration'] = selected_min * 60  # Convierte a segundos
+            st.session_state['login_time'] = time.time()  # Reinicia el temporizador
+            st.success(f"✅ Duración aplicada: {selected_min} minutos. Temporizador reiniciado.")
+            st.rerun()
+    with col2:
+        if st.button("Mantener sesión abierta"):
+            st.session_state['login_time'] = time.time()  # Solo reinicia el temporizador, sin cambiar duración
+            st.success("✅ Sesión mantenida abierta. Temporizador reiniciado.")
+            st.rerun()
+    
+    # Muestra tiempo restante (opcional)
+    remaining = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
+    if remaining > 0:
+        st.info(f"⏳ Tiempo restante: {int(remaining // 60)} minutos y {int(remaining % 60)} segundos.")
+    else:
+        st.warning("⚠️ Sesión expirada o a punto de expirar.")
+    st.divider()  # Separador visual
     st.subheader(f"Bienvenido/a, {st.session_state['user_name']}")
     
     # ==============================
@@ -903,7 +946,7 @@ def admin_panel():
                 fechas = df[df['Fecha'].notna()]['Fecha']
                 st.write(f"- **Rango de fechas real:** {fechas.min().strftime('%d/%m/%Y')} - {fechas.max().strftime('%d/%m/%Y')}")
             else:
-                st.write("- **❌ No hay fechas válidas en los datos**")
+                st.write("- **❌ No hay fechas válidas**")
             
             st.write("### Filtros aplicados:")
             for filtro in filtros_aplicados:
@@ -1243,13 +1286,26 @@ Preuniversitario CIMMA 2026""",
 
 
 
+
 # ==============================
 # APP PRINCIPAL (PROFESOR)
 # ==============================
 
 def main_app():
+    if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
+        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+            st.error("❌ Sesión expirada por límite de tiempo (5 minutos).")
+            st.session_state.clear()  # Limpia la sesión
+            st.rerun()  # Reinicia la app
+            return  # Detiene la ejecución
     st.title("📱 Registro de Asistencia")
     st.subheader("Preuniversitario CIMMA 2026")
+    if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
+        remaining = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
+        if remaining > 0:
+            st.info(f"⏳ Tiempo restante en sesión: {int(remaining // 60)} minutos y {int(remaining % 60)} segundos.")
+        else:
+            st.warning("⚠️ Sesión a punto de expirar.")
     courses = load_courses()
     if not courses:
         st.error("❌ No se encontraron cursos en 'CLASES 2026'.")
@@ -1292,7 +1348,7 @@ def main_app():
                     sheet = asistencia_sheet.worksheet(curso_seleccionado)
                 except gspread.exceptions.WorksheetNotFound:
                     sheet = asistencia_sheet.add_worksheet(title=curso_seleccionado, rows=100, cols=6)
-                    sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
+                    sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Hora Registro", "Información"])
                 chile_time = get_chile_time()
                 log = f"{chile_time.strftime('%Y-%m-%d')}: Clase no realizada. Motivo registrado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
                 sheet.append_row([
