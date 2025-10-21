@@ -19,6 +19,7 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
 
+
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
