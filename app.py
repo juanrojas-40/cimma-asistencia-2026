@@ -20,9 +20,6 @@ import time  # Para manejar tiempos y temporizadores
 import functools
 
 
-# ==============================
-# COMPONENTES INFORMATIVOS PARA FECHAS
-# ==============================
 
 # ==============================
 # COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
@@ -132,6 +129,10 @@ def tooltip_reactivar_fechas():
         </div>
     </div>
     """
+
+
+
+
 
 def tooltip_reactivar_fechas():
     """Tooltip para la función de reactivar fechas"""
