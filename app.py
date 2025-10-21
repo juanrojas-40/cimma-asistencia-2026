@@ -1913,25 +1913,16 @@ def admin_panel_mejorado():
             st.subheader("📋 Fechas Completadas")
             if stats["fechas_completadas"]:
                 for fecha in stats["fechas_completadas"]:
-                    col1, col2, col3 = st.columns([3, 1, 1])
+                    col1, col2, col3 = st.columns([4, 2, 1])  # Nuevo ratio de columnas
                     with col1:
                         st.write(f"✅ {fecha}")
                     with col2:
-                        col2_1, col2_2 = st.columns([3, 1])
-                        with col2_1:
-                            if st.button("🔄 Reactivar", key=f"reactivar_{fecha}"):
-                                if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
-                                    st.success(f"✅ Fecha {fecha} reactivada")
-                                    st.rerun()
-                        with col2_2:
-                            st.markdown(tooltip_reactivar_fechas(), unsafe_allow_html=True)
+                        if st.button("🔄 Reactivar Fecha", key=f"reactivar_{fecha}", use_container_width=True):
+                            if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
+                                st.success(f"✅ Fecha {fecha} reactivada - Ahora está disponible para registro")
+                                st.rerun()
                     with col3:
-                        col3_1, col3_2 = st.columns([3, 1])
-                        with col3_1:
-                            if st.button("🗑️ Eliminar", key=f"eliminar_{fecha}"):
-                                st.warning("Funcionalidad de eliminación en desarrollo")
-                        with col3_2:
-                            st.markdown(tooltip_eliminar_fechas(), unsafe_allow_html=True)
+                        st.markdown(tooltip_reactivar_fechas(), unsafe_allow_html=True)  # Tooltip informativo
             else:
                 st.info("ℹ️ No hay fechas completadas para este curso")
             
