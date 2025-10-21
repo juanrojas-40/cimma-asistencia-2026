@@ -25,110 +25,6 @@ import functools
 # COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
 # ==============================
 
-def crear_tooltip_fechas():
-    """Crea tooltips informativos para las funciones de fechas - VERSIÓN CORREGIDA"""
-    
-    st.markdown("""
-    <style>
-    .tooltip-fechas {
-        position: relative;
-        display: inline-block;
-        cursor: help;
-    }
-    
-    .tooltip-fechas .tooltiptext {
-        visibility: hidden;
-        width: 350px;
-        background-color: #1A3B8F;
-        color: white;
-        text-align: left;
-        border-radius: 12px;
-        padding: 16px;
-        position: absolute;
-        z-index: 1000;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -175px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        opacity: 0;
-        transition: opacity 0.3s;
-        font-size: 0.9em;
-        line-height: 1.5;
-    }
-    
-    .tooltip-fechas .tooltiptext::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -8px;
-        border-width: 8px;
-        border-style: solid;
-        border-color: #1A3B8F transparent transparent transparent;
-    }
-    
-    .tooltip-fechas:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-    
-    .funcion-card {
-        background: rgba(255,255,255,0.1);
-        border-radius: 8px;
-        padding: 12px;
-        margin: 8px 0;
-        border-left: 4px solid #10B981;
-    }
-    
-    .ventaja {
-        color: #10B981;
-        font-weight: 600;
-    }
-    
-    .alerta {
-        color: #F59E0B;
-        font-weight: 600;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-def tooltip_reactivar_fechas():
-    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
-    return """
-    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
-        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
-        <div class="tooltiptext">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
-                🔄 Reactivar Fecha
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Totalmente reversible</li>
-                    <li>Mantiene todo el historial</li>
-                    <li>Sin pérdida de datos</li>
-                    <li>Ideal para correcciones</li>
-                </ul>
-            </div>
-            
-            <div>
-                <strong class="alerta">🎯 Cuándo usar:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Error en registro original</li>
-                    <li>Asistencia incompleta</li>
-                    <li>Cambios en calendario</li>
-                    <li>Verificación de datos</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    """
 
 
 
@@ -169,10 +65,6 @@ def tooltip_reactivar_fechas():
         </div>
     </div>
     """
-
-
-
-
 
 
                     
