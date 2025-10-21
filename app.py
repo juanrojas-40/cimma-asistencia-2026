@@ -577,6 +577,9 @@ class CacheInteligente:
 # Instancia global de caché (DEFINIR ANTES DE LAS CLASES QUE LO USAN)
 cache_manager = CacheInteligente()
 
+
+
+
 # ==============================
 # SISTEMA DE FECHAS COMPLETADAS
 # ==============================
@@ -697,6 +700,10 @@ class SistemaFechasCompletadas:
 
 # Instancia global del sistema de fechas
 sistema_fechas = SistemaFechasCompletadas()
+
+
+
+
 
 # ==============================
 # SISTEMA DE AYUDA CONTEXTUAL
@@ -829,6 +836,11 @@ class SistemaAyuda:
 
 # Instancia global del sistema de ayuda
 sistema_ayuda = SistemaAyuda()
+
+
+
+
+
 
 # ==============================
 # CONFIGURACIÓN DE TEMA Y ESTILOS
@@ -1021,6 +1033,9 @@ def boton_moderno(texto, tipo="primario", icono="", key=None):
     """, unsafe_allow_html=True)
     
     return st.button(f"{icono} {texto}", key=key, use_container_width=True)
+
+
+
 
 # ==============================
 # COMPONENTES DE UI MEJORADOS
@@ -1445,6 +1460,9 @@ def panel_monitoreo_cache():
             st.success("Caché limpiado")
             st.rerun()
 
+
+
+
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
 # ==============================
@@ -1728,6 +1746,10 @@ def load_all_asistencia():
         df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
     return df
 
+
+
+
+
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
 # ==============================
@@ -1894,6 +1916,10 @@ Preuniversitario CIMMA"""
     else:
         main_app_mejorada()
 
+
+
+
+
 # ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
 # ==============================
@@ -2059,6 +2085,9 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
         st.session_state.email_status = f"❌ Error crítico: {str(e)}"
         return False
 
+
+
+
 # ==============================
 # PANEL ADMINISTRATIVO MEJORADO
 # ==============================
@@ -2107,6 +2136,9 @@ def admin_panel_mejorado():
     
     st.divider()
     
+
+
+
     # ==============================
     # GESTIÓN DE FECHAS COMPLETADAS (ADMIN)
     # ==============================
@@ -2319,6 +2351,9 @@ def admin_panel_mejorado():
     
     st.divider()
     
+
+
+
     # ==============================
     # INICIALIZACIÓN DE ESTADOS
     # ==============================
@@ -2418,6 +2453,9 @@ def admin_panel_mejorado():
         st.session_state.fecha_fin = fecha_max
         st.rerun()
     
+
+
+
     # ==============================
     # APLICACIÓN DE FILTROS
     # ==============================
@@ -2439,6 +2477,9 @@ def admin_panel_mejorado():
             (datos_filtrados['Fecha'].dt.date <= st.session_state.fecha_fin)
         ]
         filtros_aplicados.append(f"📅 Período: {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}")
+    
+
+
     
     # ==============================
     # DASHBOARD PRINCIPAL
