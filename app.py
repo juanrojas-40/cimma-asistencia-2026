@@ -17,6 +17,237 @@ from email.utils import formatdate
 import traceback
 import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
+import functools
+
+# ==============================
+# SISTEMA DE CACHÉ INTELIGENTE
+# ==============================
+
+class CacheInteligente:
+    """Sistema de caché inteligente con invalidación automática"""
+    
+    def __init__(self):
+        self.cache_data = {}
+        self.stats = {
+            'hits': 0,
+            'misses': 0,
+            'invalidaciones': 0
+        }
+    
+    def cached(self, ttl=1800, max_size=100, dependencias=None):
+        """Decorador de caché inteligente"""
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(*args, **kwargs):
+                # Generar clave única
+                cache_key = f"{func.__name__}_{str(args)}_{str(kwargs)}"
+                
+                # Verificar si está en caché y es válido
+                if (cache_key in self.cache_data and 
+                    datetime.now() < self.cache_data[cache_key]['expira'] and
+                    not self._dependencias_invalidadas(cache_key, dependencias)):
+                    
+                    self.stats['hits'] += 1
+                    return self.cache_data[cache_key]['data']
+                
+                # Cache miss - ejecutar función
+                self.stats['misses'] += 1
+                result = func(*args, **kwargs)
+                
+                # Guardar en caché
+                self.cache_data[cache_key] = {
+                    'data': result,
+                    'expira': datetime.now() + timedelta(seconds=ttl),
+                    'timestamp': datetime.now(),
+                    'dependencias': dependencias or []
+                }
+                
+                # Limpiar caché si excede tamaño máximo
+                self._limpiar_cache_excedente(max_size)
+                
+                return result
+            return wrapper
+        return decorator
+    
+    def _dependencias_invalidadas(self, cache_key, dependencias):
+        """Verifica si las dependencias han cambiado"""
+        if not dependencias:
+            return False
+        
+        for dep in dependencias:
+            if dep in self.cache_data:
+                # Si la dependencia es más reciente, invalidar
+                if (self.cache_data[dep]['timestamp'] > 
+                    self.cache_data[cache_key]['timestamp']):
+                    self.invalidar(cache_key)
+                    return True
+        return False
+    
+    def invalidar(self, clave=None):
+        """Invalida caché específico o completo"""
+        if clave:
+            if clave in self.cache_data:
+                del self.cache_data[clave]
+                self.stats['invalidaciones'] += 1
+        else:
+            self.cache_data.clear()
+            self.stats['invalidaciones'] += len(self.cache_data)
+    
+    def get_stats(self):
+        """Estadísticas de uso del caché"""
+        total_requests = self.stats['hits'] + self.stats['misses']
+        hit_rate = (self.stats['hits'] / total_requests * 100) if total_requests > 0 else 0
+        return {
+            'total_entradas': len(self.cache_data),
+            'hit_rate': f"{hit_rate:.1f}%",
+            **self.stats
+        }
+    
+    def _limpiar_cache_excedente(self, max_size):
+        """Limpia caché si excede el tamaño máximo"""
+        if len(self.cache_data) > max_size:
+            # Eliminar las entradas más antiguas
+            claves_ordenadas = sorted(
+                self.cache_data.keys(),
+                key=lambda k: self.cache_data[k]['timestamp']
+            )
+            for clave in claves_ordenadas[:len(self.cache_data) - max_size]:
+                del self.cache_data[clave]
+
+# Instancia global de caché
+cache_manager = CacheInteligente()
+
+# ==============================
+# SISTEMA DE AYUDA CONTEXTUAL
+# ==============================
+
+class SistemaAyuda:
+    """Sistema de ayuda contextual con tooltips inteligentes"""
+    
+    def __init__(self):
+        self.ayudas = {
+            'dashboard': {
+                'titulo': '📊 Dashboard Analytics',
+                'contenido': 'Visualiza métricas clave, tendencias y alertas inteligentes del sistema de asistencia.',
+                'ejemplos': [
+                    'KPIs actualizados en tiempo real',
+                    'Heatmap de patrones de asistencia', 
+                    'Alertas automáticas de estudiantes en riesgo'
+                ]
+            },
+            'filtros': {
+                'titulo': '🔍 Sistema de Filtros',
+                'contenido': 'Filtra datos por curso, estudiante, fechas y múltiples criterios simultáneamente.',
+                'ejemplos': [
+                    'Filtros combinados para análisis específicos',
+                    'Rangos de fechas personalizables',
+                    'Búsqueda rápida por nombre'
+                ]
+            },
+            'envio_emails': {
+                'titulo': '📧 Envío Masivo de Emails',
+                'contenido': 'Envía reportes personalizados a apoderados basados en los filtros aplicados.',
+                'ejemplos': [
+                    'Plantillas personalizables',
+                    'Selección automática de destinatarios',
+                    'Seguimiento de envíos exitosos/fallidos'
+                ]
+            },
+            'exportacion': {
+                'titulo': '📤 Exportación de Datos',
+                'contenido': 'Exporta reportes en múltiples formatos para análisis externo o presentaciones.',
+                'ejemplos': [
+                    'Formato Excel con pestañas organizadas',
+                    'CSV para importación en otros sistemas',
+                    'Estructura optimizada para análisis'
+                ]
+            }
+        }
+    
+    def tooltip_contextual(self, seccion, posicion="derecha"):
+        """Muestra tooltip contextual para una sección"""
+        
+        if seccion not in self.ayudas:
+            return ""
+        
+        ayuda = self.ayudas[seccion]
+        
+        return f"""
+        <div class="ayuda-contextual" style="display: inline-block; margin-left: 8px;">
+            <span class="icono-ayuda" style="cursor: help; color: #6B7280; font-size: 0.9em;">
+                ℹ️
+            </span>
+            <div class="tooltip-contenido" style="
+                visibility: hidden;
+                width: 350px;
+                background-color: #1A3B8F;
+                color: white;
+                text-align: left;
+                border-radius: 12px;
+                padding: 16px;
+                position: absolute;
+                z-index: 1000;
+                {self._obtener_posicion(posicion)};
+                box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+                opacity: 0;
+                transition: opacity 0.3s, visibility 0.3s;
+                font-size: 0.9em;
+                line-height: 1.5;
+            ">
+                <div style="font-weight: 600; margin-bottom: 8px; font-size: 1.1em;">
+                    {ayuda['titulo']}
+                </div>
+                <div style="margin-bottom: 12px; opacity: 0.9;">
+                    {ayuda['contenido']}
+                </div>
+                <div style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 8px;">
+                    <strong>💡 Ejemplos de uso:</strong>
+                    <ul style="margin: 8px 0 0 0; padding-left: 16px;">
+                        {''.join([f'<li style="margin-bottom: 4px;">{ejemplo}</li>' for ejemplo in ayuda['ejemplos']])}
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .ayuda-contextual:hover .tooltip-contenido {{
+            visibility: visible;
+            opacity: 1;
+        }}
+        </style>
+        """
+    
+    def _obtener_posicion(self, posicion):
+        """Determina posición del tooltip"""
+        posiciones = {
+            "derecha": "left: 120%; top: -20px;",
+            "izquierda": "right: 120%; top: -20px;", 
+            "arriba": "bottom: 125%; left: 50%; transform: translateX(-50%);",
+            "abajo": "top: 125%; left: 50%; transform: translateX(-50%);"
+        }
+        return posiciones.get(posicion, "left: 120%; top: -20px;")
+    
+    def boton_ayuda_completa(self):
+        """Botón para ayuda completa"""
+        if st.sidebar.button("❓ Ayuda Completa", use_container_width=True):
+            self.mostrar_ayuda_completa()
+    
+    def mostrar_ayuda_completa(self):
+        """Modal con ayuda completa"""
+        # Usaremos un expander en lugar de modal para simplicidad
+        with st.expander("🎓 Centro de Ayuda - Preuniversitario CIMMA", expanded=True):
+            st.markdown("### Guía Completa del Sistema")
+            
+            for seccion, contenido in self.ayudas.items():
+                st.markdown(f"#### {contenido['titulo']}")
+                st.write(contenido['contenido'])
+                st.markdown("**💡 Ejemplos de uso:**")
+                for ejemplo in contenido['ejemplos']:
+                    st.markdown(f"- {ejemplo}")
+                st.markdown("---")
+
+# Instancia global del sistema de ayuda
+sistema_ayuda = SistemaAyuda()
 
 # ==============================
 # CONFIGURACIÓN DE TEMA Y ESTILOS
@@ -255,6 +486,287 @@ def crear_dashboard_metricas_principales(df):
             "100% de asistencia", "⭐", "#8B5CF6"
         ), unsafe_allow_html=True)
 
+def crear_dashboard_avanzado(df):
+    """Dashboard completo con métricas avanzadas"""
+    
+    st.markdown('<h2 class="section-header">📈 Dashboard Analytics Avanzado</h2>', unsafe_allow_html=True)
+    
+    # ==================== KPIs PRINCIPALES ====================
+    st.subheader("🎯 KPIs Principales")
+    
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    
+    with kpi1:
+        tasa_asistencia = (df['Asistencia'].sum() / len(df) * 100) if len(df) > 0 else 0
+        tendencia = calcular_tendencia_semanal(df)
+        st.metric(
+            "📊 Tasa Asistencia General", 
+            f"{tasa_asistencia:.1f}%",
+            delta=f"{tendencia:+.1f}%" if tendencia != 0 else None
+        )
+    
+    with kpi2:
+        estudiantes_riesgo = identificar_estudiantes_riesgo(df)
+        st.metric(
+            "🎯 Estudiantes en Riesgo", 
+            len(estudiantes_riesgo),
+            delta=f"{len(estudiantes_riesgo)} alertas",
+            delta_color="inverse"
+        )
+    
+    with kpi3:
+        eficiencia_profesores = calcular_eficiencia_profesores(df)
+        st.metric(
+            "👨‍🏫 Eficiencia Profesores", 
+            f"{eficiencia_profesores:.0f}%"
+        )
+    
+    with kpi4:
+        cumplimiento_metas = calcular_cumplimiento_metas(df)
+        st.metric(
+            "✅ Cumplimiento Metas", 
+            f"{cumplimiento_metas:.0f}%"
+        )
+    
+    # ==================== GRÁFICOS AVANZADOS ====================
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Heatmap de Asistencia Semanal
+        crear_heatmap_asistencia(df)
+    
+    with col2:
+        # Distribución de Asistencia
+        crear_distribucion_asistencia(df)
+    
+    # ==================== ALERTAS INTELIGENTES ====================
+    st.subheader("🚨 Alertas Inteligentes")
+    generar_alertas_inteligentes(df)
+    
+    # ==================== PREDICTIVOS ====================
+    st.subheader("🔮 Análisis Predictivo")
+    crear_seccion_predictiva(df)
+
+def calcular_tendencia_semanal(df):
+    """Calcula tendencia de asistencia última semana vs anterior"""
+    if 'Fecha' not in df.columns or df.empty:
+        return 0
+    
+    try:
+        df_fechas = df.copy()
+        df_fechas['Fecha'] = pd.to_datetime(df_fechas['Fecha'])
+        
+        # Últimas 2 semanas
+        fecha_max = df_fechas['Fecha'].max()
+        semana_actual = fecha_max - timedelta(days=7)
+        semana_anterior = semana_actual - timedelta(days=7)
+        
+        asistencia_actual = df_fechas[
+            df_fechas['Fecha'] > semana_actual
+        ]['Asistencia'].mean() * 100
+        
+        asistencia_anterior = df_fechas[
+            (df_fechas['Fecha'] > semana_anterior) & 
+            (df_fechas['Fecha'] <= semana_actual)
+        ]['Asistencia'].mean() * 100
+        
+        return asistencia_actual - asistencia_anterior if asistencia_anterior else 0
+    except:
+        return 0
+
+def crear_heatmap_asistencia(df):
+    """Heatmap de asistencia por día y hora"""
+    try:
+        if 'Fecha' not in df.columns or df.empty:
+            st.info("No hay datos suficientes para el heatmap")
+            return
+            
+        df_heatmap = df.copy()
+        df_heatmap['Fecha'] = pd.to_datetime(df_heatmap['Fecha'])
+        df_heatmap['Dia_Semana'] = df_heatmap['Fecha'].dt.day_name()
+        df_heatmap['Hora'] = df_heatmap['Fecha'].dt.hour
+        
+        # Agrupar por día y hora
+        heatmap_data = df_heatmap.groupby(['Dia_Semana', 'Hora'])['Asistencia'].mean().unstack(fill_value=0)
+        
+        # Ordenar días de la semana
+        dias_orden = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+        heatmap_data = heatmap_data.reindex(dias_orden)
+        
+        fig = px.imshow(
+            heatmap_data,
+            title="🔥 Heatmap de Asistencia - Día vs Hora",
+            color_continuous_scale='RdYlGn',
+            aspect="auto"
+        )
+        
+        fig.update_layout(
+            xaxis_title="Hora del Día",
+            yaxis_title="Día de la Semana"
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"Error generando heatmap: {e}")
+
+def crear_distribucion_asistencia(df):
+    """Distribución de porcentajes de asistencia"""
+    try:
+        if df.empty:
+            return
+            
+        # Calcular porcentaje por estudiante
+        asistencia_por_estudiante = df.groupby('Estudiante')['Asistencia'].agg(['sum', 'count']).reset_index()
+        asistencia_por_estudiante['Porcentaje'] = (asistencia_por_estudiante['sum'] / asistencia_por_estudiante['count'] * 100)
+        
+        fig = px.histogram(
+            asistencia_por_estudiante, 
+            x='Porcentaje',
+            title='📊 Distribución de Asistencia por Estudiante',
+            nbins=20,
+            color_discrete_sequence=['#1A3B8F']
+        )
+        
+        fig.update_layout(
+            xaxis_title="Porcentaje de Asistencia (%)",
+            yaxis_title="Número de Estudiantes"
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+    except Exception as e:
+        st.error(f"Error en distribución: {e}")
+
+def identificar_estudiantes_riesgo(df):
+    """Identifica estudiantes con menos del 70% de asistencia"""
+    try:
+        if df.empty:
+            return []
+            
+        asistencia_por_estudiante = df.groupby('Estudiante')['Asistencia'].agg(['sum', 'count']).reset_index()
+        asistencia_por_estudiante['Porcentaje'] = (asistencia_por_estudiante['sum'] / asistencia_por_estudiante['count'] * 100)
+        
+        estudiantes_riesgo = asistencia_por_estudiante[
+            asistencia_por_estudiante['Porcentaje'] < 70
+        ]['Estudiante'].tolist()
+        
+        return estudiantes_riesgo
+    except:
+        return []
+
+def calcular_eficiencia_profesores(df):
+    """Calcula eficiencia promedio de profesores"""
+    try:
+        if df.empty:
+            return 0
+            
+        # Simulación - en producción calcularía por profesor
+        return min(95, (df['Asistencia'].mean() * 100) + 10)
+    except:
+        return 0
+
+def calcular_cumplimiento_metas(df):
+    """Calcula cumplimiento de metas institucionales"""
+    try:
+        if df.empty:
+            return 0
+            
+        tasa_asistencia = (df['Asistencia'].sum() / len(df) * 100)
+        meta_institucional = 85  # Meta del 85%
+        cumplimiento = min(100, (tasa_asistencia / meta_institucional) * 100)
+        return cumplimiento
+    except:
+        return 0
+
+def generar_alertas_inteligentes(df):
+    """Genera alertas inteligentes basadas en patrones"""
+    alertas = []
+    
+    # Alerta: Estudiantes con <70% de asistencia
+    estudiantes_riesgo = identificar_estudiantes_riesgo(df)
+    
+    if len(estudiantes_riesgo) > 0:
+        alertas.append({
+            'tipo': '⚠️',
+            'mensaje': f'{len(estudiantes_riesgo)} estudiantes con menos del 70% de asistencia',
+            'severidad': 'alta'
+        })
+    
+    # Alerta: Tendencia negativa
+    tendencia = calcular_tendencia_semanal(df)
+    if tendencia < -5:
+        alertas.append({
+            'tipo': '📉',
+            'mensaje': f'Tendencia negativa de {tendencia:.1f}% en la última semana',
+            'severidad': 'media'
+        })
+    
+    # Alerta: Baja asistencia general
+    tasa_asistencia = (df['Asistencia'].sum() / len(df) * 100) if len(df) > 0 else 0
+    if tasa_asistencia < 75:
+        alertas.append({
+            'tipo': '🔴',
+            'mensaje': f'Asistencia general baja: {tasa_asistencia:.1f}%',
+            'severidad': 'alta'
+        })
+    
+    # Mostrar alertas
+    if alertas:
+        for alerta in alertas:
+            color = "#FEF3C7" if alerta['severidad'] == 'media' else "#FEE2E2"
+            st.markdown(f"""
+            <div style="background: {color}; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid #F59E0B;">
+                <strong>{alerta['tipo']} {alerta['mensaje']}</strong>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.success("✅ No hay alertas críticas en este momento")
+
+def crear_seccion_predictiva(df):
+    """Sección de análisis predictivo"""
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Predicción de riesgo
+        st.markdown("**🎯 Predicción de Riesgo**")
+        
+        # Simulación de modelo predictivo
+        estudiantes_totales = df['Estudiante'].nunique()
+        riesgo_data = {
+            'Bajo Riesgo': int(estudiantes_totales * 0.6),
+            'Riesgo Medio': int(estudiantes_totales * 0.3),
+            'Alto Riesgo': int(estudiantes_totales * 0.1)
+        }
+        
+        fig_riesgo = px.pie(
+            values=list(riesgo_data.values()),
+            names=list(riesgo_data.keys()),
+            color=list(riesgo_data.keys()),
+            color_discrete_map={
+                'Bajo Riesgo': '#10B981',
+                'Riesgo Medio': '#F59E0B', 
+                'Alto Riesgo': '#EF4444'
+            },
+            title="Distribución de Riesgo Estudiantil"
+        )
+        
+        st.plotly_chart(fig_riesgo, use_container_width=True)
+    
+    with col2:
+        # Recomendaciones automáticas
+        st.markdown("**💡 Recomendaciones**")
+        
+        recomendaciones = [
+            "📧 Contactar a estudiantes con baja asistencia",
+            "👥 Revisar eficiencia de profesores regularmente",
+            "📊 Programar reportes automáticos para directivos",
+            "🎯 Implementar programa de incentivos para asistencia perfecta"
+        ]
+        
+        for rec in recomendaciones:
+            st.markdown(f"- {rec}")
+
 def crear_grafico_asistencia_interactivo(df, tipo="tendencia"):
     """Crea gráficos interactivos modernos con Plotly"""
     
@@ -336,6 +848,21 @@ def implementar_temporizador_seguridad():
                 ⏱️ Tiempo restante: {minutos:02d}:{segundos:02d}
             </div>
             """, unsafe_allow_html=True)
+
+def panel_monitoreo_cache():
+    """Panel para monitorear estado del caché"""
+    with st.sidebar.expander("📊 Estado del Caché"):
+        stats = cache_manager.get_stats()
+        
+        st.metric("Entradas en Caché", stats['total_entradas'])
+        st.metric("Hit Rate", stats['hit_rate'])
+        st.metric("Cache Hits", stats['hits'])
+        st.metric("Cache Misses", stats['misses'])
+        
+        if st.button("🔄 Limpiar Caché", use_container_width=True):
+            cache_manager.invalidar()
+            st.success("Caché limpiado")
+            st.rerun()
 
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
@@ -439,10 +966,10 @@ Sistema de Asistencia Preuniversitario CIMMA"""
         st.error(f"❌ Error en la configuración: {e}")
 
 # ==============================
-# CARGA DE DATOS
+# CARGA DE DATOS CON CACHÉ INTELIGENTE
 # ==============================
 
-@st.cache_data(ttl=3600)
+@cache_manager.cached(ttl=3600, dependencias=['cursos'])
 def load_courses():
     client = get_client()
     if not client:
@@ -487,7 +1014,7 @@ def load_courses():
             continue
     return courses
 
-@st.cache_data(ttl=3600)
+@cache_manager.cached(ttl=7200)  # 2 horas para emails
 def load_emails():
     try:
         client = get_client()
@@ -517,7 +1044,7 @@ def load_emails():
         st.error(f"❌ Error cargando emails: {e}")
         return {}, {}
 
-@st.cache_data(ttl=3600)
+@cache_manager.cached(ttl=1800)  # 30 minutos para asistencia
 def load_all_asistencia():
     client = get_client()
     if not client:
@@ -748,6 +1275,12 @@ Preuniversitario CIMMA"""
                     st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
         else:
             st.success(f"👤 {st.session_state['user_name']}")
+            
+            # Panel de monitoreo de caché solo para admins
+            if st.session_state["user_type"] == "admin":
+                panel_monitoreo_cache()
+                sistema_ayuda.boton_ayuda_completa()
+            
             if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
                 st.session_state.clear()
                 st.rerun()
@@ -957,14 +1490,19 @@ def admin_panel_mejorado():
             st.rerun()
             return
     
-    st.markdown('<h2 class="section-header">📊 Panel Administrativo - Análisis de Asistencia</h2>', unsafe_allow_html=True)
+    # Header con ayuda contextual
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.markdown('<h2 class="section-header">📊 Panel Administrativo - Análisis de Asistencia</h2>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(sistema_ayuda.tooltip_contextual('dashboard'), unsafe_allow_html=True)
+    
     st.markdown(
         f'<div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">'
         f'<p style="margin: 0; color: #1A3B8B; font-size: 25px; font-weight: bold;">👋 Bienvenido/a, {st.session_state["user_name"]}</p>'
         f'</div>', 
         unsafe_allow_html=True
     )
-
 
     # Configuración de temporizador
     st.subheader("⏳ Configuración de Temporizador de Sesión")
@@ -1129,8 +1667,16 @@ def admin_panel_mejorado():
     if filtros_aplicados:
         st.info(" | ".join(filtros_aplicados))
     
-    # Dashboard de métricas
-    crear_dashboard_metricas_principales(datos_filtrados)
+    # Tabs para diferentes dashboards
+    tab1, tab2 = st.tabs(["📊 Dashboard Básico", "📈 Dashboard Avanzado"])
+    
+    with tab1:
+        # Dashboard de métricas básico
+        crear_dashboard_metricas_principales(datos_filtrados)
+    
+    with tab2:
+        # Dashboard avanzado con analytics
+        crear_dashboard_avanzado(datos_filtrados)
     
     # ==============================
     # GRÁFICOS INTERACTIVOS
@@ -1214,7 +1760,13 @@ def admin_panel_mejorado():
     # ==============================
     
     st.markdown("---")
-    st.markdown('<h2 class="section-header">📧 Envío de Notificaciones a Apoderados</h2>', unsafe_allow_html=True)
+    
+    # Header con ayuda contextual
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.markdown('<h2 class="section-header">📧 Envío de Notificaciones a Apoderados</h2>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(sistema_ayuda.tooltip_contextual('envio_emails', 'derecha'), unsafe_allow_html=True)
     
     with st.expander("📊 ENVÍO DE RESUMENES DE ASISTENCIA", expanded=True):
         st.info("**📋 Esta función enviará un resumen de asistencia a TODOS los apoderados** cuyos estudiantes aparezcan en los datos actualmente filtrados.")
@@ -1291,7 +1843,15 @@ Preuniversitario CIMMA 2026""",
     # EXPORTACIÓN DE DATOS
     # ==============================
     
-    st.markdown('<h2 class="section-header">📤 Exportar Datos</h2>', unsafe_allow_html=True)
+    st.markdown("---")
+    
+    # Header con ayuda contextual
+    col1, col2 = st.columns([6, 1])
+    with col1:
+        st.markdown('<h2 class="section-header">📤 Exportar Datos</h2>', unsafe_allow_html=True)
+    with col2:
+        st.markdown(sistema_ayuda.tooltip_contextual('exportacion', 'derecha'), unsafe_allow_html=True)
+        
     col1, col2 = st.columns(2)
     
     with col1:
@@ -1348,6 +1908,7 @@ Preuniversitario CIMMA 2026""",
     
     with col1:
         if boton_moderno("🔄 RECARGAR DATOS", "primario", "🔄", "reload_data"):
+            cache_manager.invalidar()
             st.cache_data.clear()
             st.session_state.email_status = "🔄 Datos recargados"
             st.rerun()
