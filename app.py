@@ -184,59 +184,76 @@ def tooltip_eliminar_fechas():
 def mostrar_panel_informativo_fechas():
     """Muestra un panel informativo completo sobre las funciones de fechas"""
     
-    with st.expander("📚 GUÍA: Funciones de Gestión de Fechas", expanded=False):
+    with st.expander("📚 GUÍA: Gestión de Fechas Completadas", expanded=False):
         st.markdown("""
-        ### 🔄 Reactivar vs 🗑️ Eliminar Fechas
+        ### 🔄 Reactivar Fechas - Guía Completa
         
-        **¿Cuál función usar?** Esta guía te ayudará a decidir:
+        **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
         """)
         
         col1, col2 = st.columns(2)
         
         with col1:
             st.markdown("""
-            #### 🔄 REACTIVAR FECHA
-            **Ideal para:** Correcciones y ajustes
+            #### 🎯 **QUÉ HACE REACTIVAR**
             
-            **✅ Lo que hace:**
-            - Cambia estado de "Completada" → "Pendiente"
-            - Permite nuevo registro de asistencia
-            - Mantiene historial
+            **Transforma una fecha:**
+            ✅ Completada → ⏳ Pendiente
             
-            **🎯 Casos de uso:**
-            - Error en registro original
-            - Necesidad de re-registrar asistencia
-            - Corrección de datos
-            
-            **🛡️ Seguridad:** Reversible y seguro
+            **Resultado:**
+            - La fecha vuelve a estar disponible para registro
+            - Los profesores pueden tomar asistencia nuevamente
+            - El historial anterior se mantiene
             """)
         
         with col2:
             st.markdown("""
-            #### 🗑️ ELIMINAR FECHA  
-            **Solo para:** Casos extremos
+            #### 🛡️ **SEGURIDAD Y VENTAJAS**
             
-            **🚨 Lo que hace:**
-            - Elimina PERMANENTEMENTE el registro
-            - No se puede recuperar
-            - Afeta estadísticas
-            
-            **⚠️ Casos de uso:**
-            - Registros duplicados corruptos
-            - Datos creados por error
-            - Limpieza administrativa
-            
-            **🔒 Seguridad:** IRREVERSIBLE - Usar con extremo cuidado
+            **✅ Totalmente reversible**
+            **✅ Mantiene auditoría completa**
+            **✅ Sin pérdida de datos**
+            **✅ Ideal para correcciones**
             """)
         
         st.markdown("""
         ---
-        **📋 Flujo recomendado:**
-        1. **Primero intenta** → 🔄 Reactivar
-        2. **Solo si es necesario** → 🗑️ Eliminar
-        3. **Siempre comunica** los cambios al equipo
+        
+        #### 📋 **CASOS DE USO RECOMENDADOS**
+        
+        | Situación | Solución | Beneficio |
+        |-----------|----------|-----------|
+        | **Error en registro** | Reactivar y corregir | Datos precisos sin pérdida |
+        | **Asistencia incompleta** | Reactivar para completar | Información completa |
+        | **Cambio de calendario** | Reactivar fechas afectadas | Flexibilidad del sistema |
+        | **Duda en registros** | Reactivar y verificar | Calidad de datos |
+        
+        ---
+        
+        #### 🔄 **PROCESO RECOMENDADO**
+        
+        1. **Identifica** la fecha que necesita corrección
+        2. **Reactivar** usando el botón 🔄 
+        3. **Comunica** al profesor correspondiente
+        4. **Verifica** que el nuevo registro sea correcto
+        5. **Confirma** que la fecha quede como ✅ Completada
+        
+        ---
+        
+        #### ❓ **PREGUNTAS FRECUENTES**
+        
+        **¿Se pierde el registro anterior?**
+        No, el sistema mantiene todo el historial de cambios.
+        
+        **¿Puedo reactivar múltiples veces?**
+        Sí, tantas veces como sea necesario.
+        
+        **¿Los profesores ven inmediatamente el cambio?**
+        Sí, la fecha aparece disponible en su interfaz al instante.
+        
+        **¿Afecta a los reportes enviados?**
+        Los reportes futuros reflejarán los datos actualizados.
         """)
-
 
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
