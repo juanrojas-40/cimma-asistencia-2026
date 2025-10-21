@@ -20,6 +20,109 @@ import time  # Para manejar tiempos y temporizadores
 import functools
 
 # ==============================
+# SISTEMA DE FECHAS COMPLETADAS
+# ==============================
+
+class SistemaFechasCompletadas:
+    """Sistema para gestionar fechas completadas y pendientes"""
+    
+    def __init__(self):
+        self.client = get_client()
+        self.sheet_id = st.secrets["google"]["asistencia_sheet_id"]
+    
+    @cache_manager.cached(ttl=900)  # 15 minutos de caché
+    def obtener_fechas_completadas(self, curso):
+        """Obtiene las fechas ya registradas para un curso"""
+        try:
+            sheet = self.client.open_by_key(self.sheet_id)
+            try:
+                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            except gspread.exceptions.WorksheetNotFound:
+                # Crear la hoja si no existe
+                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
+                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
+                return []
+            
+            records = fechas_sheet.get_all_records()
+            fechas_curso = [
+                row["Fecha"] for row in records 
+                if row["Curso"] == curso and row["Completada"] == "SI"
+            ]
+            return fechas_curso
+        except Exception as e:
+            st.error(f"Error al cargar fechas completadas: {e}")
+            return []
+    
+    def marcar_fecha_completada(self, curso, fecha):
+        """Marca una fecha como completada"""
+        try:
+            sheet = self.client.open_by_key(self.sheet_id)
+            try:
+                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            except gspread.exceptions.WorksheetNotFound:
+                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
+                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
+            
+            # Verificar si ya existe
+            records = fechas_sheet.get_all_records()
+            existe = any(
+                row["Curso"] == curso and row["Fecha"] == fecha 
+                for row in records
+            )
+            
+            if not existe:
+                fechas_sheet.append_row([
+                    curso,
+                    fecha,
+                    "SI",
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ])
+            
+            # Invalidar caché
+            cache_manager.invalidar()
+            return True
+        except Exception as e:
+            st.error(f"Error al marcar fecha como completada: {e}")
+            return False
+    
+    def reactivar_fecha(self, curso, fecha):
+        """Reactivar una fecha completada (solo administradores)"""
+        try:
+            sheet = self.client.open_by_key(self.sheet_id)
+            fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            
+            # Buscar y actualizar el registro
+            records = fechas_sheet.get_all_records()
+            for i, row in enumerate(records, start=2):  # start=2 porque la fila 1 son headers
+                if row["Curso"] == curso and row["Fecha"] == fecha:
+                    fechas_sheet.update_cell(i, 3, "NO")  # Columna "Completada"
+                    break
+            
+            # Invalidar caché
+            cache_manager.invalidar()
+            return True
+        except Exception as e:
+            st.error(f"Error al reactivar fecha: {e}")
+            return False
+    
+    def obtener_estadisticas_fechas(self, curso, fechas_totales):
+        """Obtiene estadísticas de fechas completadas vs pendientes"""
+        fechas_completadas = self.obtener_fechas_completadas(curso)
+        fechas_pendientes = [f for f in fechas_totales if f not in fechas_completadas]
+        
+        return {
+            "completadas": len(fechas_completadas),
+            "pendientes": len(fechas_pendientes),
+            "total": len(fechas_totales),
+            "porcentaje_completado": (len(fechas_completadas) / len(fechas_totales) * 100) if fechas_totales else 0,
+            "fechas_completadas": fechas_completadas,
+            "fechas_pendientes": fechas_pendientes
+        }
+
+# Instancia global del sistema de fechas
+sistema_fechas = SistemaFechasCompletadas()
+
+# ==============================
 # SISTEMA DE CACHÉ INTELIGENTE
 # ==============================
 
@@ -1527,6 +1630,76 @@ def admin_panel_mejorado():
     st.divider()
     
     # ==============================
+    # GESTIÓN DE FECHAS COMPLETADAS (ADMIN)
+    # ==============================
+    
+    st.markdown('<h2 class="section-header">📅 Gestión de Fechas Completadas</h2>', unsafe_allow_html=True)
+    
+    with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=True):
+        cursos = load_courses()
+        
+        if not cursos:
+            st.error("❌ No se encontraron cursos")
+            return
+        
+        curso_seleccionado_admin = st.selectbox(
+            "Selecciona un curso para gestionar fechas:",
+            list(cursos.keys()),
+            key="admin_curso_select"
+        )
+        
+        if curso_seleccionado_admin:
+            data_curso = cursos[curso_seleccionado_admin]
+            fechas_totales = data_curso["fechas"]
+            
+            # Obtener estadísticas de fechas
+            stats = sistema_fechas.obtener_estadisticas_fechas(curso_seleccionado_admin, fechas_totales)
+            
+            # Mostrar estadísticas
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("📅 Total Fechas", stats["total"])
+            with col2:
+                st.metric("✅ Completadas", stats["completadas"])
+            with col3:
+                st.metric("⏳ Pendientes", stats["pendientes"])
+            with col4:
+                st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
+            
+            # Tabla de fechas completadas
+            st.subheader("📋 Fechas Completadas")
+            if stats["fechas_completadas"]:
+                for fecha in stats["fechas_completadas"]:
+                    col1, col2, col3 = st.columns([3, 1, 1])
+                    with col1:
+                        st.write(f"✅ {fecha}")
+                    with col2:
+                        if st.button("🔄 Reactivar", key=f"reactivar_{fecha}"):
+                            if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
+                                st.success(f"✅ Fecha {fecha} reactivada")
+                                st.rerun()
+                    with col3:
+                        if st.button("🗑️ Eliminar", key=f"eliminar_{fecha}"):
+                            st.warning("Funcionalidad de eliminación en desarrollo")
+            else:
+                st.info("ℹ️ No hay fechas completadas para este curso")
+            
+            # Marcado manual de fechas como completadas
+            st.subheader("✅ Marcado Manual de Fechas")
+            fecha_manual = st.selectbox(
+                "Selecciona fecha para marcar como completada:",
+                [f for f in fechas_totales if f not in stats["fechas_completadas"]],
+                key="fecha_manual_select"
+            )
+            
+            if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
+                if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
+                    st.success(f"✅ Fecha {fecha_manual} marcada como completada")
+                    st.rerun()
+    
+    st.divider()
+    
+    # ==============================
     # INICIALIZACIÓN DE ESTADOS
     # ==============================
     
@@ -1972,6 +2145,28 @@ def main_app_mejorada():
             "Horario", data['horario'], "Horario", "⏰", "#F59E0B"
         ), unsafe_allow_html=True)
     
+    # ==============================
+    # ESTADÍSTICAS DE FECHAS (PROFESOR)
+    # ==============================
+    
+    st.markdown('<h3 class="section-header">📊 Estadísticas de Fechas</h3>', unsafe_allow_html=True)
+    
+    # Obtener estadísticas de fechas
+    stats = sistema_fechas.obtener_estadisticas_fechas(curso_seleccionado, data["fechas"])
+    
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📅 Total Fechas", stats["total"])
+    with col2:
+        st.metric("✅ Completadas", stats["completadas"])
+    with col3:
+        st.metric("⏳ Pendientes", stats["pendientes"])
+    with col4:
+        st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
+    
+    # Barra de progreso
+    st.progress(stats["porcentaje_completado"] / 100)
+    
     # Selección de realización de clase
     st.markdown('<h3 class="section-header">✅ Estado de la Clase</h3>', unsafe_allow_html=True)
     clase_realizada = st.radio(
@@ -1986,7 +2181,16 @@ def main_app_mejorada():
             "📝 Motivo de la no realización",
             placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc."
         )
-        fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", data["fechas"])
+        
+        # Mostrar solo fechas pendientes para suspensión
+        fechas_pendientes = [f for f in data["fechas"] if f not in stats["fechas_completadas"]]
+        
+        if not fechas_pendientes:
+            st.warning("ℹ️ Todas las fechas ya están completadas. Para registrar una suspensión, contacta a un administrador.")
+            return
+            
+        fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", fechas_pendientes)
+        
         if boton_moderno("💾 Registrar suspensión", "peligro", "⏸️", "register_suspension"):
             try:
                 client = get_client()
@@ -2009,13 +2213,36 @@ def main_app_mejorada():
                     log,
                     motivo
                 ])
+                
+                # Marcar fecha como completada (suspensión)
+                sistema_fechas.marcar_fecha_completada(curso_seleccionado, fecha_seleccionada)
+                
                 st.success(f"✅ Suspensión registrada para la fecha **{fecha_seleccionada}**.")
+                st.rerun()
+                
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
     
-    # Si la clase se realizó, continuar con registro de asistencia
-    fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", data["fechas"])
+    # ==============================
+    # REGISTRO DE ASISTENCIA NORMAL
+    # ==============================
+    
+    # Si la clase se realizó, mostrar solo fechas pendientes
+    fechas_pendientes = [f for f in data["fechas"] if f not in stats["fechas_completadas"]]
+    
+    if not fechas_pendientes:
+        st.warning("🎉 ¡Todas las fechas ya están completadas!")
+        st.info("💡 Si necesitas registrar asistencia en una fecha ya completada, contacta a un administrador para reactivarla.")
+        return
+    
+    fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", fechas_pendientes)
+    
+    # Verificar duplicados
+    if fecha_seleccionada in stats["fechas_completadas"]:
+        st.error("🚫 Esta fecha ya fue completada anteriormente.")
+        st.info("💡 Si necesitas registrar asistencia en esta fecha, contacta a un administrador para reactivarla.")
+        return
     
     st.markdown('<h3 class="section-header">👥 Registro de Asistencia de Estudiantes</h3>', unsafe_allow_html=True)
     
@@ -2072,7 +2299,13 @@ def main_app_mejorada():
                         ""
                     ])
                 sheet.append_rows(rows)
+                
+                # Marcar fecha como completada
+                sistema_fechas.marcar_fecha_completada(curso_seleccionado, fecha_seleccionada)
+                
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
+                
+                # Envío de emails
                 emails, nombres_apoderados = load_emails()
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
@@ -2090,6 +2323,9 @@ Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 Saludos cordiales,
 Preuniversitario CIMMA 2026"""
                     send_email(correo_destino, subject, body)
+                    
+                st.rerun()
+                
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
     
