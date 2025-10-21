@@ -1929,7 +1929,7 @@ def admin_panel_mejorado():
                 for i, fecha in enumerate(stats["fechas_completadas"]):
                     # Usar un contenedor para cada fecha para mejor espaciado
                     with st.container():
-                        col1, col2, col3 = st.columns([3, 2, 1])
+                        col1, col2 = st.columns([4, 2])  # Cambiar de 3 columnas a 2
                         with col1:
                             st.write(f"**{i+1}.** ✅ {fecha}")
                         with col2:
@@ -1940,9 +1940,6 @@ def admin_panel_mejorado():
                                 if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
                                     st.success(f"✅ Fecha '{fecha}' reactivada - Ahora disponible para registro")
                                     st.rerun()
-                        with col3:
-                            # El tooltip ahora debería funcionar correctamente
-                            st.markdown(tooltip_reactivar_fechas(), unsafe_allow_html=True)
                         
                         # Separador entre fechas (solo visual)
                         if i < len(stats["fechas_completadas"]) - 1:
