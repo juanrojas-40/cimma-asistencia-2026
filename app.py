@@ -113,33 +113,37 @@ def tooltip_reactivar_fechas():
         <span style="color: #6B7280; font-size: 0.9em;">ℹ️</span>
         <div class="tooltip-text">
             <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">
-                🔄 Reactivar Fecha - Información
+                🔄 Reactivar Fecha
             </div>
             
             <div class="funcion-card funcion-reactivar">
                 <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0;">Cambia el estado de la fecha de "COMPLETADA" a "PENDIENTE", permitiendo registrar asistencia nuevamente.</p>
+                <p style="margin: 4px 0;">Cambia el estado de "COMPLETADA" a "PENDIENTE", permitiendo registrar asistencia nuevamente.</p>
                 
                 <strong class="ventaja">✅ Ventajas:</strong>
                 <ul style="margin: 4px 0; padding-left: 16px;">
-                    <li>Reversible - puedes volver a marcar como completada</li>
-                    <li>Mantiene el historial del registro original</li>
-                    <li>No afecta estadísticas históricas</li>
-                    <li>Ideal para correcciones menores</li>
-                </ul>
-                
-                <strong class="desventaja">⚠️ Consideraciones:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px;">
-                    <li>La fecha aparecerá disponible para los profesores</li>
-                    <li>Puede generar duplicación si no se comunica</li>
+                    <li><strong>Reversible</strong> - puedes volver a marcar como completada</li>
+                    <li><strong>Mantiene historial</strong> - no se pierden datos anteriores</li>
+                    <li><strong>Seguro</strong> - no afecta estadísticas históricas</li>
+                    <li><strong>Flexible</strong> - ideal para correcciones</li>
                 </ul>
                 
                 <strong class="alerta">🎯 Cuándo usar:</strong>
-                <p style="margin: 4px 0;">• Cuando necesitas permitir el registro en una fecha ya completada<br>• Para correcciones de asistencia<br>• Cuando hubo un error en el registro original</p>
+                <ul style="margin: 4px 0; padding-left: 16px;">
+                    <li>Error en registro original de asistencia</li>
+                    <li>Necesidad de completar asistencia pendiente</li>
+                    <li>Corrección de datos por cambios de calendario</li>
+                    <li>Verificación y validación de registros</li>
+                </ul>
+                
+                <div style="background: #F0F9FF; padding: 8px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #1A3B8F;">
+                    <strong>💡 Tip:</strong> Esta es la forma segura y recomendada de corregir fechas en el sistema.
+                </div>
             </div>
         </div>
     </div>
     """
+
 
 def tooltip_eliminar_fechas():
     """Tooltip para la función de eliminar fechas"""
