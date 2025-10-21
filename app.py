@@ -92,45 +92,6 @@ def crear_tooltip_fechas():
     </style>
     """, unsafe_allow_html=True)
 
-def tooltip_reactivar_fechas():
-    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
-    return """
-    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
-        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
-        <div class="tooltiptext">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
-                🔄 Reactivar Fecha
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Totalmente reversible</li>
-                    <li>Mantiene todo el historial</li>
-                    <li>Sin pérdida de datos</li>
-                    <li>Ideal para correcciones</li>
-                </ul>
-            </div>
-            
-            <div>
-                <strong class="alerta">🎯 Cuándo usar:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Error en registro original</li>
-                    <li>Asistencia incompleta</li>
-                    <li>Cambios en calendario</li>
-                    <li>Verificación de datos</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    """
-
-
 
 def tooltip_reactivar_fechas():
     """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
@@ -169,6 +130,7 @@ def tooltip_reactivar_fechas():
         </div>
     </div>
     """
+
 
 
 
@@ -2349,7 +2311,7 @@ def admin_panel_mejorado():
                 key="fecha_manual_select"
             )
             
-            
+
             if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
                 if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
                     st.success(f"✅ Fecha {fecha_manual} marcada como completada")
