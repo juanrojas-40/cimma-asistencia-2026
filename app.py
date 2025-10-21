@@ -28,6 +28,63 @@ import functools
 
 
 
+# ==============================
+# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
+# ==============================
+
+def crear_tooltip_fechas():
+    """Función para crear estilos CSS de tooltips - VERSIÓN CORREGIDA"""
+    st.markdown("""
+    <style>
+    .tooltip-fechas {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .tooltip-fechas .tooltiptext {
+        visibility: hidden;
+        width: 350px;
+        background-color: #1A3B8F;
+        color: white;
+        text-align: left;
+        border-radius: 12px;
+        padding: 16px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+        font-size: 0.9em;
+        line-height: 1.5;
+    }
+    
+    .tooltip-fechas:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .tooltip-fechas .ventaja {
+        color: #10B981 !important;
+    }
+    
+    .tooltip-fechas .alerta {
+        color: #F59E0B !important;
+    }
+    
+    .tooltip-fechas ul {
+        margin: 4px 0;
+        padding-left: 16px;
+    }
+    
+    .tooltip-fechas li {
+        margin-bottom: 4px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
 def tooltip_reactivar_fechas():
     """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
     return """
@@ -2042,7 +2099,6 @@ def admin_panel_mejorado():
     # ==============================
     
     st.markdown('<h2 class="section-header">📅 Gestión de Fechas Completadas</h2>', unsafe_allow_html=True)
-
     # Aplicar estilos de tooltips
     crear_tooltip_fechas()
 
@@ -2088,7 +2144,7 @@ def admin_panel_mejorado():
                 for i, fecha in enumerate(stats["fechas_completadas"]):
                     # Usar un contenedor para cada fecha para mejor espaciado
                     with st.container():
-                        col1, col2 = st.columns([4, 2])  # Cambiar de 3 columnas a 2
+                        col1, col2 = st.columns([4, 2])
                         with col1:
                             st.write(f"**{i+1}.** ✅ {fecha}")
                         with col2:
@@ -2105,6 +2161,22 @@ def admin_panel_mejorado():
                             st.markdown("---")
             else:
                 st.info("ℹ️ No hay fechas completadas para este curso")
+
+            # Marcado manual de fechas como completadas
+            st.subheader("✅ Marcado Manual de Fechas")
+            fecha_manual = st.selectbox(
+                "Selecciona fecha para marcar como completada:",
+                [f for f in fechas_totales if f not in stats["fechas_completadas"]],
+                key="fecha_manual_select"
+            )
+        
+        if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
+            if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
+                st.success(f"✅ Fecha {fecha_manual} marcada como completada")
+                st.rerun()
+
+
+
 
     st.divider()
     
