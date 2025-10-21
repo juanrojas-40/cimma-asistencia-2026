@@ -24,8 +24,12 @@ import functools
 # COMPONENTES INFORMATIVOS PARA FECHAS
 # ==============================
 
+# ==============================
+# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
+# ==============================
+
 def crear_tooltip_fechas():
-    """Crea tooltips informativos para las funciones de fechas"""
+    """Crea tooltips informativos para las funciones de fechas - VERSIÓN CORREGIDA"""
     
     st.markdown("""
     <style>
@@ -33,12 +37,11 @@ def crear_tooltip_fechas():
         position: relative;
         display: inline-block;
         cursor: help;
-        margin-left: 8px;
     }
     
-    .tooltip-fechas .tooltip-text {
+    .tooltip-fechas .tooltiptext {
         visibility: hidden;
-        width: 400px;
+        width: 350px;
         background-color: #1A3B8F;
         color: white;
         text-align: left;
@@ -48,20 +51,15 @@ def crear_tooltip_fechas():
         z-index: 1000;
         bottom: 125%;
         left: 50%;
-        transform: translateX(-50%);
+        margin-left: -175px;
         box-shadow: 0 10px 25px rgba(0,0,0,0.2);
         opacity: 0;
-        transition: opacity 0.3s, visibility 0.3s;
+        transition: opacity 0.3s;
         font-size: 0.9em;
         line-height: 1.5;
     }
     
-    .tooltip-fechas:hover .tooltip-text {
-        visibility: visible;
-        opacity: 1;
-    }
-    
-    .tooltip-fechas .tooltip-text::after {
+    .tooltip-fechas .tooltiptext::after {
         content: "";
         position: absolute;
         top: 100%;
@@ -72,30 +70,21 @@ def crear_tooltip_fechas():
         border-color: #1A3B8F transparent transparent transparent;
     }
     
+    .tooltip-fechas:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    
     .funcion-card {
-        background: white;
+        background: rgba(255,255,255,0.1);
         border-radius: 8px;
         padding: 12px;
         margin: 8px 0;
-        border-left: 4px solid;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .funcion-reactivar {
-        border-left-color: #10B981;
-    }
-    
-    .funcion-eliminar {
-        border-left-color: #EF4444;
+        border-left: 4px solid #10B981;
     }
     
     .ventaja {
         color: #10B981;
-        font-weight: 600;
-    }
-    
-    .desventaja {
-        color: #EF4444;
         font-weight: 600;
     }
     
@@ -105,6 +94,44 @@ def crear_tooltip_fechas():
     }
     </style>
     """, unsafe_allow_html=True)
+
+def tooltip_reactivar_fechas():
+    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
+    return """
+    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
+        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
+        <div class="tooltiptext">
+            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
+                🔄 Reactivar Fecha
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+                <strong>📝 Qué hace:</strong>
+                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+                <strong class="ventaja">✅ Ventajas:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Totalmente reversible</li>
+                    <li>Mantiene todo el historial</li>
+                    <li>Sin pérdida de datos</li>
+                    <li>Ideal para correcciones</li>
+                </ul>
+            </div>
+            
+            <div>
+                <strong class="alerta">🎯 Cuándo usar:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Error en registro original</li>
+                    <li>Asistencia incompleta</li>
+                    <li>Cambios en calendario</li>
+                    <li>Verificación de datos</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    """
 
 def tooltip_reactivar_fechas():
     """Tooltip para la función de reactivar fechas"""
@@ -1930,23 +1957,38 @@ def admin_panel_mejorado():
             with col4:
                 st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
             
-            # Tabla de fechas completadas
+            # Tabla de fechas completadas - VERSIÓN CORREGIDA
             st.subheader("📋 Fechas Completadas")
             if stats["fechas_completadas"]:
-                for fecha in stats["fechas_completadas"]:
-                    col1, col2, col3 = st.columns([4, 2, 1])  # Nuevo ratio de columnas
-                    with col1:
-                        st.write(f"✅ {fecha}")
-                    with col2:
-                        if st.button("🔄 Reactivar Fecha", key=f"reactivar_{fecha}", use_container_width=True):
-                            if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
-                                st.success(f"✅ Fecha {fecha} reactivada - Ahora está disponible para registro")
-                                st.rerun()
-                    with col3:
-                        st.markdown(tooltip_reactivar_fechas(), unsafe_allow_html=True)  # Tooltip informativo
+                st.markdown("**Haz hover sobre ℹ️ para más información**")
+                
+                for i, fecha in enumerate(stats["fechas_completadas"]):
+                    # Usar un contenedor para cada fecha para mejor espaciado
+                    with st.container():
+                        col1, col2, col3 = st.columns([3, 2, 1])
+                        with col1:
+                            st.write(f"**{i+1}.** ✅ {fecha}")
+                        with col2:
+                            if st.button("🔄 Reactivar Fecha", 
+                                    key=f"reactivar_{curso_seleccionado_admin}_{fecha}",
+                                    use_container_width=True,
+                                    help="Haz clic para reactivar esta fecha y permitir nuevo registro"):
+                                if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
+                                    st.success(f"✅ Fecha '{fecha}' reactivada - Ahora disponible para registro")
+                                    st.rerun()
+                        with col3:
+                            # El tooltip ahora debería funcionar correctamente
+                            st.markdown(tooltip_reactivar_fechas(), unsafe_allow_html=True)
+                        
+                        # Separador entre fechas (solo visual)
+                        if i < len(stats["fechas_completadas"]) - 1:
+                            st.markdown("---")
             else:
                 st.info("ℹ️ No hay fechas completadas para este curso")
-            
+
+
+
+
             # Marcado manual de fechas como completadas
             st.subheader("✅ Marcado Manual de Fechas")
             fecha_manual = st.selectbox(
