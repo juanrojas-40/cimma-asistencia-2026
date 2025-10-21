@@ -20,110 +20,7 @@ import time  # Para manejar tiempos y temporizadores
 import functools
 
 # ==============================
-# SISTEMA DE FECHAS COMPLETADAS
-# ==============================
-
-class SistemaFechasCompletadas:
-    """Sistema para gestionar fechas completadas y pendientes"""
-    
-    def __init__(self):
-        self.client = get_client()
-        self.sheet_id = st.secrets["google"]["asistencia_sheet_id"]
-    
-    @cache_manager.cached(ttl=900)  # 15 minutos de caché
-    def obtener_fechas_completadas(self, curso):
-        """Obtiene las fechas ya registradas para un curso"""
-        try:
-            sheet = self.client.open_by_key(self.sheet_id)
-            try:
-                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
-            except gspread.exceptions.WorksheetNotFound:
-                # Crear la hoja si no existe
-                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
-                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
-                return []
-            
-            records = fechas_sheet.get_all_records()
-            fechas_curso = [
-                row["Fecha"] for row in records 
-                if row["Curso"] == curso and row["Completada"] == "SI"
-            ]
-            return fechas_curso
-        except Exception as e:
-            st.error(f"Error al cargar fechas completadas: {e}")
-            return []
-    
-    def marcar_fecha_completada(self, curso, fecha):
-        """Marca una fecha como completada"""
-        try:
-            sheet = self.client.open_by_key(self.sheet_id)
-            try:
-                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
-            except gspread.exceptions.WorksheetNotFound:
-                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
-                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
-            
-            # Verificar si ya existe
-            records = fechas_sheet.get_all_records()
-            existe = any(
-                row["Curso"] == curso and row["Fecha"] == fecha 
-                for row in records
-            )
-            
-            if not existe:
-                fechas_sheet.append_row([
-                    curso,
-                    fecha,
-                    "SI",
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ])
-            
-            # Invalidar caché
-            cache_manager.invalidar()
-            return True
-        except Exception as e:
-            st.error(f"Error al marcar fecha como completada: {e}")
-            return False
-    
-    def reactivar_fecha(self, curso, fecha):
-        """Reactivar una fecha completada (solo administradores)"""
-        try:
-            sheet = self.client.open_by_key(self.sheet_id)
-            fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
-            
-            # Buscar y actualizar el registro
-            records = fechas_sheet.get_all_records()
-            for i, row in enumerate(records, start=2):  # start=2 porque la fila 1 son headers
-                if row["Curso"] == curso and row["Fecha"] == fecha:
-                    fechas_sheet.update_cell(i, 3, "NO")  # Columna "Completada"
-                    break
-            
-            # Invalidar caché
-            cache_manager.invalidar()
-            return True
-        except Exception as e:
-            st.error(f"Error al reactivar fecha: {e}")
-            return False
-    
-    def obtener_estadisticas_fechas(self, curso, fechas_totales):
-        """Obtiene estadísticas de fechas completadas vs pendientes"""
-        fechas_completadas = self.obtener_fechas_completadas(curso)
-        fechas_pendientes = [f for f in fechas_totales if f not in fechas_completadas]
-        
-        return {
-            "completadas": len(fechas_completadas),
-            "pendientes": len(fechas_pendientes),
-            "total": len(fechas_totales),
-            "porcentaje_completado": (len(fechas_completadas) / len(fechas_totales) * 100) if fechas_totales else 0,
-            "fechas_completadas": fechas_completadas,
-            "fechas_pendientes": fechas_pendientes
-        }
-
-# Instancia global del sistema de fechas
-sistema_fechas = SistemaFechasCompletadas()
-
-# ==============================
-# SISTEMA DE CACHÉ INTELIGENTE
+# SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
 
 class CacheInteligente:
@@ -217,8 +114,129 @@ class CacheInteligente:
             for clave in claves_ordenadas[:len(self.cache_data) - max_size]:
                 del self.cache_data[clave]
 
-# Instancia global de caché
+# Instancia global de caché (DEFINIR ANTES DE LAS CLASES QUE LO USAN)
 cache_manager = CacheInteligente()
+
+# ==============================
+# SISTEMA DE FECHAS COMPLETADAS
+# ==============================
+
+class SistemaFechasCompletadas:
+    """Sistema para gestionar fechas completadas y pendientes"""
+    
+    def __init__(self):
+        self.client = None
+        self.sheet_id = st.secrets["google"]["asistencia_sheet_id"]
+    
+    def _get_client(self):
+        """Obtiene el cliente de Google Sheets de forma lazy"""
+        if self.client is None:
+            self.client = get_client()
+        return self.client
+    
+    @cache_manager.cached(ttl=900)  # 15 minutos de caché
+    def obtener_fechas_completadas(self, curso):
+        """Obtiene las fechas ya registradas para un curso"""
+        try:
+            client = self._get_client()
+            if not client:
+                return []
+                
+            sheet = client.open_by_key(self.sheet_id)
+            try:
+                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            except gspread.exceptions.WorksheetNotFound:
+                # Crear la hoja si no existe
+                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
+                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
+                return []
+            
+            records = fechas_sheet.get_all_records()
+            fechas_curso = [
+                row["Fecha"] for row in records 
+                if row["Curso"] == curso and row["Completada"] == "SI"
+            ]
+            return fechas_curso
+        except Exception as e:
+            st.error(f"Error al cargar fechas completadas: {e}")
+            return []
+    
+    def marcar_fecha_completada(self, curso, fecha):
+        """Marca una fecha como completada"""
+        try:
+            client = self._get_client()
+            if not client:
+                return False
+                
+            sheet = client.open_by_key(self.sheet_id)
+            try:
+                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            except gspread.exceptions.WorksheetNotFound:
+                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
+                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
+            
+            # Verificar si ya existe
+            records = fechas_sheet.get_all_records()
+            existe = any(
+                row["Curso"] == curso and row["Fecha"] == fecha 
+                for row in records
+            )
+            
+            if not existe:
+                fechas_sheet.append_row([
+                    curso,
+                    fecha,
+                    "SI",
+                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                ])
+            
+            # Invalidar caché
+            cache_manager.invalidar()
+            return True
+        except Exception as e:
+            st.error(f"Error al marcar fecha como completada: {e}")
+            return False
+    
+    def reactivar_fecha(self, curso, fecha):
+        """Reactivar una fecha completada (solo administradores)"""
+        try:
+            client = self._get_client()
+            if not client:
+                return False
+                
+            sheet = client.open_by_key(self.sheet_id)
+            fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            
+            # Buscar y actualizar el registro
+            records = fechas_sheet.get_all_records()
+            for i, row in enumerate(records, start=2):  # start=2 porque la fila 1 son headers
+                if row["Curso"] == curso and row["Fecha"] == fecha:
+                    fechas_sheet.update_cell(i, 3, "NO")  # Columna "Completada"
+                    break
+            
+            # Invalidar caché
+            cache_manager.invalidar()
+            return True
+        except Exception as e:
+            st.error(f"Error al reactivar fecha: {e}")
+            return False
+    
+    def obtener_estadisticas_fechas(self, curso, fechas_totales):
+        """Obtiene estadísticas de fechas completadas vs pendientes"""
+        fechas_completadas = self.obtener_fechas_completadas(curso)
+        fechas_pendientes = [f for f in fechas_totales if f not in fechas_completadas]
+        
+        return {
+            "completadas": len(fechas_completadas),
+            "pendientes": len(fechas_pendientes),
+            "total": len(fechas_totales),
+            "porcentaje_completado": (len(fechas_completadas) / len(fechas_totales) * 100) if fechas_totales else 0,
+            "fechas_completadas": fechas_completadas,
+            "fechas_pendientes": fechas_pendientes
+        }
+
+# Instancia global del sistema de fechas
+sistema_fechas = SistemaFechasCompletadas()
 
 # ==============================
 # SISTEMA DE AYUDA CONTEXTUAL
