@@ -2349,6 +2349,7 @@ def admin_panel_mejorado():
                 key="fecha_manual_select"
             )
             
+            
             if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
                 if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
                     st.success(f"✅ Fecha {fecha_manual} marcada como completada")
