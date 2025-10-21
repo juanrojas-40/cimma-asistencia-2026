@@ -132,87 +132,50 @@ def tooltip_reactivar_fechas():
 
 
 
-
-
 def tooltip_reactivar_fechas():
-    """Tooltip para la función de reactivar fechas"""
+    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
     return """
-    <div class="tooltip-fechas">
-        <span style="color: #6B7280; font-size: 0.9em;">ℹ️</span>
-        <div class="tooltip-text">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">
+    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
+        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
+        <div class="tooltiptext">
+            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
                 🔄 Reactivar Fecha
             </div>
             
-            <div class="funcion-card funcion-reactivar">
+            <div style="margin-bottom: 8px;">
                 <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0;">Cambia el estado de "COMPLETADA" a "PENDIENTE", permitiendo registrar asistencia nuevamente.</p>
-                
-                <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px;">
-                    <li><strong>Reversible</strong> - puedes volver a marcar como completada</li>
-                    <li><strong>Mantiene historial</strong> - no se pierden datos anteriores</li>
-                    <li><strong>Seguro</strong> - no afecta estadísticas históricas</li>
-                    <li><strong>Flexible</strong> - ideal para correcciones</li>
-                </ul>
-                
-                <strong class="alerta">🎯 Cuándo usar:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px;">
-                    <li>Error en registro original de asistencia</li>
-                    <li>Necesidad de completar asistencia pendiente</li>
-                    <li>Corrección de datos por cambios de calendario</li>
-                    <li>Verificación y validación de registros</li>
-                </ul>
-                
-                <div style="background: #F0F9FF; padding: 8px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #1A3B8F;">
-                    <strong>💡 Tip:</strong> Esta es la forma segura y recomendada de corregir fechas en el sistema.
-                </div>
-            </div>
-        </div>
-    </div>
-    """
-
-
-def tooltip_eliminar_fechas():
-    """Tooltip para la función de eliminar fechas"""
-    return """
-    <div class="tooltip-fechas">
-        <span style="color: #6B7280; font-size: 0.9em;">ℹ️</span>
-        <div class="tooltip-text">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">
-                🗑️ Eliminar Fecha - Información
+                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
             </div>
             
-            <div class="funcion-card funcion-eliminar">
-                <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0;">Elimina PERMANENTEMENTE el registro de la fecha completada del sistema.</p>
-                
+            <div style="margin-bottom: 8px;">
                 <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px;">
-                    <li>Limpia registros duplicados o erróneos</li>
-                    <li>Elimina datos corruptos del sistema</li>
-                    <li>Soluciona problemas de integridad de datos</li>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Totalmente reversible</li>
+                    <li>Mantiene todo el historial</li>
+                    <li>Sin pérdida de datos</li>
+                    <li>Ideal para correcciones</li>
                 </ul>
-                
-                <strong class="desventaja">🚨 ALERTAS DE CUIDADO:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px;">
-                    <li><strong>IRREVERSIBLE</strong> - No se puede recuperar</li>
-                    <li>Afeta estadísticas históricas</li>
-                    <li>Pérdida de trazabilidad</li>
-                    <li>Impacto en reportes y análisis</li>
+            </div>
+            
+            <div>
+                <strong class="alerta">🎯 Cuándo usar:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Error en registro original</li>
+                    <li>Asistencia incompleta</li>
+                    <li>Cambios en calendario</li>
+                    <li>Verificación de datos</li>
                 </ul>
-                
-                <strong class="alerta">🎯 Cuándo usar (CASOS ESPECIALES):</strong>
-                <p style="margin: 4px 0;">• Registros duplicados corruptos<br>• Fechas creadas por error<br>• Limpieza administrativa autorizada<br>• <strong>SOLO cuando reactivar no es suficiente</strong></p>
-                
-                <div style="background: #FEF3C7; padding: 8px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #F59E0B;">
-                    <strong>💡 Recomendación:</strong> Usa <strong>🔄 Reactivar</strong> en la mayoría de casos. Solo elimina si es absolutamente necesario.
-                </div>
             </div>
         </div>
     </div>
     """
 
+
+
+
+
+
+                    
 def mostrar_panel_informativo_fechas():
     """Muestra un panel informativo completo sobre las funciones de fechas"""
     
