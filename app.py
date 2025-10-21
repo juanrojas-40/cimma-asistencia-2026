@@ -190,6 +190,12 @@ class SistemaFechasCompletadas:
                     "SI",
                     datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 ])
+            else:
+                # Si existe, actualizar a "SI"
+                for i, row in enumerate(records, start=2):
+                    if row["Curso"] == curso and row["Fecha"] == fecha:
+                        fechas_sheet.update_cell(i, 3, "SI")
+                        break
             
             # Invalidar caché
             cache_manager.invalidar()
