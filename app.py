@@ -250,6 +250,273 @@ def mostrar_panel_informativo_fechas():
         Los reportes futuros reflejarán los datos actualizados.
         """)
 
+
+
+# ==============================
+# CAMBIO DE CURSO ENTRE ESTUDIANTES
+# ==============================
+
+def panel_cambio_curso():
+    """Panel para gestionar cambios de curso entre estudiantes"""
+    
+    st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
+    
+    st.warning("""
+    **⚠️ IMPORTANTE:** Esta función mueve el historial completo de un estudiante a otro curso.
+    - Mantiene todo el historial de asistencia
+    - Actualiza automáticamente en todos los reportes
+    - No pierde datos históricos
+    """)
+    
+    # Cargar datos
+    cursos = load_courses()
+    df = load_all_asistencia()
+    
+    if not cursos or df.empty:
+        st.error("No se pudieron cargar los datos necesarios")
+        return
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("👤 Seleccionar Estudiante")
+        
+        # Seleccionar curso origen
+        curso_origen = st.selectbox(
+            "Curso de origen:",
+            list(cursos.keys()),
+            key="curso_origen"
+        )
+        
+        # Seleccionar estudiante
+        estudiantes_origen = cursos[curso_origen]["estudiantes"]
+        estudiante_seleccionado = st.selectbox(
+            "Estudiante a cambiar:",
+            estudiantes_origen,
+            key="estudiante_cambio"
+        )
+        
+        # Mostrar información del estudiante
+        if estudiante_seleccionado:
+            datos_estudiante = df[df['Estudiante'] == estudiante_seleccionado]
+            if not datos_estudiante.empty:
+                total_clases = len(datos_estudiante)
+                asistencias = datos_estudiante['Asistencia'].sum()
+                porcentaje = (asistencias / total_clases * 100) if total_clases > 0 else 0
+                
+                st.info(f"""
+                **📊 Historial actual:**
+                - **Curso actual:** {curso_origen}
+                - **Total clases:** {total_clases}
+                - **Asistencias:** {asistencias}
+                - **Porcentaje:** {porcentaje:.1f}%
+                """)
+    
+    with col2:
+        st.subheader("🎯 Curso Destino")
+        
+        # Seleccionar curso destino (excluyendo el curso origen)
+        cursos_destino = [curso for curso in cursos.keys() if curso != curso_origen]
+        curso_destino = st.selectbox(
+            "Curso destino:",
+            cursos_destino,
+            key="curso_destino"
+        )
+        
+        # Mostrar información del curso destino
+        if curso_destino:
+            estudiantes_destino = cursos[curso_destino]["estudiantes"]
+            st.success(f"""
+            **📚 Curso destino: {curso_destino}**
+            - **Profesor:** {cursos[curso_destino]['profesor']}
+            - **Día:** {cursos[curso_destino]['dia']}
+            - **Horario:** {cursos[curso_destino]['horario']}
+            - **Estudiantes actuales:** {len(estudiantes_destino)}
+            """)
+    
+    # Confirmación y ejecución
+    st.markdown("---")
+    st.subheader("✅ Confirmar Cambio")
+    
+    if estudiante_seleccionado and curso_origen and curso_destino:
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            # Verificar si el estudiante ya existe en el curso destino
+            estudiantes_destino = cursos[curso_destino]["estudiantes"]
+            if estudiante_seleccionado in estudiantes_destino:
+                st.error(f"❌ **{estudiante_seleccionado}** ya existe en el curso **{curso_destino}**")
+                return
+            
+            st.warning(f"""
+            **🔔 ¿Estás seguro de realizar este cambio?**
+            
+            **Estudiante:** {estudiante_seleccionado}
+            **De:** {curso_origen} → **A:** {curso_destino}
+            
+            **Esta acción:**
+            ✅ Mantendrá todo el historial de asistencia
+            ✅ Actualizará todos los reportes futuros
+            ✅ El estudiante aparecerá en el nuevo curso
+            """)
+            
+            # Opción de fecha efectiva
+            fecha_efectiva = st.date_input(
+                "Fecha efectiva del cambio:",
+                value=datetime.now().date(),
+                help="Los reportes futuros usarán esta fecha para el cambio"
+            )
+            
+            if st.button("🔄 EJECUTAR CAMBIO DE CURSO", type="primary", use_container_width=True):
+                if ejecutar_cambio_curso(estudiante_seleccionado, curso_origen, curso_destino, fecha_efectiva):
+                    st.success("""
+                    ✅ **¡Cambio de curso ejecutado exitosamente!**
+                    
+                    **Próximos pasos:**
+                    1. El estudiante ya aparece en el nuevo curso
+                    2. Los reportes reflejarán el cambio inmediatamente
+                    3. El historial anterior se mantiene intacto
+                    """)
+                    
+                    # Invalidar caché para reflejar cambios
+                    cache_manager.invalidar()
+                    st.rerun()
+
+def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiva):
+    """Ejecuta el cambio de curso en Google Sheets"""
+    
+    try:
+        client = get_client()
+        if not client:
+            st.error("❌ Error de conexión con Google Sheets")
+            return False
+        
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
+        try:
+            sheet_origen = asistencia_sheet.worksheet(curso_origen)
+            records_origen = sheet_origen.get_all_records()
+            
+            # Encontrar y actualizar registros del estudiante
+            for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
+                if row.get('Estudiante') == estudiante:
+                    # Actualizar el curso en el registro
+                    sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
+        
+        # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
+        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
+        
+        try:
+            # Remover de curso origen
+            sheet_clases_origen = clases_sheet.worksheet(curso_origen)
+            valores_origen = sheet_clases_origen.get_all_values()
+            
+            for i, fila in enumerate(valores_origen):
+                if estudiante in fila:
+                    # Encontrar la columna del estudiante y limpiar
+                    for j, valor in enumerate(fila):
+                        if valor == estudiante:
+                            sheet_clases_origen.update_cell(i + 1, j + 1, "")
+                            break
+                    break
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
+        
+        try:
+            # Agregar a curso destino
+            sheet_clases_destino = clases_sheet.worksheet(curso_destino)
+            valores_destino = sheet_clases_destino.get_all_values()
+            
+            # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
+            idx_estudiantes = None
+            for i, fila in enumerate(valores_destino):
+                if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
+                    idx_estudiantes = i + 1
+                    break
+            
+            if idx_estudiantes is not None:
+                # Encontrar primera celda vacía en la columna de estudiantes
+                col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
+                for i in range(idx_estudiantes, len(valores_destino)):
+                    if not valores_destino[i][col_estudiantes].strip():
+                        sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
+                        break
+                else:
+                    # Si no hay celdas vacías, agregar al final
+                    sheet_clases_destino.append_row([estudiante])
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
+        
+        # 3. REGISTRAR EN LOG DE CAMBIOS
+        try:
+            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
+        except gspread.exceptions.WorksheetNotFound:
+            cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
+            cambios_sheet.append_row([
+                "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
+                "Fecha Efectiva", "Administrador"
+            ])
+        
+        cambios_sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            estudiante,
+            curso_origen,
+            curso_destino,
+            fecha_efectiva.strftime("%Y-%m-%d"),
+            st.session_state["user_name"]
+        ])
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
+        return False
+
+def panel_historial_cambios():
+    """Panel para ver historial de cambios de curso"""
+    
+    st.markdown('<h2 class="section-header">📋 Historial de Cambios</h2>', unsafe_allow_html=True)
+    
+    try:
+        client = get_client()
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        try:
+            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
+            cambios_data = cambios_sheet.get_all_records()
+            
+            if cambios_data:
+                df_cambios = pd.DataFrame(cambios_data)
+                st.dataframe(df_cambios, use_container_width=True)
+                
+                # Estadísticas
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("📊 Total Cambios", len(df_cambios))
+                with col2:
+                    cambios_mes = len(df_cambios[df_cambios['Fecha Cambio'].str.contains(datetime.now().strftime("%Y-%m"))])
+                    st.metric("📈 Este Mes", cambios_mes)
+                with col3:
+                    estudiante_mas_cambios = df_cambios['Estudiante'].value_counts().idxmax() if not df_cambios.empty else "N/A"
+                    st.metric("👤 Más Cambios", estudiante_mas_cambios)
+            else:
+                st.info("ℹ️ No hay registros de cambios de curso")
+                
+        except gspread.exceptions.WorksheetNotFound:
+            st.info("ℹ️ No se ha realizado ningún cambio de curso aún")
+            
+    except Exception as e:
+        st.error(f"❌ Error cargando historial: {e}")
+
+
+
+
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
@@ -1947,7 +2214,131 @@ def admin_panel_mejorado():
             else:
                 st.info("ℹ️ No hay fechas completadas para este curso")
 
-
+    st.divider()
+    
+    # ==============================
+    # GESTIÓN DE CAMBIOS DE CURSO (NUEVA SECCIÓN)
+    # ==============================
+    
+    st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
+    
+    with st.expander("📋 Cambiar Estudiante de Curso", expanded=True):
+        st.warning("""
+        **⚠️ IMPORTANTE:** Esta función mueve el historial completo de un estudiante a otro curso.
+        - Mantiene todo el historial de asistencia
+        - Actualiza automáticamente en todos los reportes
+        - No pierde datos históricos
+        """)
+        
+        # Cargar datos
+        cursos = load_courses()
+        df = load_all_asistencia()
+        
+        if not cursos or df.empty:
+            st.error("No se pudieron cargar los datos necesarios")
+            return
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.subheader("👤 Seleccionar Estudiante")
+            
+            # Seleccionar curso origen
+            curso_origen = st.selectbox(
+                "Curso de origen:",
+                list(cursos.keys()),
+                key="curso_origen"
+            )
+            
+            # Seleccionar estudiante
+            estudiantes_origen = cursos[curso_origen]["estudiantes"]
+            estudiante_seleccionado = st.selectbox(
+                "Estudiante a cambiar:",
+                estudiantes_origen,
+                key="estudiante_cambio"
+            )
+            
+            # Mostrar información del estudiante
+            if estudiante_seleccionado:
+                datos_estudiante = df[df['Estudiante'] == estudiante_seleccionado]
+                if not datos_estudiante.empty:
+                    total_clases = len(datos_estudiante)
+                    asistencias = datos_estudiante['Asistencia'].sum()
+                    porcentaje = (asistencias / total_clases * 100) if total_clases > 0 else 0
+                    
+                    st.info(f"""
+                    **📊 Historial actual:**
+                    - **Curso actual:** {curso_origen}
+                    - **Total clases:** {total_clases}
+                    - **Asistencias:** {asistencias}
+                    - **Porcentaje:** {porcentaje:.1f}%
+                    """)
+        
+        with col2:
+            st.subheader("🎯 Curso Destino")
+            
+            # Seleccionar curso destino (excluyendo el curso origen)
+            cursos_destino = [curso for curso in cursos.keys() if curso != curso_origen]
+            curso_destino = st.selectbox(
+                "Curso destino:",
+                cursos_destino,
+                key="curso_destino"
+            )
+            
+            # Mostrar información del curso destino
+            if curso_destino:
+                estudiantes_destino = cursos[curso_destino]["estudiantes"]
+                st.success(f"""
+                **📚 Curso destino: {curso_destino}**
+                - **Profesor:** {cursos[curso_destino]['profesor']}
+                - **Día:** {cursos[curso_destino]['dia']}
+                - **Horario:** {cursos[curso_destino]['horario']}
+                - **Estudiantes actuales:** {len(estudiantes_destino)}
+                """)
+        
+        # Confirmación y ejecución
+        st.markdown("---")
+        st.subheader("✅ Confirmar Cambio")
+        
+        if estudiante_seleccionado and curso_origen and curso_destino:
+            # Verificar si el estudiante ya existe en el curso destino
+            estudiantes_destino = cursos[curso_destino]["estudiantes"]
+            if estudiante_seleccionado in estudiantes_destino:
+                st.error(f"❌ **{estudiante_seleccionado}** ya existe en el curso **{curso_destino}**")
+            else:
+                st.warning(f"""
+                **🔔 ¿Estás seguro de realizar este cambio?**
+                
+                **Estudiante:** {estudiante_seleccionado}
+                **De:** {curso_origen} → **A:** {curso_destino}
+                
+                **Esta acción:**
+                ✅ Mantendrá todo el historial de asistencia
+                ✅ Actualizará todos los reportes futuros
+                ✅ El estudiante aparecerá en el nuevo curso
+                """)
+                
+                # Opción de fecha efectiva
+                fecha_efectiva = st.date_input(
+                    "Fecha efectiva del cambio:",
+                    value=datetime.now().date(),
+                    help="Los reportes futuros usarán esta fecha para el cambio"
+                )
+                
+                if st.button("🔄 EJECUTAR CAMBIO DE CURSO", type="primary", use_container_width=True):
+                    if ejecutar_cambio_curso(estudiante_seleccionado, curso_origen, curso_destino, fecha_efectiva):
+                        st.success("""
+                        ✅ **¡Cambio de curso ejecutado exitosamente!**
+                        
+                        **Próximos pasos:**
+                        1. El estudiante ya aparece en el nuevo curso
+                        2. Los reportes reflejarán el cambio inmediatamente
+                        3. El historial anterior se mantiene intacto
+                        """)
+                        
+                        # Invalidar caché para reflejar cambios
+                        cache_manager.invalidar()
+                        st.rerun()
 
 
             # Marcado manual de fechas como completadas
@@ -2363,6 +2754,13 @@ Preuniversitario CIMMA 2026""",
             st.session_state.curso_seleccionado = "Todos"
             st.session_state.estudiante_seleccionado = "Todos"
             st.rerun()
+
+
+
+
+
+
+
 
 # ==============================
 # APP PRINCIPAL MEJORADA (PROFESOR)
