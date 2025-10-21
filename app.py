@@ -19,453 +19,6 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
 
-
-
-# ==============================
-# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
-# ==============================
-
-
-
-
-# ==============================
-# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
-# ==============================
-
-def crear_tooltip_fechas():
-    """Función para crear estilos CSS de tooltips - VERSIÓN CORREGIDA"""
-    st.markdown("""
-    <style>
-    .tooltip-fechas {
-        position: relative;
-        display: inline-block;
-    }
-    
-    .tooltip-fechas .tooltiptext {
-        visibility: hidden;
-        width: 350px;
-        background-color: #1A3B8F;
-        color: white;
-        text-align: left;
-        border-radius: 12px;
-        padding: 16px;
-        position: absolute;
-        z-index: 1000;
-        bottom: 125%;
-        left: 50%;
-        transform: translateX(-50%);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        opacity: 0;
-        transition: opacity 0.3s, visibility 0.3s;
-        font-size: 0.9em;
-        line-height: 1.5;
-    }
-    
-    .tooltip-fechas:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-    
-    .tooltip-fechas .ventaja {
-        color: #10B981 !important;
-    }
-    
-    .tooltip-fechas .alerta {
-        color: #F59E0B !important;
-    }
-    
-    .tooltip-fechas ul {
-        margin: 4px 0;
-        padding-left: 16px;
-    }
-    
-    .tooltip-fechas li {
-        margin-bottom: 4px;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-def tooltip_reactivar_fechas():
-    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
-    return """
-    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
-        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
-        <div class="tooltiptext">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
-                🔄 Reactivar Fecha
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Totalmente reversible</li>
-                    <li>Mantiene todo el historial</li>
-                    <li>Sin pérdida de datos</li>
-                    <li>Ideal para correcciones</li>
-                </ul>
-            </div>
-            
-            <div>
-                <strong class="alerta">🎯 Cuándo usar:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Error en registro original</li>
-                    <li>Asistencia incompleta</li>
-                    <li>Cambios en calendario</li>
-                    <li>Verificación de datos</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    """
-
-
-                    
-def mostrar_panel_informativo_fechas():
-    """Muestra un panel informativo completo sobre las funciones de fechas"""
-    
-    with st.expander("📚 GUÍA: Gestión de Fechas Completadas", expanded=False):
-        st.markdown("""
-        ### 🔄 Reactivar Fechas - Guía Completa
-        
-        **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
-        """)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("""
-            #### 🎯 **QUÉ HACE REACTIVAR**
-            
-            **Transforma una fecha:**
-            ✅ Completada → ⏳ Pendiente
-            
-            **Resultado:**
-            - La fecha vuelve a estar disponible para registro
-            - Los profesores pueden tomar asistencia nuevamente
-            - El historial anterior se mantiene
-            """)
-        
-        with col2:
-            st.markdown("""
-            #### 🛡️ **SEGURIDAD Y VENTAJAS**
-            
-            **✅ Totalmente reversible**
-            **✅ Mantiene auditoría completa**
-            **✅ Sin pérdida de datos**
-            **✅ Ideal para correcciones**
-            """)
-        
-        st.markdown("""
-        ---
-        
-        #### 📋 **CASOS DE USO RECOMENDADOS**
-        
-        | Situación | Solución | Beneficio |
-        |-----------|----------|-----------|
-        | **Error en registro** | Reactivar y corregir | Datos precisos sin pérdida |
-        | **Asistencia incompleta** | Reactivar para completar | Información completa |
-        | **Cambio de calendario** | Reactivar fechas afectadas | Flexibilidad del sistema |
-        | **Duda en registros** | Reactivar y verificar | Calidad de datos |
-        
-        ---
-        
-        #### 🔄 **PROCESO RECOMENDADO**
-        
-        1. **Identifica** la fecha que necesita corrección
-        2. **Reactivar** usando el botón 🔄 
-        3. **Comunica** al profesor correspondiente
-        4. **Verifica** que el nuevo registro sea correcto
-        5. **Confirma** que la fecha quede como ✅ Completada
-        
-        ---
-        
-        #### ❓ **PREGUNTAS FRECUENTES**
-        
-        **¿Se pierde el registro anterior?**
-        No, el sistema mantiene todo el historial de cambios.
-        
-        **¿Puedo reactivar múltiples veces?**
-        Sí, tantas veces como sea necesario.
-        
-        **¿Los profesores ven inmediatamente el cambio?**
-        Sí, la fecha aparece disponible en su interfaz al instante.
-        
-        **¿Afecta a los reportes enviados?**
-        Los reportes futuros reflejarán los datos actualizados.
-        """)
-
-
-
-# ==============================
-# CAMBIO DE CURSO ENTRE ESTUDIANTES
-# ==============================
-
-def panel_cambio_curso():
-    """Panel para gestionar cambios de curso entre estudiantes"""
-    
-    st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
-    
-    st.warning("""
-    **⚠️ IMPORTANTE:** Esta función mueve el historial completo de un estudiante a otro curso.
-    - Mantiene todo el historial de asistencia
-    - Actualiza automáticamente en todos los reportes
-    - No pierde datos históricos
-    """)
-    
-    # Cargar datos
-    cursos = load_courses()
-    df = load_all_asistencia()
-    
-    if not cursos or df.empty:
-        st.error("No se pudieron cargar los datos necesarios")
-        return
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("👤 Seleccionar Estudiante")
-        
-        # Seleccionar curso origen
-        curso_origen = st.selectbox(
-            "Curso de origen:",
-            list(cursos.keys()),
-            key="curso_origen"
-        )
-        
-        # Seleccionar estudiante
-        estudiantes_origen = cursos[curso_origen]["estudiantes"]
-        estudiante_seleccionado = st.selectbox(
-            "Estudiante a cambiar:",
-            estudiantes_origen,
-            key="estudiante_cambio"
-        )
-        
-        # Mostrar información del estudiante
-        if estudiante_seleccionado:
-            datos_estudiante = df[df['Estudiante'] == estudiante_seleccionado]
-            if not datos_estudiante.empty:
-                total_clases = len(datos_estudiante)
-                asistencias = datos_estudiante['Asistencia'].sum()
-                porcentaje = (asistencias / total_clases * 100) if total_clases > 0 else 0
-                
-                st.info(f"""
-                **📊 Historial actual:**
-                - **Curso actual:** {curso_origen}
-                - **Total clases:** {total_clases}
-                - **Asistencias:** {asistencias}
-                - **Porcentaje:** {porcentaje:.1f}%
-                """)
-    
-    with col2:
-        st.subheader("🎯 Curso Destino")
-        
-        # Seleccionar curso destino (excluyendo el curso origen)
-        cursos_destino = [curso for curso in cursos.keys() if curso != curso_origen]
-        curso_destino = st.selectbox(
-            "Curso destino:",
-            cursos_destino,
-            key="curso_destino"
-        )
-        
-        # Mostrar información del curso destino
-        if curso_destino:
-            estudiantes_destino = cursos[curso_destino]["estudiantes"]
-            st.success(f"""
-            **📚 Curso destino: {curso_destino}**
-            - **Profesor:** {cursos[curso_destino]['profesor']}
-            - **Día:** {cursos[curso_destino]['dia']}
-            - **Horario:** {cursos[curso_destino]['horario']}
-            - **Estudiantes actuales:** {len(estudiantes_destino)}
-            """)
-    
-    # Confirmación y ejecución
-    st.markdown("---")
-    st.subheader("✅ Confirmar Cambio")
-    
-    if estudiante_seleccionado and curso_origen and curso_destino:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            # Verificar si el estudiante ya existe en el curso destino
-            estudiantes_destino = cursos[curso_destino]["estudiantes"]
-            if estudiante_seleccionado in estudiantes_destino:
-                st.error(f"❌ **{estudiante_seleccionado}** ya existe en el curso **{curso_destino}**")
-                return
-            
-            st.warning(f"""
-            **🔔 ¿Estás seguro de realizar este cambio?**
-            
-            **Estudiante:** {estudiante_seleccionado}
-            **De:** {curso_origen} → **A:** {curso_destino}
-            
-            **Esta acción:**
-            ✅ Mantendrá todo el historial de asistencia
-            ✅ Actualizará todos los reportes futuros
-            ✅ El estudiante aparecerá en el nuevo curso
-            """)
-            
-            # Opción de fecha efectiva
-            fecha_efectiva = st.date_input(
-                "Fecha efectiva del cambio:",
-                value=datetime.now().date(),
-                help="Los reportes futuros usarán esta fecha para el cambio"
-            )
-            
-            if st.button("🔄 EJECUTAR CAMBIO DE CURSO", type="primary", use_container_width=True):
-                if ejecutar_cambio_curso(estudiante_seleccionado, curso_origen, curso_destino, fecha_efectiva):
-                    st.success("""
-                    ✅ **¡Cambio de curso ejecutado exitosamente!**
-                    
-                    **Próximos pasos:**
-                    1. El estudiante ya aparece en el nuevo curso
-                    2. Los reportes reflejarán el cambio inmediatamente
-                    3. El historial anterior se mantiene intacto
-                    """)
-                    
-                    # Invalidar caché para reflejar cambios
-                    cache_manager.invalidar()
-                    st.rerun()
-
-def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiva):
-    """Ejecuta el cambio de curso en Google Sheets"""
-    
-    try:
-        client = get_client()
-        if not client:
-            st.error("❌ Error de conexión con Google Sheets")
-            return False
-        
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-        
-        # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
-        try:
-            sheet_origen = asistencia_sheet.worksheet(curso_origen)
-            records_origen = sheet_origen.get_all_records()
-            
-            # Encontrar y actualizar registros del estudiante
-            for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
-                if row.get('Estudiante') == estudiante:
-                    # Actualizar el curso en el registro
-                    sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
-        
-        # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
-        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
-        
-        try:
-            # Remover de curso origen
-            sheet_clases_origen = clases_sheet.worksheet(curso_origen)
-            valores_origen = sheet_clases_origen.get_all_values()
-            
-            for i, fila in enumerate(valores_origen):
-                if estudiante in fila:
-                    # Encontrar la columna del estudiante y limpiar
-                    for j, valor in enumerate(fila):
-                        if valor == estudiante:
-                            sheet_clases_origen.update_cell(i + 1, j + 1, "")
-                            break
-                    break
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
-        
-        try:
-            # Agregar a curso destino
-            sheet_clases_destino = clases_sheet.worksheet(curso_destino)
-            valores_destino = sheet_clases_destino.get_all_values()
-            
-            # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
-            idx_estudiantes = None
-            for i, fila in enumerate(valores_destino):
-                if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
-                    idx_estudiantes = i + 1
-                    break
-            
-            if idx_estudiantes is not None:
-                # Encontrar primera celda vacía en la columna de estudiantes
-                col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
-                for i in range(idx_estudiantes, len(valores_destino)):
-                    if not valores_destino[i][col_estudiantes].strip():
-                        sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
-                        break
-                else:
-                    # Si no hay celdas vacías, agregar al final
-                    sheet_clases_destino.append_row([estudiante])
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
-        
-        # 3. REGISTRAR EN LOG DE CAMBIOS
-        try:
-            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
-        except gspread.exceptions.WorksheetNotFound:
-            cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
-            cambios_sheet.append_row([
-                "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
-                "Fecha Efectiva", "Administrador"
-            ])
-        
-        cambios_sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            estudiante,
-            curso_origen,
-            curso_destino,
-            fecha_efectiva.strftime("%Y-%m-%d"),
-            st.session_state["user_name"]
-        ])
-        
-        return True
-        
-    except Exception as e:
-        st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
-        return False
-
-def panel_historial_cambios():
-    """Panel para ver historial de cambios de curso"""
-    
-    st.markdown('<h2 class="section-header">📋 Historial de Cambios</h2>', unsafe_allow_html=True)
-    
-    try:
-        client = get_client()
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-        
-        try:
-            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
-            cambios_data = cambios_sheet.get_all_records()
-            
-            if cambios_data:
-                df_cambios = pd.DataFrame(cambios_data)
-                st.dataframe(df_cambios, use_container_width=True)
-                
-                # Estadísticas
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("📊 Total Cambios", len(df_cambios))
-                with col2:
-                    cambios_mes = len(df_cambios[df_cambios['Fecha Cambio'].str.contains(datetime.now().strftime("%Y-%m"))])
-                    st.metric("📈 Este Mes", cambios_mes)
-                with col3:
-                    estudiante_mas_cambios = df_cambios['Estudiante'].value_counts().idxmax() if not df_cambios.empty else "N/A"
-                    st.metric("👤 Más Cambios", estudiante_mas_cambios)
-            else:
-                st.info("ℹ️ No hay registros de cambios de curso")
-                
-        except gspread.exceptions.WorksheetNotFound:
-            st.info("ℹ️ No se ha realizado ningún cambio de curso aún")
-            
-    except Exception as e:
-        st.error(f"❌ Error cargando historial: {e}")
-
-
-
-
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
@@ -561,7 +114,7 @@ class CacheInteligente:
             for clave in claves_ordenadas[:len(self.cache_data) - max_size]:
                 del self.cache_data[clave]
 
-# Instancia global de caché (DEFINIR ANTES DE LAS CLASES QUE LO USAN)
+# Instancia global de caché
 cache_manager = CacheInteligente()
 
 # ==============================
@@ -686,6 +239,175 @@ class SistemaFechasCompletadas:
 sistema_fechas = SistemaFechasCompletadas()
 
 # ==============================
+# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
+# ==============================
+
+def crear_tooltip_fechas():
+    """Función para crear estilos CSS de tooltips - VERSIÓN CORREGIDA"""
+    st.markdown("""
+    <style>
+    .tooltip-fechas {
+        position: relative;
+        display: inline-block;
+    }
+    
+    .tooltip-fechas .tooltiptext {
+        visibility: hidden;
+        width: 350px;
+        background-color: #1A3B8F;
+        color: white;
+        text-align: left;
+        border-radius: 12px;
+        padding: 16px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+        font-size: 0.9em;
+        line-height: 1.5;
+    }
+    
+    .tooltip-fechas:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .tooltip-fechas .ventaja {
+        color: #10B981 !important;
+    }
+    
+    .tooltip-fechas .alerta {
+        color: #F59E0B !important;
+    }
+    
+    .tooltip-fechas ul {
+        margin: 4px 0;
+        padding-left: 16px;
+    }
+    
+    .tooltip-fechas li {
+        margin-bottom: 4px;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def tooltip_reactivar_fechas():
+    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
+    return """
+    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
+        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
+        <div class="tooltiptext">
+            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
+                🔄 Reactivar Fecha
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+                <strong>📝 Qué hace:</strong>
+                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+                <strong class="ventaja">✅ Ventajas:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Totalmente reversible</li>
+                    <li>Mantiene todo el historial</li>
+                    <li>Sin pérdida de datos</li>
+                    <li>Ideal para correcciones</li>
+                </ul>
+            </div>
+            
+            <div>
+                <strong class="alerta">🎯 Cuándo usar:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Error en registro original</li>
+                    <li>Asistencia incompleta</li>
+                    <li>Cambios en calendario</li>
+                    <li>Verificación de datos</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    """
+                    
+def mostrar_panel_informativo_fechas():
+    """Muestra un panel informativo completo sobre las funciones de fechas"""
+    
+    with st.expander("📚 GUÍA: Gestión de Fechas Completadas", expanded=False):
+        st.markdown("""
+        ### 🔄 Reactivar Fechas - Guía Completa
+        
+        **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            #### 🎯 **QUÉ HACE REACTIVAR**
+            
+            **Transforma una fecha:**
+            ✅ Completada → ⏳ Pendiente
+            
+            **Resultado:**
+            - La fecha vuelve a estar disponible para registro
+            - Los profesores pueden tomar asistencia nuevamente
+            - El historial anterior se mantiene
+            """)
+        
+        with col2:
+            st.markdown("""
+            #### 🛡️ **SEGURIDAD Y VENTAJAS**
+            
+            **✅ Totalmente reversible**
+            **✅ Mantiene auditoría completa**
+            **✅ Sin pérdida de datos**
+            **✅ Ideal para correcciones**
+            """)
+        
+        st.markdown("""
+        ---
+        
+        #### 📋 **CASOS DE USO RECOMENDADOS**
+        
+        | Situación | Solución | Beneficio |
+        |-----------|----------|-----------|
+        | **Error en registro** | Reactivar y corregir | Datos precisos sin pérdida |
+        | **Asistencia incompleta** | Reactivar para completar | Información completa |
+        | **Cambio de calendario** | Reactivar fechas afectadas | Flexibilidad del sistema |
+        | **Duda en registros** | Reactivar y verificar | Calidad de datos |
+        
+        ---
+        
+        #### 🔄 **PROCESO RECOMENDADO**
+        
+        1. **Identifica** la fecha que necesita corrección
+        2. **Reactivar** usando el botón 🔄 
+        3. **Comunica** al profesor correspondiente
+        4. **Verifica** que el nuevo registro sea correcto
+        5. **Confirma** que la fecha quede como ✅ Completada
+        
+        ---
+        
+        #### ❓ **PREGUNTAS FRECUENTES**
+        
+        **¿Se pierde el registro anterior?**
+        No, el sistema mantiene todo el historial de cambios.
+        
+        **¿Puedo reactivar múltiples veces?**
+        Sí, tantas veces como sea necesario.
+        
+        **¿Los profesores ven inmediatamente el cambio?**
+        Sí, la fecha aparece disponible en su interfaz al instante.
+        
+        **¿Afecta a los reportes enviados?**
+        Los reportes futuros reflejarán los datos actualizados.
+        """)
+
+# ==============================
 # SISTEMA DE AYUDA CONTEXTUAL
 # ==============================
 
@@ -802,7 +524,6 @@ class SistemaAyuda:
     
     def mostrar_ayuda_completa(self):
         """Modal con ayuda completa"""
-        # Usaremos un expander en lugar de modal para simplicidad
         with st.expander("🎓 Centro de Ayuda - Preuniversitario CIMMA", expanded=True):
             st.markdown("### Guía Completa del Sistema")
             
@@ -1716,172 +1437,6 @@ def load_all_asistencia():
     return df
 
 # ==============================
-# MENÚ LATERAL Y AUTENTICACIÓN
-# ==============================
-
-def main():
-    st.set_page_config(
-        page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
-        page_icon="🎓",
-        layout="wide",
-        initial_sidebar_state="expanded"
-    )
-    
-    # Aplicar tema moderno
-    aplicar_tema_moderno()
-    crear_header_moderno()
-    
-    with st.sidebar:
-        st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
-        st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.title("🔐 Acceso")
-        
-        if "user_type" not in st.session_state:
-            st.session_state["user_type"] = None
-            st.session_state["user_name"] = None
-            st.session_state["2fa_code"] = None
-            st.session_state["2fa_email"] = None
-            st.session_state["awaiting_2fa"] = False
-            st.session_state["2fa_user_name"] = None
-            st.session_state["2fa_time"] = None
-            st.session_state["2fa_attempts"] = 0
-        
-        if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
-            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
-            if user_type == "Profesor":
-                profesores = st.secrets.get("profesores", {})
-                if profesores:
-                    nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
-                    clave = st.text_input("Clave", type="password", key="prof_pass")
-                    if boton_moderno("Ingresar como Profesor", "primario", "👨‍🏫", "prof_login"):
-                        if profesores.get(nombre) == clave:
-                            st.session_state["user_type"] = "profesor"
-                            st.session_state["user_name"] = nombre
-                            st.session_state['login_time'] = time.time()
-                            st.session_state['timeout_duration'] = 5 * 60  # 5 minutos
-                            st.rerun()
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay profesores configurados en Secrets.")
-            else:
-                try:
-                    admins = st.secrets.get("administradores", {})
-                    admin_emails = st.secrets.get("admin_emails", {})
-                except KeyError:
-                    st.error("Configuración de administradores no encontrada en Secrets.")
-                    return
-                if admins and admin_emails:
-                    nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
-                    clave = st.text_input("Clave", type="password", key="admin_pass")
-                    if boton_moderno("Ingresar como Admin", "primario", "👨‍💼", "admin_login"):
-                        if admins.get(nombre) == clave:
-                            code = generate_2fa_code()
-                            email = admin_emails.get(nombre, "profereport@gmail.com")
-                            subject = "Código de Verificación - Preuniversitario CIMMA"
-                            body = f"""Estimado/a {nombre},
-
-Su código de verificación para acceder al sistema es: 
-
-{code}
-
-Este código es válido por 10 minutos.
-
-Saludos,
-Preuniversitario CIMMA"""
-                            if send_email(email, subject, body):
-                                st.session_state["2fa_code"] = code
-                                st.session_state["2fa_email"] = email
-                                st.session_state["awaiting_2fa"] = True
-                                st.session_state["2fa_user_name"] = nombre
-                                st.session_state["2fa_time"] = get_chile_time()
-                                st.session_state["2fa_attempts"] = 0
-                                st.rerun()
-                            else:
-                                st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
-                        else:
-                            st.error("❌ Clave incorrecta")
-                else:
-                    st.error("No hay administradores o correos configurados en Secrets.")
-        elif st.session_state["awaiting_2fa"]:
-            st.subheader("🔐 Verificación en dos pasos")
-            st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
-            time_remaining = 600 - (get_chile_time() - st.session_state["2fa_time"]).total_seconds()
-            if time_remaining > 0:
-                st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
-            code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
-            if boton_moderno("Verificar código", "primario", "🔒", "verify_2fa"):
-                if not code_input.isdigit() or len(code_input) != 6:
-                    st.error("El código debe ser un número de 6 dígitos")
-                elif (get_chile_time() - st.session_state["2fa_time"]).total_seconds() > 600:
-                    st.error("❌ El código ha expirado. Por favor, intenta iniciar sesión de nuevo.")
-                    st.session_state["awaiting_2fa"] = False
-                    st.session_state["2fa_code"] = None
-                    st.session_state["2fa_email"] = None
-                    st.session_state["2fa_attempts"] = 0
-                    st.rerun()
-                elif st.session_state["2fa_attempts"] >= 3:
-                    st.error("❌ Demasiados intentos fallidos. Intenta iniciar sesión de nuevo.")
-                    st.session_state["awaiting_2fa"] = False
-                    st.session_state["2fa_code"] = None
-                    st.session_state["2fa_email"] = None
-                    st.session_state["2fa_attempts"] = 0
-                    st.rerun()
-                elif code_input == st.session_state["2fa_code"]:
-                    st.session_state["user_type"] = "admin"
-                    st.session_state["user_name"] = st.session_state["2fa_user_name"]
-                    st.session_state["awaiting_2fa"] = False
-                    st.session_state["2fa_code"] = None
-                    st.session_state["2fa_email"] = None
-                    st.session_state["2fa_attempts"] = 0
-                    st.session_state["2fa_time"] = None
-                    st.session_state['login_time'] = time.time()
-                    st.session_state['timeout_duration'] = 30 * 60  # 30 minutos
-                    st.rerun()
-                else:
-                    st.session_state["2fa_attempts"] += 1
-                    st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
-        else:
-            st.success(f"👤 {st.session_state['user_name']}")
-            
-            # Panel de monitoreo de caché solo para admins
-            if st.session_state["user_type"] == "admin":
-                panel_monitoreo_cache()
-                sistema_ayuda.boton_ayuda_completa()
-            
-            if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
-                st.session_state.clear()
-                st.rerun()
-        st.markdown('</div>', unsafe_allow_html=True)
-    
-    # Implementar temporizador si hay sesión activa
-    if st.session_state.get("user_type"):
-        implementar_temporizador_seguridad()
-    
-    if st.session_state["user_type"] is None:
-        st.markdown("""
-        <div style="text-align: center; padding: 4rem 2rem;">
-            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA</h1>
-            <h2 style="color: #6B7280; font-size: 1.5rem; margin-bottom: 2rem;">Sistema de Gestión de Asistencia 2026</h2>
-            <div class="card" style="max-width: 600px; margin: 0 auto;">
-                <h3 style="color: #1A3B8F;">👋 ¡Bienvenido!</h3>
-                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <p style="margin: 0; color: #1A3B8F;">Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
-                </div>  
-                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
-                    <p style="margin: 0; color: #1A3B8F;"><strong>💡 Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.</p>
-                </div>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        return
-    
-    if st.session_state["user_type"] == "admin":
-        admin_panel_mejorado()
-    else:
-        main_app_mejorada()
-
-# ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
 # ==============================
 
@@ -2047,6 +1602,106 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
         return False
 
 # ==============================
+# GESTIÓN DE CAMBIOS DE CURSO
+# ==============================
+
+def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiva):
+    """Ejecuta el cambio de curso en Google Sheets"""
+    
+    try:
+        client = get_client()
+        if not client:
+            st.error("❌ Error de conexión con Google Sheets")
+            return False
+        
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
+        try:
+            sheet_origen = asistencia_sheet.worksheet(curso_origen)
+            records_origen = sheet_origen.get_all_records()
+            
+            # Encontrar y actualizar registros del estudiante
+            for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
+                if row.get('Estudiante') == estudiante:
+                    # Actualizar el curso en el registro
+                    sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
+        
+        # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
+        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
+        
+        try:
+            # Remover de curso origen
+            sheet_clases_origen = clases_sheet.worksheet(curso_origen)
+            valores_origen = sheet_clases_origen.get_all_values()
+            
+            for i, fila in enumerate(valores_origen):
+                if estudiante in fila:
+                    # Encontrar la columna del estudiante y limpiar
+                    for j, valor in enumerate(fila):
+                        if valor == estudiante:
+                            sheet_clases_origen.update_cell(i + 1, j + 1, "")
+                            break
+                    break
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
+        
+        try:
+            # Agregar a curso destino
+            sheet_clases_destino = clases_sheet.worksheet(curso_destino)
+            valores_destino = sheet_clases_destino.get_all_values()
+            
+            # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
+            idx_estudiantes = None
+            for i, fila in enumerate(valores_destino):
+                if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
+                    idx_estudiantes = i + 1
+                    break
+            
+            if idx_estudiantes is not None:
+                # Encontrar primera celda vacía en la columna de estudiantes
+                col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
+                for i in range(idx_estudiantes, len(valores_destino)):
+                    if not valores_destino[i][col_estudiantes].strip():
+                        sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
+                        break
+                else:
+                    # Si no hay celdas vacías, agregar al final
+                    sheet_clases_destino.append_row([estudiante])
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
+        
+        # 3. REGISTRAR EN LOG DE CAMBIOS
+        try:
+            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
+        except gspread.exceptions.WorksheetNotFound:
+            cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
+            cambios_sheet.append_row([
+                "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
+                "Fecha Efectiva", "Administrador"
+            ])
+        
+        cambios_sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            estudiante,
+            curso_origen,
+            curso_destino,
+            fecha_efectiva.strftime("%Y-%m-%d"),
+            st.session_state["user_name"]
+        ])
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
+        return False
+
+# ==============================
 # PANEL ADMINISTRATIVO MEJORADO
 # ==============================
 
@@ -2099,6 +1754,7 @@ def admin_panel_mejorado():
     # ==============================
     
     st.markdown('<h2 class="section-header">📅 Gestión de Fechas Completadas</h2>', unsafe_allow_html=True)
+
     # Aplicar estilos de tooltips
     crear_tooltip_fechas()
 
@@ -2136,13 +1792,12 @@ def admin_panel_mejorado():
             with col4:
                 st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
             
-            # Tabla de fechas completadas - VERSIÓN CORREGIDA
+            # Tabla de fechas completadas
             st.subheader("📋 Fechas Completadas")
             if stats["fechas_completadas"]:
                 st.markdown("**Haz clic sobre 🔄 para habilitar fecha en menú del profesor**")
                 
                 for i, fecha in enumerate(stats["fechas_completadas"]):
-                    # Usar un contenedor para cada fecha para mejor espaciado
                     with st.container():
                         col1, col2 = st.columns([4, 2])
                         with col1:
@@ -2156,7 +1811,6 @@ def admin_panel_mejorado():
                                     st.success(f"✅ Fecha '{fecha}' reactivada - Ahora disponible para registro")
                                     st.rerun()
                         
-                        # Separador entre fechas (solo visual)
                         if i < len(stats["fechas_completadas"]) - 1:
                             st.markdown("---")
             else:
@@ -2164,24 +1818,25 @@ def admin_panel_mejorado():
 
             # Marcado manual de fechas como completadas
             st.subheader("✅ Marcado Manual de Fechas")
-            fecha_manual = st.selectbox(
-                "Selecciona fecha para marcar como completada:",
-                [f for f in fechas_totales if f not in stats["fechas_completadas"]],
-                key="fecha_manual_select"
-            )
-        
-        if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
-            if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
-                st.success(f"✅ Fecha {fecha_manual} marcada como completada")
-                st.rerun()
-
-
-
-
+            fechas_pendientes = [f for f in fechas_totales if f not in stats["fechas_completadas"]]
+            if fechas_pendientes:
+                fecha_manual = st.selectbox(
+                    "Selecciona fecha para marcar como completada:",
+                    fechas_pendientes,
+                    key="fecha_manual_select_admin"
+                )
+                
+                if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True, key="marcar_completada_admin"):
+                    if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
+                        st.success(f"✅ Fecha {fecha_manual} marcada como completada")
+                        st.rerun()
+            else:
+                st.info("🎉 ¡Todas las fechas ya están completadas!")
+    
     st.divider()
     
     # ==============================
-    # GESTIÓN DE CAMBIOS DE CURSO (NUEVA SECCIÓN)
+    # GESTIÓN DE CAMBIOS DE CURSO
     # ==============================
     
     st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
@@ -2211,7 +1866,7 @@ def admin_panel_mejorado():
             curso_origen = st.selectbox(
                 "Curso de origen:",
                 list(cursos.keys()),
-                key="curso_origen"
+                key="curso_origen_admin"
             )
             
             # Seleccionar estudiante
@@ -2219,7 +1874,7 @@ def admin_panel_mejorado():
             estudiante_seleccionado = st.selectbox(
                 "Estudiante a cambiar:",
                 estudiantes_origen,
-                key="estudiante_cambio"
+                key="estudiante_cambio_admin"
             )
             
             # Mostrar información del estudiante
@@ -2246,7 +1901,7 @@ def admin_panel_mejorado():
             curso_destino = st.selectbox(
                 "Curso destino:",
                 cursos_destino,
-                key="curso_destino"
+                key="curso_destino_admin"
             )
             
             # Mostrar información del curso destino
@@ -2286,10 +1941,11 @@ def admin_panel_mejorado():
                 fecha_efectiva = st.date_input(
                     "Fecha efectiva del cambio:",
                     value=datetime.now().date(),
-                    help="Los reportes futuros usarán esta fecha para el cambio"
+                    help="Los reportes futuros usarán esta fecha para el cambio",
+                    key="fecha_efectiva_admin"
                 )
                 
-                if st.button("🔄 EJECUTAR CAMBIO DE CURSO", type="primary", use_container_width=True):
+                if st.button("🔄 EJECUTAR CAMBIO DE CURSO", type="primary", use_container_width=True, key="ejecutar_cambio_admin"):
                     if ejecutar_cambio_curso(estudiante_seleccionado, curso_origen, curso_destino, fecha_efectiva):
                         st.success("""
                         ✅ **¡Cambio de curso ejecutado exitosamente!**
@@ -2304,20 +1960,6 @@ def admin_panel_mejorado():
                         cache_manager.invalidar()
                         st.rerun()
 
-
-            # Marcado manual de fechas como completadas
-            st.subheader("✅ Marcado Manual de Fechas")
-            fecha_manual = st.selectbox(
-                "Selecciona fecha para marcar como completada:",
-                [f for f in fechas_totales if f not in stats["fechas_completadas"]],
-                key="fecha_manual_select"
-            )
-            
-            if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
-                if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
-                    st.success(f"✅ Fecha {fecha_manual} marcada como completada")
-                    st.rerun()
-    
     st.divider()
     
     # ==============================
@@ -2373,7 +2015,8 @@ def admin_panel_mejorado():
     curso_seleccionado = st.sidebar.selectbox(
         "Seleccionar Curso",
         cursos,
-        index=cursos.index(st.session_state.curso_seleccionado) if st.session_state.curso_seleccionado in cursos else 0
+        index=cursos.index(st.session_state.curso_seleccionado) if st.session_state.curso_seleccionado in cursos else 0,
+        key="curso_select_admin"
     )
     st.session_state.curso_seleccionado = curso_seleccionado
     
@@ -2387,7 +2030,8 @@ def admin_panel_mejorado():
     estudiante_seleccionado = st.sidebar.selectbox(
         "Seleccionar Estudiante",
         estudiantes,
-        index=estudiantes.index(st.session_state.estudiante_seleccionado) if st.session_state.estudiante_seleccionado in estudiantes else 0
+        index=estudiantes.index(st.session_state.estudiante_seleccionado) if st.session_state.estudiante_seleccionado in estudiantes else 0,
+        key="estudiante_select_admin"
     )
     st.session_state.estudiante_seleccionado = estudiante_seleccionado
     
@@ -2398,7 +2042,8 @@ def admin_panel_mejorado():
             "Desde",
             value=st.session_state.fecha_inicio,
             min_value=fecha_min,
-            max_value=fecha_max
+            max_value=fecha_max,
+            key="fecha_inicio_admin"
         )
         st.session_state.fecha_inicio = fecha_inicio
     
@@ -2407,12 +2052,13 @@ def admin_panel_mejorado():
             "Hasta",
             value=st.session_state.fecha_fin,
             min_value=fecha_min,
-            max_value=fecha_max
+            max_value=fecha_max,
+            key="fecha_fin_admin"
         )
         st.session_state.fecha_fin = fecha_fin
     
     # Botón limpiar filtros
-    if boton_moderno("🧹 Limpiar Filtros", "secundario", "🧹", "clear_filters"):
+    if boton_moderno("🧹 Limpiar Filtros", "secundario", "🧹", "clear_filters_admin"):
         st.session_state.curso_seleccionado = "Todos"
         st.session_state.estudiante_seleccionado = "Todos"
         st.session_state.fecha_inicio = fecha_min
@@ -2586,13 +2232,14 @@ Para consultas específicas, por favor contacte a la administración.
 
 Saludos cordiales,
 Preuniversitario CIMMA 2026""",
-            height=300
+            height=300,
+            key="email_template_admin"
         )
         
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            if boton_moderno("🔍 PREPARAR ENVÍO DE RESUMENES", "primario", "🔍", "prepare_emails"):
+            if boton_moderno("🔍 PREPARAR ENVÍO DE RESUMENES", "primario", "🔍", "prepare_emails_admin"):
                 st.session_state.email_status = ""
                 
                 with st.spinner("🔄 Analizando datos y preparando envío..."):
@@ -2625,7 +2272,7 @@ Preuniversitario CIMMA 2026""",
                         st.rerun()
         
         with col2:
-            if boton_moderno("🔄 LIMPIAR ESTADO", "secundario", "🔄", "clear_status"):
+            if boton_moderno("🔄 LIMPIAR ESTADO", "secundario", "🔄", "clear_status_admin"):
                 st.session_state.email_status = ""
                 st.rerun()
         
@@ -2660,7 +2307,8 @@ Preuniversitario CIMMA 2026""",
             csv,
             "asistencia_filtrada.csv",
             "text/csv",
-            use_container_width=True
+            use_container_width=True,
+            key="download_csv_admin"
         )
     
     with col2:
@@ -2690,7 +2338,8 @@ Preuniversitario CIMMA 2026""",
             excel_data,
             "asistencia_filtrada.xlsx",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            use_container_width=True
+            use_container_width=True,
+            key="download_excel_admin"
         )
     
     # ==============================
@@ -2701,30 +2350,23 @@ Preuniversitario CIMMA 2026""",
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        if boton_moderno("🔄 RECARGAR DATOS", "primario", "🔄", "reload_data"):
+        if boton_moderno("🔄 RECARGAR DATOS", "primario", "🔄", "reload_data_admin"):
             cache_manager.invalidar()
             st.cache_data.clear()
             st.session_state.email_status = "🔄 Datos recargados"
             st.rerun()
     
     with col2:
-        if boton_moderno("📊 ACTUALIZAR VISTA", "secundario", "📊", "refresh_view"):
+        if boton_moderno("📊 ACTUALIZAR VISTA", "secundario", "📊", "refresh_view_admin"):
             st.session_state.email_status = "📊 Vista actualizada"
             st.rerun()
     
     with col3:
-        if boton_moderno("🧹 LIMPIAR TODO", "peligro", "🧹", "clear_all"):
+        if boton_moderno("🧹 LIMPIAR TODO", "peligro", "🧹", "clear_all_admin"):
             st.session_state.email_status = ""
             st.session_state.curso_seleccionado = "Todos"
             st.session_state.estudiante_seleccionado = "Todos"
             st.rerun()
-
-
-
-
-
-
-
 
 # ==============================
 # APP PRINCIPAL MEJORADA (PROFESOR)
@@ -2755,7 +2397,7 @@ def main_app_mejorada():
         st.stop()
     
     # Selector de curso moderno
-    curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()))
+    curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()), key="curso_select_profesor")
     data = cursos_filtrados[curso_seleccionado]
     
     # Información del curso en tarjetas
@@ -2801,13 +2443,15 @@ def main_app_mejorada():
         "¿Se realizó la clase?",
         ("Sí", "No"),
         index=0,
-        horizontal=True
+        horizontal=True,
+        key="clase_realizada_profesor"
     )
     
     if clase_realizada == "No":
         motivo = st.text_area(
             "📝 Motivo de la no realización",
-            placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc."
+            placeholder="Ej: Feriado nacional, suspensión por evento escolar, emergencia, etc.",
+            key="motivo_suspension_profesor"
         )
         
         # Mostrar solo fechas pendientes para suspensión
@@ -2817,9 +2461,9 @@ def main_app_mejorada():
             st.warning("ℹ️ Todas las fechas ya están completadas. Para registrar una suspensión, contacta a un administrador.")
             return
             
-        fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", fechas_pendientes)
+        fecha_seleccionada = st.selectbox("🗓️ Fecha afectada", fechas_pendientes, key="fecha_suspension_profesor")
         
-        if boton_moderno("💾 Registrar suspensión", "peligro", "⏸️", "register_suspension"):
+        if boton_moderno("💾 Registrar suspensión", "peligro", "⏸️", "register_suspension_profesor"):
             try:
                 client = get_client()
                 if not client:
@@ -2864,7 +2508,7 @@ def main_app_mejorada():
         st.info("💡 Si necesitas registrar asistencia en una fecha ya completada, contacta a un administrador para reactivarla.")
         return
     
-    fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", fechas_pendientes)
+    fecha_seleccionada = st.selectbox("🗓️ Selecciona la fecha", fechas_pendientes, key="fecha_asistencia_profesor")
     
     # Verificar duplicados
     if fecha_seleccionada in stats["fechas_completadas"]:
@@ -2902,7 +2546,7 @@ def main_app_mejorada():
     # Botón de guardar
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
-        if boton_moderno("💾 Guardar Asistencia", "exito", "💾", "guardar_asistencia"):
+        if boton_moderno("💾 Guardar Asistencia", "exito", "💾", "guardar_asistencia_profesor"):
             try:
                 client = get_client()
                 if not client:
@@ -2960,8 +2604,8 @@ Preuniversitario CIMMA 2026"""
     # Sección de sugerencias
     st.divider()
     st.markdown('<h3 class="section-header">💡 Sugerencias de Mejora</h3>', unsafe_allow_html=True)
-    mejora = st.text_area("Comparte tus ideas para mejorar esta plataforma:", placeholder="Ej: Agregar notificación por WhatsApp...")
-    if boton_moderno("📤 Enviar sugerencia", "secundario", "💡", "send_suggestion"):
+    mejora = st.text_area("Comparte tus ideas para mejorar esta plataforma:", placeholder="Ej: Agregar notificación por WhatsApp...", key="sugerencia_profesor")
+    if boton_moderno("📤 Enviar sugerencia", "secundario", "💡", "send_suggestion_profesor"):
         try:
             client = get_client()
             if not client:
@@ -2977,6 +2621,174 @@ Preuniversitario CIMMA 2026"""
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
+
+# ==============================
+# MENÚ LATERAL Y AUTENTICACIÓN
+# ==============================
+
+def main():
+    st.set_page_config(
+        page_title="Preuniversitario CIMMA : Asistencia Cursos 2026",
+        page_icon="🎓",
+        layout="wide",
+        initial_sidebar_state="expanded"
+    )
+    
+    # Aplicar tema moderno
+    aplicar_tema_moderno()
+    crear_header_moderno()
+    
+    with st.sidebar:
+        st.image("https://raw.githubusercontent.com/juanrojas-40/asistencia-2026/main/LOGO.jpg", use_container_width=True)
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.title("🔐 Acceso")
+        
+        if "user_type" not in st.session_state:
+            st.session_state["user_type"] = None
+            st.session_state["user_name"] = None
+            st.session_state["2fa_code"] = None
+            st.session_state["2fa_email"] = None
+            st.session_state["awaiting_2fa"] = False
+            st.session_state["2fa_user_name"] = None
+            st.session_state["2fa_time"] = None
+            st.session_state["2fa_attempts"] = 0
+            st.session_state["login_time"] = time.time()
+            st.session_state["timeout_duration"] = 5 * 60  # 5 minutos por defecto
+        
+        if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
+            user_type = st.radio("Selecciona tu rol", ["Profesor", "Administrador"], key="role_select")
+            if user_type == "Profesor":
+                profesores = st.secrets.get("profesores", {})
+                if profesores:
+                    nombre = st.selectbox("Nombre", list(profesores.keys()), key="prof_select")
+                    clave = st.text_input("Clave", type="password", key="prof_pass")
+                    if boton_moderno("Ingresar como Profesor", "primario", "👨‍🏫", "prof_login"):
+                        if profesores.get(nombre) == clave:
+                            st.session_state["user_type"] = "profesor"
+                            st.session_state["user_name"] = nombre
+                            st.session_state['login_time'] = time.time()
+                            st.session_state['timeout_duration'] = 5 * 60  # 5 minutos
+                            st.rerun()
+                        else:
+                            st.error("❌ Clave incorrecta")
+                else:
+                    st.error("No hay profesores configurados en Secrets.")
+            else:
+                try:
+                    admins = st.secrets.get("administradores", {})
+                    admin_emails = st.secrets.get("admin_emails", {})
+                except KeyError:
+                    st.error("Configuración de administradores no encontrada en Secrets.")
+                    return
+                if admins and admin_emails:
+                    nombre = st.selectbox("Usuario", list(admins.keys()), key="admin_select")
+                    clave = st.text_input("Clave", type="password", key="admin_pass")
+                    if boton_moderno("Ingresar como Admin", "primario", "👨‍💼", "admin_login"):
+                        if admins.get(nombre) == clave:
+                            code = generate_2fa_code()
+                            email = admin_emails.get(nombre, "profereport@gmail.com")
+                            subject = "Código de Verificación - Preuniversitario CIMMA"
+                            body = f"""Estimado/a {nombre},
+
+Su código de verificación para acceder al sistema es: 
+
+{code}
+
+Este código es válido por 10 minutos.
+
+Saludos,
+Preuniversitario CIMMA"""
+                            if send_email(email, subject, body):
+                                st.session_state["2fa_code"] = code
+                                st.session_state["2fa_email"] = email
+                                st.session_state["awaiting_2fa"] = True
+                                st.session_state["2fa_user_name"] = nombre
+                                st.session_state["2fa_time"] = get_chile_time()
+                                st.session_state["2fa_attempts"] = 0
+                                st.rerun()
+                            else:
+                                st.error("❌ Error al enviar el código de verificación. Intenta de nuevo.")
+                        else:
+                            st.error("❌ Clave incorrecta")
+                else:
+                    st.error("No hay administradores o correos configurados en Secrets.")
+        elif st.session_state["awaiting_2fa"]:
+            st.subheader("🔐 Verificación en dos pasos")
+            st.info(f"Se ha enviado un código de 6 dígitos a {st.session_state['2fa_email']}")
+            time_remaining = 600 - (get_chile_time() - st.session_state["2fa_time"]).total_seconds()
+            if time_remaining > 0:
+                st.write(f"Tiempo restante: {int(time_remaining // 60)} minutos y {int(time_remaining % 60)} segundos")
+            code_input = st.text_input("Ingresa el código de verificación", type="password", key="2fa_code_input")
+            if boton_moderno("Verificar código", "primario", "🔒", "verify_2fa"):
+                if not code_input.isdigit() or len(code_input) != 6:
+                    st.error("El código debe ser un número de 6 dígitos")
+                elif (get_chile_time() - st.session_state["2fa_time"]).total_seconds() > 600:
+                    st.error("❌ El código ha expirado. Por favor, intenta iniciar sesión de nuevo.")
+                    st.session_state["awaiting_2fa"] = False
+                    st.session_state["2fa_code"] = None
+                    st.session_state["2fa_email"] = None
+                    st.session_state["2fa_attempts"] = 0
+                    st.rerun()
+                elif st.session_state["2fa_attempts"] >= 3:
+                    st.error("❌ Demasiados intentos fallidos. Intenta iniciar sesión de nuevo.")
+                    st.session_state["awaiting_2fa"] = False
+                    st.session_state["2fa_code"] = None
+                    st.session_state["2fa_email"] = None
+                    st.session_state["2fa_attempts"] = 0
+                    st.rerun()
+                elif code_input == st.session_state["2fa_code"]:
+                    st.session_state["user_type"] = "admin"
+                    st.session_state["user_name"] = st.session_state["2fa_user_name"]
+                    st.session_state["awaiting_2fa"] = False
+                    st.session_state["2fa_code"] = None
+                    st.session_state["2fa_email"] = None
+                    st.session_state["2fa_attempts"] = 0
+                    st.session_state["2fa_time"] = None
+                    st.session_state['login_time'] = time.time()
+                    st.session_state['timeout_duration'] = 30 * 60  # 30 minutos
+                    st.rerun()
+                else:
+                    st.session_state["2fa_attempts"] += 1
+                    st.error(f"❌ Código incorrecto. Intentos restantes: {3 - st.session_state['2fa_attempts']}")
+        else:
+            st.success(f"👤 {st.session_state['user_name']}")
+            
+            # Panel de monitoreo de caché solo para admins
+            if st.session_state["user_type"] == "admin":
+                panel_monitoreo_cache()
+                sistema_ayuda.boton_ayuda_completa()
+            
+            if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
+                st.session_state.clear()
+                st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Implementar temporizador si hay sesión activa
+    if st.session_state.get("user_type"):
+        implementar_temporizador_seguridad()
+    
+    if st.session_state["user_type"] is None:
+        st.markdown("""
+        <div style="text-align: center; padding: 4rem 2rem;">
+            <h1 style="color: #1A3B8F; font-size: 3rem; margin-bottom: 1rem;">🎓 Preuniversitario CIMMA</h1>
+            <h2 style="color: #6B7280; font-size: 1.5rem; margin-bottom: 2rem;">Sistema de Gestión de Asistencia 2026</h2>
+            <div class="card" style="max-width: 600px; margin: 0 auto;">
+                <h3 style="color: #1A3B8F;">👋 ¡Bienvenido!</h3>
+                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="margin: 0; color: #1A3B8F;">Por favor, inicia sesión desde el menú lateral izquierdo para acceder al sistema.</p>
+                </div>  
+                <div style="background: #F0F4FF; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+                    <p style="margin: 0; color: #1A3B8F;"><strong>💡 Tip:</strong> El menú lateral se despliega al hacer clic en el icono ☰ en la esquina superior izquierda.</p>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        return
+    
+    if st.session_state["user_type"] == "admin":
+        admin_panel_mejorado()
+    else:
+        main_app_mejorada()
 
 if __name__ == "__main__":
     main()
