@@ -19,6 +19,225 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
 
+
+# ==============================
+# COMPONENTES INFORMATIVOS PARA FECHAS
+# ==============================
+
+def crear_tooltip_fechas():
+    """Crea tooltips informativos para las funciones de fechas"""
+    
+    st.markdown("""
+    <style>
+    .tooltip-fechas {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+        margin-left: 8px;
+    }
+    
+    .tooltip-fechas .tooltip-text {
+        visibility: hidden;
+        width: 400px;
+        background-color: #1A3B8F;
+        color: white;
+        text-align: left;
+        border-radius: 12px;
+        padding: 16px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        transform: translateX(-50%);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        opacity: 0;
+        transition: opacity 0.3s, visibility 0.3s;
+        font-size: 0.9em;
+        line-height: 1.5;
+    }
+    
+    .tooltip-fechas:hover .tooltip-text {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .tooltip-fechas .tooltip-text::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -8px;
+        border-width: 8px;
+        border-style: solid;
+        border-color: #1A3B8F transparent transparent transparent;
+    }
+    
+    .funcion-card {
+        background: white;
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        border-left: 4px solid;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .funcion-reactivar {
+        border-left-color: #10B981;
+    }
+    
+    .funcion-eliminar {
+        border-left-color: #EF4444;
+    }
+    
+    .ventaja {
+        color: #10B981;
+        font-weight: 600;
+    }
+    
+    .desventaja {
+        color: #EF4444;
+        font-weight: 600;
+    }
+    
+    .alerta {
+        color: #F59E0B;
+        font-weight: 600;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def tooltip_reactivar_fechas():
+    """Tooltip para la función de reactivar fechas"""
+    return """
+    <div class="tooltip-fechas">
+        <span style="color: #6B7280; font-size: 0.9em;">ℹ️</span>
+        <div class="tooltip-text">
+            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">
+                🔄 Reactivar Fecha - Información
+            </div>
+            
+            <div class="funcion-card funcion-reactivar">
+                <strong>📝 Qué hace:</strong>
+                <p style="margin: 4px 0;">Cambia el estado de la fecha de "COMPLETADA" a "PENDIENTE", permitiendo registrar asistencia nuevamente.</p>
+                
+                <strong class="ventaja">✅ Ventajas:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px;">
+                    <li>Reversible - puedes volver a marcar como completada</li>
+                    <li>Mantiene el historial del registro original</li>
+                    <li>No afecta estadísticas históricas</li>
+                    <li>Ideal para correcciones menores</li>
+                </ul>
+                
+                <strong class="desventaja">⚠️ Consideraciones:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px;">
+                    <li>La fecha aparecerá disponible para los profesores</li>
+                    <li>Puede generar duplicación si no se comunica</li>
+                </ul>
+                
+                <strong class="alerta">🎯 Cuándo usar:</strong>
+                <p style="margin: 4px 0;">• Cuando necesitas permitir el registro en una fecha ya completada<br>• Para correcciones de asistencia<br>• Cuando hubo un error en el registro original</p>
+            </div>
+        </div>
+    </div>
+    """
+
+def tooltip_eliminar_fechas():
+    """Tooltip para la función de eliminar fechas"""
+    return """
+    <div class="tooltip-fechas">
+        <span style="color: #6B7280; font-size: 0.9em;">ℹ️</span>
+        <div class="tooltip-text">
+            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em;">
+                🗑️ Eliminar Fecha - Información
+            </div>
+            
+            <div class="funcion-card funcion-eliminar">
+                <strong>📝 Qué hace:</strong>
+                <p style="margin: 4px 0;">Elimina PERMANENTEMENTE el registro de la fecha completada del sistema.</p>
+                
+                <strong class="ventaja">✅ Ventajas:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px;">
+                    <li>Limpia registros duplicados o erróneos</li>
+                    <li>Elimina datos corruptos del sistema</li>
+                    <li>Soluciona problemas de integridad de datos</li>
+                </ul>
+                
+                <strong class="desventaja">🚨 ALERTAS DE CUIDADO:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px;">
+                    <li><strong>IRREVERSIBLE</strong> - No se puede recuperar</li>
+                    <li>Afeta estadísticas históricas</li>
+                    <li>Pérdida de trazabilidad</li>
+                    <li>Impacto en reportes y análisis</li>
+                </ul>
+                
+                <strong class="alerta">🎯 Cuándo usar (CASOS ESPECIALES):</strong>
+                <p style="margin: 4px 0;">• Registros duplicados corruptos<br>• Fechas creadas por error<br>• Limpieza administrativa autorizada<br>• <strong>SOLO cuando reactivar no es suficiente</strong></p>
+                
+                <div style="background: #FEF3C7; padding: 8px; border-radius: 4px; margin-top: 8px; border-left: 4px solid #F59E0B;">
+                    <strong>💡 Recomendación:</strong> Usa <strong>🔄 Reactivar</strong> en la mayoría de casos. Solo elimina si es absolutamente necesario.
+                </div>
+            </div>
+        </div>
+    </div>
+    """
+
+def mostrar_panel_informativo_fechas():
+    """Muestra un panel informativo completo sobre las funciones de fechas"""
+    
+    with st.expander("📚 GUÍA: Funciones de Gestión de Fechas", expanded=False):
+        st.markdown("""
+        ### 🔄 Reactivar vs 🗑️ Eliminar Fechas
+        
+        **¿Cuál función usar?** Esta guía te ayudará a decidir:
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            #### 🔄 REACTIVAR FECHA
+            **Ideal para:** Correcciones y ajustes
+            
+            **✅ Lo que hace:**
+            - Cambia estado de "Completada" → "Pendiente"
+            - Permite nuevo registro de asistencia
+            - Mantiene historial
+            
+            **🎯 Casos de uso:**
+            - Error en registro original
+            - Necesidad de re-registrar asistencia
+            - Corrección de datos
+            
+            **🛡️ Seguridad:** Reversible y seguro
+            """)
+        
+        with col2:
+            st.markdown("""
+            #### 🗑️ ELIMINAR FECHA  
+            **Solo para:** Casos extremos
+            
+            **🚨 Lo que hace:**
+            - Elimina PERMANENTEMENTE el registro
+            - No se puede recuperar
+            - Afeta estadísticas
+            
+            **⚠️ Casos de uso:**
+            - Registros duplicados corruptos
+            - Datos creados por error
+            - Limpieza administrativa
+            
+            **🔒 Seguridad:** IRREVERSIBLE - Usar con extremo cuidado
+            """)
+        
+        st.markdown("""
+        ---
+        **📋 Flujo recomendado:**
+        1. **Primero intenta** → 🔄 Reactivar
+        2. **Solo si es necesario** → 🗑️ Eliminar
+        3. **Siempre comunica** los cambios al equipo
+        """)
+
+
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
@@ -1652,7 +1871,13 @@ def admin_panel_mejorado():
     # ==============================
     
     st.markdown('<h2 class="section-header">📅 Gestión de Fechas Completadas</h2>', unsafe_allow_html=True)
-    
+
+    # Aplicar estilos de tooltips
+    crear_tooltip_fechas()
+
+    # Mostrar panel informativo
+    mostrar_panel_informativo_fechas()
+
     with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=True):
         cursos = load_courses()
         
@@ -1692,13 +1917,21 @@ def admin_panel_mejorado():
                     with col1:
                         st.write(f"✅ {fecha}")
                     with col2:
-                        if st.button("🔄 Reactivar", key=f"reactivar_{fecha}"):
-                            if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
-                                st.success(f"✅ Fecha {fecha} reactivada")
-                                st.rerun()
+                        col2_1, col2_2 = st.columns([3, 1])
+                        with col2_1:
+                            if st.button("🔄 Reactivar", key=f"reactivar_{fecha}"):
+                                if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
+                                    st.success(f"✅ Fecha {fecha} reactivada")
+                                    st.rerun()
+                        with col2_2:
+                            st.markdown(tooltip_reactivar_fechas(), unsafe_allow_html=True)
                     with col3:
-                        if st.button("🗑️ Eliminar", key=f"eliminar_{fecha}"):
-                            st.warning("Funcionalidad de eliminación en desarrollo")
+                        col3_1, col3_2 = st.columns([3, 1])
+                        with col3_1:
+                            if st.button("🗑️ Eliminar", key=f"eliminar_{fecha}"):
+                                st.warning("Funcionalidad de eliminación en desarrollo")
+                        with col3_2:
+                            st.markdown(tooltip_eliminar_fechas(), unsafe_allow_html=True)
             else:
                 st.info("ℹ️ No hay fechas completadas para este curso")
             
