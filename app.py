@@ -1924,7 +1924,7 @@ def admin_panel_mejorado():
             # Tabla de fechas completadas - VERSIÓN CORREGIDA
             st.subheader("📋 Fechas Completadas")
             if stats["fechas_completadas"]:
-                st.markdown("**Haz hover sobre ℹ️ para más información**")
+                st.markdown("**Haz clic sobre 🔄 para habilitar fecha en menú del profesor**")
                 
                 for i, fecha in enumerate(stats["fechas_completadas"]):
                     # Usar un contenedor para cada fecha para mejor espaciado
