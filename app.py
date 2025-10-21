@@ -19,468 +19,8 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
 
-
-
 # ==============================
-# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
-# ==============================
-
-def crear_tooltip_fechas():
-    """Crea tooltips informativos para las funciones de fechas - VERSIÓN CORREGIDA"""
-    
-    st.markdown("""
-    <style>
-    .tooltip-fechas {
-        position: relative;
-        display: inline-block;
-        cursor: help;
-    }
-    
-    .tooltip-fechas .tooltiptext {
-        visibility: hidden;
-        width: 350px;
-        background-color: #1A3B8F;
-        color: white;
-        text-align: left;
-        border-radius: 12px;
-        padding: 16px;
-        position: absolute;
-        z-index: 1000;
-        bottom: 125%;
-        left: 50%;
-        margin-left: -175px;
-        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-        opacity: 0;
-        transition: opacity 0.3s;
-        font-size: 0.9em;
-        line-height: 1.5;
-    }
-    
-    .tooltip-fechas .tooltiptext::after {
-        content: "";
-        position: absolute;
-        top: 100%;
-        left: 50%;
-        margin-left: -8px;
-        border-width: 8px;
-        border-style: solid;
-        border-color: #1A3B8F transparent transparent transparent;
-    }
-    
-    .tooltip-fechas:hover .tooltiptext {
-        visibility: visible;
-        opacity: 1;
-    }
-    
-    .funcion-card {
-        background: rgba(255,255,255,0.1);
-        border-radius: 8px;
-        padding: 12px;
-        margin: 8px 0;
-        border-left: 4px solid #10B981;
-    }
-    
-    .ventaja {
-        color: #10B981;
-        font-weight: 600;
-    }
-    
-    .alerta {
-        color: #F59E0B;
-        font-weight: 600;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-
-def tooltip_reactivar_fechas():
-    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
-    return """
-    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
-        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
-        <div class="tooltiptext">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
-                🔄 Reactivar Fecha
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Totalmente reversible</li>
-                    <li>Mantiene todo el historial</li>
-                    <li>Sin pérdida de datos</li>
-                    <li>Ideal para correcciones</li>
-                </ul>
-            </div>
-            
-            <div>
-                <strong class="alerta">🎯 Cuándo usar:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Error en registro original</li>
-                    <li>Asistencia incompleta</li>
-                    <li>Cambios en calendario</li>
-                    <li>Verificación de datos</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    """
-
-
-
-
-
-
-
-                    
-def mostrar_panel_informativo_fechas():
-    """Muestra un panel informativo completo sobre las funciones de fechas"""
-    
-    with st.expander("📚 GUÍA: Gestión de Fechas Completadas", expanded=False):
-        st.markdown("""
-        ### 🔄 Reactivar Fechas - Guía Completa
-        
-        **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
-        """)
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            st.markdown("""
-            #### 🎯 **QUÉ HACE REACTIVAR**
-            
-            **Transforma una fecha:**
-            ✅ Completada → ⏳ Pendiente
-            
-            **Resultado:**
-            - La fecha vuelve a estar disponible para registro
-            - Los profesores pueden tomar asistencia nuevamente
-            - El historial anterior se mantiene
-            """)
-        
-        with col2:
-            st.markdown("""
-            #### 🛡️ **SEGURIDAD Y VENTAJAS**
-            
-            **✅ Totalmente reversible**
-            **✅ Mantiene auditoría completa**
-            **✅ Sin pérdida de datos**
-            **✅ Ideal para correcciones**
-            """)
-        
-        st.markdown("""
-        ---
-        
-        #### 📋 **CASOS DE USO RECOMENDADOS**
-        
-        | Situación | Solución | Beneficio |
-        |-----------|----------|-----------|
-        | **Error en registro** | Reactivar y corregir | Datos precisos sin pérdida |
-        | **Asistencia incompleta** | Reactivar para completar | Información completa |
-        | **Cambio de calendario** | Reactivar fechas afectadas | Flexibilidad del sistema |
-        | **Duda en registros** | Reactivar y verificar | Calidad de datos |
-        
-        ---
-        
-        #### 🔄 **PROCESO RECOMENDADO**
-        
-        1. **Identifica** la fecha que necesita corrección
-        2. **Reactivar** usando el botón 🔄 
-        3. **Comunica** al profesor correspondiente
-        4. **Verifica** que el nuevo registro sea correcto
-        5. **Confirma** que la fecha quede como ✅ Completada
-        
-        ---
-        
-        #### ❓ **PREGUNTAS FRECUENTES**
-        
-        **¿Se pierde el registro anterior?**
-        No, el sistema mantiene todo el historial de cambios.
-        
-        **¿Puedo reactivar múltiples veces?**
-        Sí, tantas veces como sea necesario.
-        
-        **¿Los profesores ven inmediatamente el cambio?**
-        Sí, la fecha aparece disponible en su interfaz al instante.
-        
-        **¿Afecta a los reportes enviados?**
-        Los reportes futuros reflejarán los datos actualizados.
-        """)
-
-
-
-# ==============================
-# CAMBIO DE CURSO ENTRE ESTUDIANTES
-# ==============================
-
-def panel_cambio_curso():
-    """Panel para gestionar cambios de curso entre estudiantes"""
-    
-    st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
-    
-    st.warning("""
-    **⚠️ IMPORTANTE:** Esta función mueve el historial completo de un estudiante a otro curso.
-    - Mantiene todo el historial de asistencia
-    - Actualiza automáticamente en todos los reportes
-    - No pierde datos históricos
-    """)
-    
-    # Cargar datos
-    cursos = load_courses()
-    df = load_all_asistencia()
-    
-    if not cursos or df.empty:
-        st.error("No se pudieron cargar los datos necesarios")
-        return
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("👤 Seleccionar Estudiante")
-        
-        # Seleccionar curso origen
-        curso_origen = st.selectbox(
-            "Curso de origen:",
-            list(cursos.keys()),
-            key="curso_origen"
-        )
-        
-        # Seleccionar estudiante
-        estudiantes_origen = cursos[curso_origen]["estudiantes"]
-        estudiante_seleccionado = st.selectbox(
-            "Estudiante a cambiar:",
-            estudiantes_origen,
-            key="estudiante_cambio"
-        )
-        
-        # Mostrar información del estudiante
-        if estudiante_seleccionado:
-            datos_estudiante = df[df['Estudiante'] == estudiante_seleccionado]
-            if not datos_estudiante.empty:
-                total_clases = len(datos_estudiante)
-                asistencias = datos_estudiante['Asistencia'].sum()
-                porcentaje = (asistencias / total_clases * 100) if total_clases > 0 else 0
-                
-                st.info(f"""
-                **📊 Historial actual:**
-                - **Curso actual:** {curso_origen}
-                - **Total clases:** {total_clases}
-                - **Asistencias:** {asistencias}
-                - **Porcentaje:** {porcentaje:.1f}%
-                """)
-    
-    with col2:
-        st.subheader("🎯 Curso Destino")
-        
-        # Seleccionar curso destino (excluyendo el curso origen)
-        cursos_destino = [curso for curso in cursos.keys() if curso != curso_origen]
-        curso_destino = st.selectbox(
-            "Curso destino:",
-            cursos_destino,
-            key="curso_destino"
-        )
-        
-        # Mostrar información del curso destino
-        if curso_destino:
-            estudiantes_destino = cursos[curso_destino]["estudiantes"]
-            st.success(f"""
-            **📚 Curso destino: {curso_destino}**
-            - **Profesor:** {cursos[curso_destino]['profesor']}
-            - **Día:** {cursos[curso_destino]['dia']}
-            - **Horario:** {cursos[curso_destino]['horario']}
-            - **Estudiantes actuales:** {len(estudiantes_destino)}
-            """)
-    
-    # Confirmación y ejecución
-    st.markdown("---")
-    st.subheader("✅ Confirmar Cambio")
-    
-    if estudiante_seleccionado and curso_origen and curso_destino:
-        col1, col2, col3 = st.columns([1, 2, 1])
-        
-        with col2:
-            # Verificar si el estudiante ya existe en el curso destino
-            estudiantes_destino = cursos[curso_destino]["estudiantes"]
-            if estudiante_seleccionado in estudiantes_destino:
-                st.error(f"❌ **{estudiante_seleccionado}** ya existe en el curso **{curso_destino}**")
-                return
-            
-            st.warning(f"""
-            **🔔 ¿Estás seguro de realizar este cambio?**
-            
-            **Estudiante:** {estudiante_seleccionado}
-            **De:** {curso_origen} → **A:** {curso_destino}
-            
-            **Esta acción:**
-            ✅ Mantendrá todo el historial de asistencia
-            ✅ Actualizará todos los reportes futuros
-            ✅ El estudiante aparecerá en el nuevo curso
-            """)
-            
-            # Opción de fecha efectiva
-            fecha_efectiva = st.date_input(
-                "Fecha efectiva del cambio:",
-                value=datetime.now().date(),
-                help="Los reportes futuros usarán esta fecha para el cambio"
-            )
-            
-            if st.button("🔄 EJECUTAR CAMBIO DE CURSO", type="primary", use_container_width=True):
-                if ejecutar_cambio_curso(estudiante_seleccionado, curso_origen, curso_destino, fecha_efectiva):
-                    st.success("""
-                    ✅ **¡Cambio de curso ejecutado exitosamente!**
-                    
-                    **Próximos pasos:**
-                    1. El estudiante ya aparece en el nuevo curso
-                    2. Los reportes reflejarán el cambio inmediatamente
-                    3. El historial anterior se mantiene intacto
-                    """)
-                    
-                    # Invalidar caché para reflejar cambios
-                    cache_manager.invalidar()
-                    st.rerun()
-
-def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiva):
-    """Ejecuta el cambio de curso en Google Sheets"""
-    
-    try:
-        client = get_client()
-        if not client:
-            st.error("❌ Error de conexión con Google Sheets")
-            return False
-        
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-        
-        # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
-        try:
-            sheet_origen = asistencia_sheet.worksheet(curso_origen)
-            records_origen = sheet_origen.get_all_records()
-            
-            # Encontrar y actualizar registros del estudiante
-            for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
-                if row.get('Estudiante') == estudiante:
-                    # Actualizar el curso en el registro
-                    sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
-        
-        # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
-        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
-        
-        try:
-            # Remover de curso origen
-            sheet_clases_origen = clases_sheet.worksheet(curso_origen)
-            valores_origen = sheet_clases_origen.get_all_values()
-            
-            for i, fila in enumerate(valores_origen):
-                if estudiante in fila:
-                    # Encontrar la columna del estudiante y limpiar
-                    for j, valor in enumerate(fila):
-                        if valor == estudiante:
-                            sheet_clases_origen.update_cell(i + 1, j + 1, "")
-                            break
-                    break
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
-        
-        try:
-            # Agregar a curso destino
-            sheet_clases_destino = clases_sheet.worksheet(curso_destino)
-            valores_destino = sheet_clases_destino.get_all_values()
-            
-            # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
-            idx_estudiantes = None
-            for i, fila in enumerate(valores_destino):
-                if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
-                    idx_estudiantes = i + 1
-                    break
-            
-            if idx_estudiantes is not None:
-                # Encontrar primera celda vacía en la columna de estudiantes
-                col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
-                for i in range(idx_estudiantes, len(valores_destino)):
-                    if not valores_destino[i][col_estudiantes].strip():
-                        sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
-                        break
-                else:
-                    # Si no hay celdas vacías, agregar al final
-                    sheet_clases_destino.append_row([estudiante])
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
-        
-        # 3. REGISTRAR EN LOG DE CAMBIOS
-        try:
-            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
-        except gspread.exceptions.WorksheetNotFound:
-            cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
-            cambios_sheet.append_row([
-                "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
-                "Fecha Efectiva", "Administrador"
-            ])
-        
-        cambios_sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            estudiante,
-            curso_origen,
-            curso_destino,
-            fecha_efectiva.strftime("%Y-%m-%d"),
-            st.session_state["user_name"]
-        ])
-        
-        return True
-        
-    except Exception as e:
-        st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
-        return False
-
-def panel_historial_cambios():
-    """Panel para ver historial de cambios de curso"""
-    
-    st.markdown('<h2 class="section-header">📋 Historial de Cambios</h2>', unsafe_allow_html=True)
-    
-    try:
-        client = get_client()
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-        
-        try:
-            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
-            cambios_data = cambios_sheet.get_all_records()
-            
-            if cambios_data:
-                df_cambios = pd.DataFrame(cambios_data)
-                st.dataframe(df_cambios, use_container_width=True)
-                
-                # Estadísticas
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("📊 Total Cambios", len(df_cambios))
-                with col2:
-                    cambios_mes = len(df_cambios[df_cambios['Fecha Cambio'].str.contains(datetime.now().strftime("%Y-%m"))])
-                    st.metric("📈 Este Mes", cambios_mes)
-                with col3:
-                    estudiante_mas_cambios = df_cambios['Estudiante'].value_counts().idxmax() if not df_cambios.empty else "N/A"
-                    st.metric("👤 Más Cambios", estudiante_mas_cambios)
-            else:
-                st.info("ℹ️ No hay registros de cambios de curso")
-                
-        except gspread.exceptions.WorksheetNotFound:
-            st.info("ℹ️ No se ha realizado ningún cambio de curso aún")
-            
-    except Exception as e:
-        st.error(f"❌ Error cargando historial: {e}")
-
-
-
-
-# ==============================
-# SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
+# SISTEMA DE CACHÉ INTELIGENTE
 # ==============================
 
 class CacheInteligente:
@@ -574,11 +114,8 @@ class CacheInteligente:
             for clave in claves_ordenadas[:len(self.cache_data) - max_size]:
                 del self.cache_data[clave]
 
-# Instancia global de caché (DEFINIR ANTES DE LAS CLASES QUE LO USAN)
+# Instancia global de caché
 cache_manager = CacheInteligente()
-
-
-
 
 # ==============================
 # SISTEMA DE FECHAS COMPLETADAS
@@ -701,9 +238,460 @@ class SistemaFechasCompletadas:
 # Instancia global del sistema de fechas
 sistema_fechas = SistemaFechasCompletadas()
 
+# ==============================
+# COMPONENTES INFORMATIVOS PARA FECHAS
+# ==============================
 
+def crear_tooltip_fechas():
+    """Crea tooltips informativos para las funciones de fechas"""
+    
+    st.markdown("""
+    <style>
+    .tooltip-fechas {
+        position: relative;
+        display: inline-block;
+        cursor: help;
+    }
+    
+    .tooltip-fechas .tooltiptext {
+        visibility: hidden;
+        width: 350px;
+        background-color: #1A3B8F;
+        color: white;
+        text-align: left;
+        border-radius: 12px;
+        padding: 16px;
+        position: absolute;
+        z-index: 1000;
+        bottom: 125%;
+        left: 50%;
+        margin-left: -175px;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        opacity: 0;
+        transition: opacity 0.3s;
+        font-size: 0.9em;
+        line-height: 1.5;
+    }
+    
+    .tooltip-fechas .tooltiptext::after {
+        content: "";
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        margin-left: -8px;
+        border-width: 8px;
+        border-style: solid;
+        border-color: #1A3B8F transparent transparent transparent;
+    }
+    
+    .tooltip-fechas:hover .tooltiptext {
+        visibility: visible;
+        opacity: 1;
+    }
+    
+    .funcion-card {
+        background: rgba(255,255,255,0.1);
+        border-radius: 8px;
+        padding: 12px;
+        margin: 8px 0;
+        border-left: 4px solid #10B981;
+    }
+    
+    .ventaja {
+        color: #10B981;
+        font-weight: 600;
+    }
+    
+    .alerta {
+        color: #F59E0B;
+        font-weight: 600;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
+def tooltip_reactivar_fechas():
+    """Tooltip para la función de reactivar fechas"""
+    return """
+    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
+        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
+        <div class="tooltiptext">
+            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
+                🔄 Reactivar Fecha
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+                <strong>📝 Qué hace:</strong>
+                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
+            </div>
+            
+            <div style="margin-bottom: 8px;">
+                <strong class="ventaja">✅ Ventajas:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Totalmente reversible</li>
+                    <li>Mantiene todo el historial</li>
+                    <li>Sin pérdida de datos</li>
+                    <li>Ideal para correcciones</li>
+                </ul>
+            </div>
+            
+            <div>
+                <strong class="alerta">🎯 Cuándo usar:</strong>
+                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
+                    <li>Error en registro original</li>
+                    <li>Asistencia incompleta</li>
+                    <li>Cambios en calendario</li>
+                    <li>Verificación de datos</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    """
 
+def mostrar_panel_informativo_fechas():
+    """Muestra un panel informativo completo sobre las funciones de fechas"""
+    
+    with st.expander("📚 GUÍA: Gestión de Fechas Completadas", expanded=False):
+        st.markdown("""
+        ### 🔄 Reactivar Fechas - Guía Completa
+        
+        **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
+        """)
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.markdown("""
+            #### 🎯 **QUÉ HACE REACTIVAR**
+            
+            **Transforma una fecha:**
+            ✅ Completada → ⏳ Pendiente
+            
+            **Resultado:**
+            - La fecha vuelve a estar disponible para registro
+            - Los profesores pueden tomar asistencia nuevamente
+            - El historial anterior se mantiene
+            """)
+        
+        with col2:
+            st.markdown("""
+            #### 🛡️ **SEGURIDAD Y VENTAJAS**
+            
+            **✅ Totalmente reversible**
+            **✅ Mantiene auditoría completa**
+            **✅ Sin pérdida de datos**
+            **✅ Ideal para correcciones**
+            """)
+        
+        st.markdown("""
+        ---
+        
+        #### 📋 **CASOS DE USO RECOMENDADOS**
+        
+        | Situación | Solución | Beneficio |
+        |-----------|----------|-----------|
+        | **Error en registro** | Reactivar y corregir | Datos precisos sin pérdida |
+        | **Asistencia incompleta** | Reactivar para completar | Información completa |
+        | **Cambio de calendario** | Reactivar fechas afectadas | Flexibilidad del sistema |
+        | **Duda en registros** | Reactivar y verificar | Calidad de datos |
+        
+        ---
+        
+        #### 🔄 **PROCESO RECOMENDADO**
+        
+        1. **Identifica** la fecha que necesita corrección
+        2. **Reactivar** usando el botón 🔄 
+        3. **Comunica** al profesor correspondiente
+        4. **Verifica** que el nuevo registro sea correcto
+        5. **Confirma** que la fecha quede como ✅ Completada
+        
+        ---
+        
+        #### ❓ **PREGUNTAS FRECUENTES**
+        
+        **¿Se pierde el registro anterior?**
+        No, el sistema mantiene todo el historial de cambios.
+        
+        **¿Puedo reactivar múltiples veces?**
+        Sí, tantas veces como sea necesario.
+        
+        **¿Los profesores ven inmediatamente el cambio?**
+        Sí, la fecha aparece disponible en su interfaz al instante.
+        
+        **¿Afecta a los reportes enviados?**
+        Los reportes futuros reflejarán los datos actualizados.
+        """)
+
+# ==============================
+# SECCIÓN DE REACTIVACIÓN DE FECHAS COMPLETADAS
+# ==============================
+
+def panel_reactivar_fechas():
+    """Panel principal para reactivar fechas completadas"""
+    
+    st.markdown('<h2 class="section-header">🔄 Reactivar Fechas Completadas</h2>', unsafe_allow_html=True)
+    
+    # Aplicar estilos de tooltips
+    crear_tooltip_fechas()
+    
+    # Mostrar información educativa
+    st.markdown("""
+    <div style="background: #F0F9FF; padding: 1.5rem; border-radius: 12px; border-left: 4px solid #1A3B8F; margin: 1rem 0;">
+        <h4 style="color: #1A3B8F; margin-top: 0;">💡 ¿Para qué reactivar fechas?</h4>
+        <p style="margin-bottom: 0.5rem;"><strong>Permite corregir errores en registros anteriores:</strong></p>
+        <ul style="margin-bottom: 0;">
+            <li>📝 <strong>Registro incorrecto:</strong> Si se cometió un error al tomar asistencia</li>
+            <li>🔧 <strong>Asistencia incompleta:</strong> Si faltó registrar algunos estudiantes</li>
+            <li>🔄 <strong>Cambios necesarios:</strong> Para ajustar información después del registro</li>
+            <li>✅ <strong>Verificación:</strong> Para validar y corregir datos históricos</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Cargar datos de cursos
+    cursos = load_courses()
+    
+    if not cursos:
+        st.error("❌ No se pudieron cargar los datos de cursos")
+        return
+    
+    # Selección de curso
+    curso_seleccionado = st.selectbox(
+        "🎓 Selecciona el curso:",
+        list(cursos.keys()),
+        key="reactivar_curso_select"
+    )
+    
+    if not curso_seleccionado:
+        st.info("ℹ️ Selecciona un curso para ver las fechas completadas")
+        return
+    
+    # Obtener fechas del curso
+    data_curso = cursos[curso_seleccionado]
+    fechas_totales = data_curso["fechas"]
+    
+    # Obtener estadísticas de fechas
+    stats = sistema_fechas.obtener_estadisticas_fechas(curso_seleccionado, fechas_totales)
+    
+    # Mostrar resumen
+    col1, col2, col3, col4 = st.columns(4)
+    with col1:
+        st.metric("📅 Total Fechas", stats["total"])
+    with col2:
+        st.metric("✅ Completadas", stats["completadas"])
+    with col3:
+        st.metric("⏳ Pendientes", stats["pendientes"])
+    with col4:
+        st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
+    
+    st.markdown("---")
+    
+    # SECCIÓN DE FECHAS COMPLETADAS PARA REACTIVAR
+    st.subheader("📋 Fechas Completadas Disponibles para Reactivar")
+    
+    if not stats["fechas_completadas"]:
+        st.info("""
+        ℹ️ **No hay fechas completadas para reactivar en este curso.**
+        
+        Las fechas aparecerán aquí una vez que:
+        - Los profesores hayan registrado asistencia
+        - Se hayan marcado suspensiones de clases
+        - O se hayan completado fechas manualmente
+        """)
+        return
+    
+    # Mostrar lista de fechas completadas con opción de reactivar
+    st.markdown(f"""
+    <div style="background: #FFF7ED; padding: 1rem; border-radius: 8px; margin: 1rem 0; border-left: 4px solid #F59E0B;">
+        <strong>🔄 {len(stats['fechas_completadas'])} fechas completadas encontradas</strong>
+        <p style="margin: 0.5rem 0 0 0; font-size: 0.9em;">
+        Haz clic en "REACTIVAR FECHA" para que vuelva a estar disponible en el menú del profesor.
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Lista de fechas con opciones de reactivación
+    for i, fecha in enumerate(stats["fechas_completadas"]):
+        with st.container():
+            col1, col2, col3 = st.columns([3, 2, 1])
+            
+            with col1:
+                st.write(f"**{i+1}. 📅 {fecha}**")
+                st.caption(f"Curso: {curso_seleccionado}")
+            
+            with col2:
+                # Información adicional (podría mostrar estadísticas de esa fecha)
+                st.caption("✅ Completada")
+            
+            with col3:
+                # Botón de reactivación
+                if st.button(
+                    "🔄 Reactivar", 
+                    key=f"reactivar_{curso_seleccionado}_{fecha}",
+                    use_container_width=True,
+                    help=f"Hacer disponible la fecha {fecha} para nuevo registro"
+                ):
+                    if reactivar_fecha_completada(curso_seleccionado, fecha):
+                        st.success(f"✅ **Fecha reactivada:** {fecha} ahora está disponible para registro")
+                        # Invalidar caché para reflejar cambios
+                        cache_manager.invalidar()
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Error al reactivar la fecha {fecha}")
+            
+            # Separador visual entre fechas
+            if i < len(stats["fechas_completadas"]) - 1:
+                st.markdown("---")
+    
+    # SECCIÓN DE INFORMACIÓN ADICIONAL
+    st.markdown("---")
+    
+    with st.expander("📚 Información Adicional sobre Reactivación", expanded=False):
+        st.markdown("""
+        ### ❓ Preguntas Frecuentes
+        
+        **¿Qué pasa cuando reactivo una fecha?**
+        - La fecha cambia de estado: ✅ Completada → ⏳ Pendiente
+        - Aparece nuevamente en el menú del profesor
+        - El profesor puede registrar asistencia nuevamente
+        - Los registros anteriores se mantienen en el historial
+        
+        **¿Se pierden los datos anteriores?**
+        No, el sistema mantiene todo el historial de registros anteriores. 
+        La reactivación solo afecta la disponibilidad para nuevos registros.
+        
+        **¿Puedo reactivar una fecha múltiples veces?**
+        Sí, no hay límite en la cantidad de veces que puedes reactivar una fecha.
+        
+        **¿Los profesores reciben alguna notificación?**
+        No automáticamente, pero verán la fecha disponible inmediatamente en su interfaz.
+        
+        ### 🎯 Buenas Prácticas
+        
+        1. **Comunica al profesor** cuando reactives una fecha
+        2. **Verifica** que el nuevo registro sea correcto
+        3. **Documenta** el motivo de la reactivación
+        4. **Confirma** que la fecha quede correctamente registrada
+        
+        ### ⚠️ Consideraciones Importantes
+        
+        - Solo usuarios administradores pueden reactivar fechas
+        - La reactivación es inmediata
+        - No afecta reportes ya generados
+        - Los nuevos registros sobrescriben visualmente los anteriores en reportes futuros
+        """)
+
+def reactivar_fecha_completada(curso, fecha):
+    """
+    Reactiva una fecha completada para que vuelva a estar disponible
+    Returns: bool - True si fue exitoso, False si hubo error
+    """
+    try:
+        client = get_client()
+        if not client:
+            st.error("❌ Error de conexión con Google Sheets")
+            return False
+        
+        sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        try:
+            fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+        except gspread.exceptions.WorksheetNotFound:
+            st.error("❌ No se encontró la hoja de fechas completadas")
+            return False
+        
+        # Buscar el registro específico
+        records = fechas_sheet.get_all_records()
+        
+        fecha_reactivada = False
+        for i, row in enumerate(records, start=2):  # start=2 porque fila 1 son headers
+            if (row.get("Curso") == curso and 
+                row.get("Fecha") == fecha and 
+                row.get("Completada") == "SI"):
+                
+                # Actualizar a "NO" (no completada)
+                fechas_sheet.update_cell(i, 3, "NO")  # Columna "Completada"
+                fecha_reactivada = True
+                break
+        
+        if fecha_reactivada:
+            # Registrar en log de cambios
+            try:
+                cambios_sheet = sheet.worksheet("LOG_REACTIVACIONES")
+            except gspread.exceptions.WorksheetNotFound:
+                cambios_sheet = sheet.add_worksheet("LOG_REACTIVACIONES", 100, 5)
+                cambios_sheet.append_row([
+                    "Timestamp", "Curso", "Fecha", "Administrador", "Acción"
+                ])
+            
+            cambios_sheet.append_row([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                curso,
+                fecha,
+                st.session_state["user_name"],
+                "REACTIVACIÓN"
+            ])
+            
+            # Invalidar caché
+            cache_manager.invalidar()
+            
+            return True
+        else:
+            st.error(f"❌ No se encontró la fecha {fecha} para el curso {curso}")
+            return False
+            
+    except Exception as e:
+        st.error(f"❌ Error al reactivar fecha: {str(e)}")
+        return False
+
+def ver_historial_reactivaciones():
+    """Muestra el historial de reactivaciones realizadas"""
+    
+    st.markdown('<h3 class="section-header">📋 Historial de Reactivaciones</h3>', unsafe_allow_html=True)
+    
+    try:
+        client = get_client()
+        sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        try:
+            cambios_sheet = sheet.worksheet("LOG_REACTIVACIONES")
+            historial_data = cambios_sheet.get_all_records()
+            
+            if historial_data:
+                df_historial = pd.DataFrame(historial_data)
+                
+                # Mostrar estadísticas
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("📊 Total Reactivaciones", len(df_historial))
+                with col2:
+                    hoy = datetime.now().strftime("%Y-%m-%d")
+                    reactivaciones_hoy = len(df_historial[df_historial['Timestamp'].str.contains(hoy)])
+                    st.metric("📈 Hoy", reactivaciones_hoy)
+                with col3:
+                    admin_mas_activaciones = df_historial['Administrador'].value_counts().idxmax() if not df_historial.empty else "N/A"
+                    st.metric("👤 Más Activo", admin_mas_activaciones)
+                
+                # Mostrar tabla
+                st.dataframe(df_historial, use_container_width=True)
+                
+                # Opción de exportar
+                if st.button("📤 Exportar Historial", use_container_width=True):
+                    csv = df_historial.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        "💾 Descargar CSV",
+                        csv,
+                        f"historial_reactivaciones_{datetime.now().strftime('%Y%m%d')}.csv",
+                        "text/csv",
+                        use_container_width=True
+                    )
+            else:
+                st.info("ℹ️ No hay registros de reactivaciones en el historial")
+                
+        except gspread.exceptions.WorksheetNotFound:
+            st.info("ℹ️ No se ha realizado ninguna reactivación aún")
+            
+    except Exception as e:
+        st.error(f"❌ Error cargando historial: {e}")
 
 # ==============================
 # SISTEMA DE AYUDA CONTEXTUAL
@@ -836,11 +824,6 @@ class SistemaAyuda:
 
 # Instancia global del sistema de ayuda
 sistema_ayuda = SistemaAyuda()
-
-
-
-
-
 
 # ==============================
 # CONFIGURACIÓN DE TEMA Y ESTILOS
@@ -1033,9 +1016,6 @@ def boton_moderno(texto, tipo="primario", icono="", key=None):
     """, unsafe_allow_html=True)
     
     return st.button(f"{icono} {texto}", key=key, use_container_width=True)
-
-
-
 
 # ==============================
 # COMPONENTES DE UI MEJORADOS
@@ -1460,9 +1440,6 @@ def panel_monitoreo_cache():
             st.success("Caché limpiado")
             st.rerun()
 
-
-
-
 # ==============================
 # CONFIGURACIÓN Y CONEXIONES
 # ==============================
@@ -1746,9 +1723,270 @@ def load_all_asistencia():
         df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
     return df
 
+# ==============================
+# CAMBIO DE CURSO ENTRE ESTUDIANTES
+# ==============================
 
+def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiva):
+    """Ejecuta el cambio de curso en Google Sheets"""
+    
+    try:
+        client = get_client()
+        if not client:
+            st.error("❌ Error de conexión con Google Sheets")
+            return False
+        
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        
+        # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
+        try:
+            sheet_origen = asistencia_sheet.worksheet(curso_origen)
+            records_origen = sheet_origen.get_all_records()
+            
+            # Encontrar y actualizar registros del estudiante
+            for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
+                if row.get('Estudiante') == estudiante:
+                    # Actualizar el curso en el registro
+                    sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
+        
+        # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
+        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
+        
+        try:
+            # Remover de curso origen
+            sheet_clases_origen = clases_sheet.worksheet(curso_origen)
+            valores_origen = sheet_clases_origen.get_all_values()
+            
+            for i, fila in enumerate(valores_origen):
+                if estudiante in fila:
+                    # Encontrar la columna del estudiante y limpiar
+                    for j, valor in enumerate(fila):
+                        if valor == estudiante:
+                            sheet_clases_origen.update_cell(i + 1, j + 1, "")
+                            break
+                    break
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
+        
+        try:
+            # Agregar a curso destino
+            sheet_clases_destino = clases_sheet.worksheet(curso_destino)
+            valores_destino = sheet_clases_destino.get_all_values()
+            
+            # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
+            idx_estudiantes = None
+            for i, fila in enumerate(valores_destino):
+                if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
+                    idx_estudiantes = i + 1
+                    break
+            
+            if idx_estudiantes is not None:
+                # Encontrar primera celda vacía en la columna de estudiantes
+                col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
+                for i in range(idx_estudiantes, len(valores_destino)):
+                    if not valores_destino[i][col_estudiantes].strip():
+                        sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
+                        break
+                else:
+                    # Si no hay celdas vacías, agregar al final
+                    sheet_clases_destino.append_row([estudiante])
+                    
+        except gspread.exceptions.WorksheetNotFound:
+            st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
+        
+        # 3. REGISTRAR EN LOG DE CAMBIOS
+        try:
+            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
+        except gspread.exceptions.WorksheetNotFound:
+            cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
+            cambios_sheet.append_row([
+                "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
+                "Fecha Efectiva", "Administrador"
+            ])
+        
+        cambios_sheet.append_row([
+            datetime.now().strftime("%Y-%m-%d %H:%M"),
+            estudiante,
+            curso_origen,
+            curso_destino,
+            fecha_efectiva.strftime("%Y-%m-%d"),
+            st.session_state["user_name"]
+        ])
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
+        return False
 
+# ==============================
+# FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
+# ==============================
 
+def enviar_resumen_asistencia(datos_filtrados, email_template):
+    """Envía un resumen de asistencia a TODOS los apoderados con email registrado"""
+    
+    progress_placeholder = st.empty()
+    status_placeholder = st.empty()
+    
+    progress_placeholder.info("🚀 INICIANDO PROCESO DE ENVÍO DE RESUMENES...")
+    
+    try:
+        if datos_filtrados.empty:
+            progress_placeholder.error("❌ ERROR: Los datos filtrados están VACÍOS")
+            return False
+        
+        progress_placeholder.success(f"✅ Datos recibidos: {len(datos_filtrados)} registros")
+        
+        status_placeholder.info("🔄 Cargando información de apoderados...")
+        emails, nombres_apoderados = load_emails()
+        
+        if not emails:
+            progress_placeholder.error("❌ ERROR: No se encontraron emails de apoderados")
+            return False
+        
+        estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
+        estudiantes_con_email = []
+        estudiantes_sin_email = []
+        
+        for estudiante in estudiantes_filtrados:
+            nombre_variantes = [
+                estudiante.strip().lower(),
+                estudiante.strip(),
+                estudiante.lower(),
+                estudiante
+            ]
+            
+            email_encontrado = None
+            for variante in nombre_variantes:
+                if variante in emails:
+                    email_encontrado = emails[variante]
+                    break
+            
+            if email_encontrado:
+                estudiantes_con_email.append({
+                    'nombre_original': estudiante,
+                    'email': email_encontrado,
+                    'apoderado': nombres_apoderados.get(variante, "Apoderado")
+                })
+            else:
+                estudiantes_sin_email.append(estudiante)
+        
+        if not estudiantes_con_email:
+            progress_placeholder.error("🚫 No hay estudiantes con email registrado")
+            return False
+        
+        with st.expander("👀 VER DETALLES DE ENVÍO PROGRAMADO", expanded=True):
+            st.success(f"📧 **ENVÍO PROGRAMADO:** {len(estudiantes_con_email)} emails a enviar")
+            
+            if estudiantes_sin_email:
+                st.warning(f"⚠️ {len(estudiantes_sin_email)} estudiantes sin email registrado")
+        
+        fecha_inicio = st.session_state.get('fecha_inicio', date.today())
+        fecha_fin = st.session_state.get('fecha_fin', date.today())
+        
+        if boton_moderno("🚀 EJECUTAR ENVÍO DE RESUMENES", "exito", "📧", "execute_email_send"):
+            progress_bar = st.progress(0)
+            resultados = []
+            emails_enviados = 0
+            
+            for i, est_data in enumerate(estudiantes_con_email):
+                estudiante = est_data['nombre_original']
+                correo_destino = est_data['email']
+                nombre_apoderado = est_data['apoderado']
+                
+                status_placeholder.info(f"📨 Enviando {i+1}/{len(estudiantes_con_email)}: {estudiante}")
+                
+                datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
+                
+                if datos_estudiante.empty:
+                    continue
+                
+                total_clases = len(datos_estudiante)
+                asistencias = datos_estudiante['Asistencia'].sum()
+                ausencias = total_clases - asistencias
+                porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
+                
+                cursos_estudiante = datos_estudiante['Curso'].unique()
+                resumen_cursos = []
+                
+                for curso in cursos_estudiante:
+                    datos_curso = datos_estudiante[datos_estudiante['Curso'] == curso]
+                    total_curso = len(datos_curso)
+                    asistencias_curso = datos_curso['Asistencia'].sum()
+                    porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
+                    resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
+                
+                subject = f"Resumen de Asistencia - {estudiante} - Preuniversitario CIMMA"
+                
+                body = email_template.format(
+                    nombre_apoderado=nombre_apoderado,
+                    estudiante=estudiante,
+                    total_clases=total_clases,
+                    asistencias=asistencias,
+                    ausencias=ausencias,
+                    porcentaje_asistencia=porcentaje_asistencia,
+                    resumen_cursos="\n".join(resumen_cursos),
+                    fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
+                    fecha_fin=fecha_fin.strftime('%d/%m/%Y')
+                )
+                
+                with st.spinner(f"Enviando a {estudiante}..."):
+                    exito = send_email(correo_destino, subject, body)
+                
+                if exito:
+                    emails_enviados += 1
+                    st.success(f"✅ **{i+1}/{len(estudiantes_con_email)}:** Email enviado a {estudiante}")
+                else:
+                    st.error(f"❌ **{i+1}/{len(estudiantes_con_email)}:** Falló envío a {estudiante}")
+                
+                resultados.append({
+                    'estudiante': estudiante,
+                    'exito': exito
+                })
+                
+                progress_bar.progress((i + 1) / len(estudiantes_con_email))
+            
+            progress_placeholder.empty()
+            status_placeholder.empty()
+            progress_bar.empty()
+            
+            st.markdown("---")
+            st.subheader("📊 RESULTADO FINAL DEL ENVÍO")
+            
+            exitosos = sum(1 for r in resultados if r['exito'])
+            fallidos = len(resultados) - exitosos
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                st.metric("📧 Total Programados", len(resultados))
+            with col2:
+                st.metric("✅ Envíos Exitosos", exitosos)
+            with col3:
+                st.metric("❌ Envíos Fallidos", fallidos)
+            
+            if exitosos == len(resultados):
+                st.balloons()
+                st.success(f"🎉 **¡ÉXITO TOTAL!** Todos los {exitosos} emails fueron enviados")
+                st.session_state.email_status = f"🎉 ¡ÉXITO! {exitosos} emails enviados"
+            elif exitosos > 0:
+                st.warning(f"⚠️ **ENVÍO PARCIALMENTE EXITOSO:** {exitosos} de {len(resultados)} emails enviados")
+                st.session_state.email_status = f"⚠️ Envío parcial: {exitosos}/{len(resultados)} emails"
+            else:
+                st.error("❌ **FALLO TOTAL:** No se pudo enviar ningún email")
+                st.session_state.email_status = "❌ Falló el envío de emails"
+            
+            return exitosos > 0
+            
+    except Exception as e:
+        progress_placeholder.error(f"❌ ERROR CRÍTICO en el proceso: {str(e)}")
+        st.session_state.email_status = f"❌ Error crítico: {str(e)}"
+        return False
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
@@ -1916,178 +2154,6 @@ Preuniversitario CIMMA"""
     else:
         main_app_mejorada()
 
-
-
-
-
-# ==============================
-# FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
-# ==============================
-
-def enviar_resumen_asistencia(datos_filtrados, email_template):
-    """Envía un resumen de asistencia a TODOS los apoderados con email registrado"""
-    
-    progress_placeholder = st.empty()
-    status_placeholder = st.empty()
-    
-    progress_placeholder.info("🚀 INICIANDO PROCESO DE ENVÍO DE RESUMENES...")
-    
-    try:
-        if datos_filtrados.empty:
-            progress_placeholder.error("❌ ERROR: Los datos filtrados están VACÍOS")
-            return False
-        
-        progress_placeholder.success(f"✅ Datos recibidos: {len(datos_filtrados)} registros")
-        
-        status_placeholder.info("🔄 Cargando información de apoderados...")
-        emails, nombres_apoderados = load_emails()
-        
-        if not emails:
-            progress_placeholder.error("❌ ERROR: No se encontraron emails de apoderados")
-            return False
-        
-        estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
-        estudiantes_con_email = []
-        estudiantes_sin_email = []
-        
-        for estudiante in estudiantes_filtrados:
-            nombre_variantes = [
-                estudiante.strip().lower(),
-                estudiante.strip(),
-                estudiante.lower(),
-                estudiante
-            ]
-            
-            email_encontrado = None
-            for variante in nombre_variantes:
-                if variante in emails:
-                    email_encontrado = emails[variante]
-                    break
-            
-            if email_encontrado:
-                estudiantes_con_email.append({
-                    'nombre_original': estudiante,
-                    'email': email_encontrado,
-                    'apoderado': nombres_apoderados.get(variante, "Apoderado")
-                })
-            else:
-                estudiantes_sin_email.append(estudiante)
-        
-        if not estudiantes_con_email:
-            progress_placeholder.error("🚫 No hay estudiantes con email registrado")
-            return False
-        
-        with st.expander("👀 VER DETALLES DE ENVÍO PROGRAMADO", expanded=True):
-            st.success(f"📧 **ENVÍO PROGRAMADO:** {len(estudiantes_con_email)} emails a enviar")
-            
-            if estudiantes_sin_email:
-                st.warning(f"⚠️ {len(estudiantes_sin_email)} estudiantes sin email registrado")
-        
-        fecha_inicio = st.session_state.get('fecha_inicio', date.today())
-        fecha_fin = st.session_state.get('fecha_fin', date.today())
-        
-        if boton_moderno("🚀 EJECUTAR ENVÍO DE RESUMENES", "exito", "📧", "execute_email_send"):
-            progress_bar = st.progress(0)
-            resultados = []
-            emails_enviados = 0
-            
-            for i, est_data in enumerate(estudiantes_con_email):
-                estudiante = est_data['nombre_original']
-                correo_destino = est_data['email']
-                nombre_apoderado = est_data['apoderado']
-                
-                status_placeholder.info(f"📨 Enviando {i+1}/{len(estudiantes_con_email)}: {estudiante}")
-                
-                datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
-                
-                if datos_estudiante.empty:
-                    continue
-                
-                total_clases = len(datos_estudiante)
-                asistencias = datos_estudiante['Asistencia'].sum()
-                ausencias = total_clases - asistencias
-                porcentaje_asistencia = (asistencias / total_clases * 100) if total_clases > 0 else 0
-                
-                cursos_estudiante = datos_estudiante['Curso'].unique()
-                resumen_cursos = []
-                
-                for curso in cursos_estudiante:
-                    datos_curso = datos_estudiante[datos_estudiante['Curso'] == curso]
-                    total_curso = len(datos_curso)
-                    asistencias_curso = datos_curso['Asistencia'].sum()
-                    porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
-                    resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
-                
-                subject = f"Resumen de Asistencia - {estudiante} - Preuniversitario CIMMA"
-                
-                body = email_template.format(
-                    nombre_apoderado=nombre_apoderado,
-                    estudiante=estudiante,
-                    total_clases=total_clases,
-                    asistencias=asistencias,
-                    ausencias=ausencias,
-                    porcentaje_asistencia=porcentaje_asistencia,
-                    resumen_cursos="\n".join(resumen_cursos),
-                    fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
-                    fecha_fin=fecha_fin.strftime('%d/%m/%Y')
-                )
-                
-                with st.spinner(f"Enviando a {estudiante}..."):
-                    exito = send_email(correo_destino, subject, body)
-                
-                if exito:
-                    emails_enviados += 1
-                    st.success(f"✅ **{i+1}/{len(estudiantes_con_email)}:** Email enviado a {estudiante}")
-                else:
-                    st.error(f"❌ **{i+1}/{len(estudiantes_con_email)}:** Falló envío a {estudiante}")
-                
-                resultados.append({
-                    'estudiante': estudiante,
-                    'exito': exito
-                })
-                
-                progress_bar.progress((i + 1) / len(estudiantes_con_email))
-            
-            progress_placeholder.empty()
-            status_placeholder.empty()
-            progress_bar.empty()
-            
-            st.markdown("---")
-            st.subheader("📊 RESULTADO FINAL DEL ENVÍO")
-            
-            exitosos = sum(1 for r in resultados if r['exito'])
-            fallidos = len(resultados) - exitosos
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric("📧 Total Programados", len(resultados))
-            with col2:
-                st.metric("✅ Envíos Exitosos", exitosos)
-            with col3:
-                st.metric("❌ Envíos Fallidos", fallidos)
-            
-            if exitosos == len(resultados):
-                st.balloons()
-                st.success(f"🎉 **¡ÉXITO TOTAL!** Todos los {exitosos} emails fueron enviados")
-                st.session_state.email_status = f"🎉 ¡ÉXITO! {exitosos} emails enviados"
-            elif exitosos > 0:
-                st.warning(f"⚠️ **ENVÍO PARCIALMENTE EXITOSO:** {exitosos} de {len(resultados)} emails enviados")
-                st.session_state.email_status = f"⚠️ Envío parcial: {exitosos}/{len(resultados)} emails"
-            else:
-                st.error("❌ **FALLO TOTAL:** No se pudo enviar ningún email")
-                st.session_state.email_status = "❌ Falló el envío de emails"
-            
-            return exitosos > 0
-            
-    except Exception as e:
-        progress_placeholder.error(f"❌ ERROR CRÍTICO en el proceso: {str(e)}")
-        st.session_state.email_status = f"❌ Error crítico: {str(e)}"
-        return False
-
-
-
-
 # ==============================
 # PANEL ADMINISTRATIVO MEJORADO
 # ==============================
@@ -2136,82 +2202,77 @@ def admin_panel_mejorado():
     
     st.divider()
     
-
-
-
     # ==============================
-    # GESTIÓN DE FECHAS COMPLETADAS (ADMIN)
+    # GESTIÓN DE FECHAS COMPLETADAS (ADMIN) - VERSIÓN COMPLETA
     # ==============================
     
     st.markdown('<h2 class="section-header">📅 Gestión de Fechas Completadas</h2>', unsafe_allow_html=True)
 
-    # Aplicar estilos de tooltips
-    crear_tooltip_fechas()
-
-    # Mostrar panel informativo
-    mostrar_panel_informativo_fechas()
-
-    with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=True):
-        cursos = load_courses()
-        
-        if not cursos:
-            st.error("❌ No se encontraron cursos")
-            return
-        
-        curso_seleccionado_admin = st.selectbox(
-            "Selecciona un curso para gestionar fechas:",
-            list(cursos.keys()),
-            key="admin_curso_select"
-        )
-        
-        if curso_seleccionado_admin:
-            data_curso = cursos[curso_seleccionado_admin]
-            fechas_totales = data_curso["fechas"]
+    # Crear tabs para las diferentes funcionalidades
+    tab1, tab2, tab3 = st.tabs([
+        "🔄 Reactivar Fechas", 
+        "✅ Marcar Completadas", 
+        "📋 Historial"
+    ])
+    
+    with tab1:
+        # PANEL DE REACTIVACIÓN DE FECHAS
+        panel_reactivar_fechas()
+    
+    with tab2:
+        # PANEL DE MARCADO MANUAL (existente)
+        with st.expander("✅ Marcado Manual de Fechas como Completadas", expanded=True):
+            cursos = load_courses()
             
-            # Obtener estadísticas de fechas
-            stats = sistema_fechas.obtener_estadisticas_fechas(curso_seleccionado_admin, fechas_totales)
+            if not cursos:
+                st.error("❌ No se encontraron cursos")
+                return
             
-            # Mostrar estadísticas
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("📅 Total Fechas", stats["total"])
-            with col2:
-                st.metric("✅ Completadas", stats["completadas"])
-            with col3:
-                st.metric("⏳ Pendientes", stats["pendientes"])
-            with col4:
-                st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
+            curso_seleccionado_admin = st.selectbox(
+                "Selecciona un curso:",
+                list(cursos.keys()),
+                key="admin_curso_select"
+            )
             
-            # Tabla de fechas completadas - VERSIÓN CORREGIDA
-            st.subheader("📋 Fechas Completadas")
-            if stats["fechas_completadas"]:
-                st.markdown("**Haz clic sobre 🔄 para habilitar fecha en menú del profesor**")
+            if curso_seleccionado_admin:
+                data_curso = cursos[curso_seleccionado_admin]
+                fechas_totales = data_curso["fechas"]
                 
-                for i, fecha in enumerate(stats["fechas_completadas"]):
-                    # Usar un contenedor para cada fecha para mejor espaciado
-                    with st.container():
-                        col1, col2 = st.columns([4, 2])  # Cambiar de 3 columnas a 2
-                        with col1:
-                            st.write(f"**{i+1}.** ✅ {fecha}")
-                        with col2:
-                            if st.button("🔄 Reactivar Fecha", 
-                                    key=f"reactivar_{curso_seleccionado_admin}_{fecha}",
-                                    use_container_width=True,
-                                    help="Haz clic para reactivar esta fecha y permitir nuevo registro"):
-                                if sistema_fechas.reactivar_fecha(curso_seleccionado_admin, fecha):
-                                    st.success(f"✅ Fecha '{fecha}' reactivada - Ahora disponible para registro")
-                                    st.rerun()
-                        
-                        # Separador entre fechas (solo visual)
-                        if i < len(stats["fechas_completadas"]) - 1:
-                            st.markdown("---")
-            else:
-                st.info("ℹ️ No hay fechas completadas para este curso")
-
+                # Obtener estadísticas de fechas
+                stats = sistema_fechas.obtener_estadisticas_fechas(curso_seleccionado_admin, fechas_totales)
+                
+                # Mostrar estadísticas
+                col1, col2, col3, col4 = st.columns(4)
+                with col1:
+                    st.metric("📅 Total Fechas", stats["total"])
+                with col2:
+                    st.metric("✅ Completadas", stats["completadas"])
+                with col3:
+                    st.metric("⏳ Pendientes", stats["pendientes"])
+                with col4:
+                    st.metric("📊 Progreso", f"{stats['porcentaje_completado']:.1f}%")
+                
+                # Marcado manual de fechas como completadas
+                st.subheader("✅ Marcado Manual de Fechas")
+                fecha_manual = st.selectbox(
+                    "Selecciona fecha para marcar como completada:",
+                    [f for f in fechas_totales if f not in stats["fechas_completadas"]],
+                    key="fecha_manual_select"
+                )
+                
+                if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
+                    if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
+                        st.success(f"✅ Fecha {fecha_manual} marcada como completada")
+                        st.rerun()
+    
+    with tab3:
+        # HISTORIAL DE REACTIVACIONES
+        ver_historial_reactivaciones()
+    
     st.divider()
     
     # ==============================
-    # GESTIÓN DE CAMBIOS DE CURSO (NUEVA SECCIÓN)
+    # GESTIÓN DE CAMBIOS DE CURSO
     # ==============================
     
     st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
@@ -2334,26 +2395,8 @@ def admin_panel_mejorado():
                         cache_manager.invalidar()
                         st.rerun()
 
-
-            # Marcado manual de fechas como completadas
-            st.subheader("✅ Marcado Manual de Fechas")
-            fecha_manual = st.selectbox(
-                "Selecciona fecha para marcar como completada:",
-                [f for f in fechas_totales if f not in stats["fechas_completadas"]],
-                key="fecha_manual_select"
-            )
-            
-
-            if fecha_manual and st.button("✅ Marcar como Completada", use_container_width=True):
-                if sistema_fechas.marcar_fecha_completada(curso_seleccionado_admin, fecha_manual):
-                    st.success(f"✅ Fecha {fecha_manual} marcada como completada")
-                    st.rerun()
-    
     st.divider()
     
-
-
-
     # ==============================
     # INICIALIZACIÓN DE ESTADOS
     # ==============================
@@ -2453,9 +2496,6 @@ def admin_panel_mejorado():
         st.session_state.fecha_fin = fecha_max
         st.rerun()
     
-
-
-
     # ==============================
     # APLICACIÓN DE FILTROS
     # ==============================
@@ -2477,9 +2517,6 @@ def admin_panel_mejorado():
             (datos_filtrados['Fecha'].dt.date <= st.session_state.fecha_fin)
         ]
         filtros_aplicados.append(f"📅 Período: {st.session_state.fecha_inicio.strftime('%d/%m/%Y')} - {st.session_state.fecha_fin.strftime('%d/%m/%Y')}")
-    
-
-
     
     # ==============================
     # DASHBOARD PRINCIPAL
@@ -2758,13 +2795,6 @@ Preuniversitario CIMMA 2026""",
             st.session_state.curso_seleccionado = "Todos"
             st.session_state.estudiante_seleccionado = "Todos"
             st.rerun()
-
-
-
-
-
-
-
 
 # ==============================
 # APP PRINCIPAL MEJORADA (PROFESOR)
