@@ -2053,17 +2053,22 @@ def admin_panel_mejorado():
     )
     st.session_state.estudiante_seleccionado = estudiante_seleccionado
     
-    # Selector de sede
+    # Selector de sedes (MULTISELECT)
     courses = load_courses()
     df['Sede'] = df['Curso'].map(lambda c: courses.get(c, {}).get('sede', ''))
     sedes = ["Todas"] + sorted(df['Sede'].unique().tolist())
-    sede_seleccionada = st.sidebar.selectbox(
-        "Seleccionar Sede",
+    # Initialize session state for sedes as a list
+    if 'sede_seleccionadas' not in st.session_state:
+        st.session_state.sede_seleccionadas = ["Todas"]
+
+    sede_seleccionadas = st.sidebar.multiselect(
+        "Seleccionar Sedes",
         sedes,
-        index=sedes.index(st.session_state.sede_seleccionada) if st.session_state.sede_seleccionada in sedes else 0,
+        default=st.session_state.sede_seleccionadas,
         key="sede_select_admin"
     )
-    st.session_state.sede_seleccionada = sede_seleccionada
+    # Update session state
+    st.session_state.sede_seleccionadas = sede_seleccionadas if sede_seleccionadas else ["Todas"]
     
     # Selectores de fecha
     col1, col2 = st.sidebar.columns(2)
