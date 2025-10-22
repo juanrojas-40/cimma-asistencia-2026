@@ -482,7 +482,7 @@ class SistemaAyuda:
         
         ayuda = self.ayudas[seccion]
         
-        
+
         return f"""
         <div class="ayuda-contextual" style="display: inline-block; margin-left: 8px;">
             <span class="icono-ayuda" style="cursor: help; color: #6B7280; font-size: 0.9em;">
@@ -576,7 +576,7 @@ def aplicar_tema_moderno():
         "fondo": "#F8FAFC"          # Fondo claro
     }
     
-    st.markdown(f"" "
+    st.markdown(f"""
     <style>
     /* FUENTES Y TIPOGRAFÍA */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
