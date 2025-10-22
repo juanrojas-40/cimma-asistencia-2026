@@ -361,7 +361,7 @@ def mostrar_panel_informativo_fechas():
         ### 🔄 Reactivar Fechas - Guía Completa
         
         **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
-        """)
+        """ )
         
         col1, col2 = st.columns(2)
         
@@ -376,7 +376,7 @@ def mostrar_panel_informativo_fechas():
             - La fecha vuelve a estar disponible para registro
             - Los profesores pueden tomar asistencia nuevamente
             - El historial anterior se mantiene
-            """)
+            """ )
         
         with col2:
             st.markdown("""
@@ -386,7 +386,7 @@ def mostrar_panel_informativo_fechas():
             **✅ Mantiene auditoría completa**
             **✅ Sin pérdida de datos**
             **✅ Ideal para correcciones**
-            """)
+            """ )
         
         st.markdown("""
         ---
@@ -425,7 +425,7 @@ def mostrar_panel_informativo_fechas():
         
         **¿Afecta a los reportes enviados?**
         Los reportes futuros reflejarán los datos actualizados.
-        """)
+        """ )
 
 # ==============================
 # SISTEMA DE AYUDA CONTEXTUAL
@@ -482,7 +482,7 @@ class SistemaAyuda:
         
         ayuda = self.ayudas[seccion]
         
-        return f"""
+        return f"" "
         <div class="ayuda-contextual" style="display: inline-block; margin-left: 8px;">
             <span class="icono-ayuda" style="cursor: help; color: #6B7280; font-size: 0.9em;">
                 ℹ️
@@ -525,7 +525,7 @@ class SistemaAyuda:
             opacity: 1;
         }}
         </style>
-        """
+        """ 
     
     def _obtener_posicion(self, posicion):
         """Determina posición del tooltip"""
@@ -575,7 +575,7 @@ def aplicar_tema_moderno():
         "fondo": "#F8FAFC"          # Fondo claro
     }
     
-    st.markdown(f"""
+    st.markdown(f"" "
     <style>
     /* FUENTES Y TIPOGRAFÍA */
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
@@ -696,7 +696,7 @@ def aplicar_tema_moderno():
     }}
     
     </style>
-    """, unsafe_allow_html=True)
+    """ , unsafe_allow_html=True)
 
 def crear_header_moderno():
     """Crea un header moderno con logo y título"""
@@ -707,7 +707,7 @@ def crear_header_moderno():
 
 def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
     """Crea una tarjeta de métricas moderna"""
-    return f"""
+    return f"" "
     <div class="card" style="border-left: 4px solid {color};">
         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
             <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icono}</span>
@@ -716,7 +716,7 @@ def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A
         <div style="font-size: 2rem; font-weight: 700; color: {color};">{valor}</div>
         <div style="color: #6B7280; font-size: 0.9rem;">{subtitulo}</div>
     </div>
-    """
+    """ 
 
 def boton_moderno(texto, tipo="primario", icono="", key=None):
     """Crea un botón moderno con icono"""
@@ -730,7 +730,7 @@ def boton_moderno(texto, tipo="primario", icono="", key=None):
     color = colores.get(tipo, "#1A3B8F")
     icono_html = f"<span style='margin-right: 0.5rem;'>{icono}</span>" if icono else ""
     
-    st.markdown(f"""
+    st.markdown(f"" "
     <style>
     .boton-{key} {{
         background: {color} !important;
@@ -746,7 +746,7 @@ def boton_moderno(texto, tipo="primario", icono="", key=None):
         box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
     }}
     </style>
-    """, unsafe_allow_html=True)
+    """ , unsafe_allow_html=True)
     
     return st.button(f"{icono} {texto}", key=key, use_container_width=True)
 
@@ -1024,11 +1024,11 @@ def generar_alertas_inteligentes(df):
     if alertas:
         for alerta in alertas:
             color = "#FEF3C7" if alerta['severidad'] == 'media' else "#FEE2E2"
-            st.markdown(f"""
+            st.markdown(f"" "
             <div style="background: {color}; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid #F59E0B;">
                 <strong>{alerta['tipo']} {alerta['mensaje']}</strong>
             </div>
-            """, unsafe_allow_html=True)
+            """ , unsafe_allow_html=True)
     else:
         st.success("✅ No hay alertas críticas en este momento")
 
@@ -1152,11 +1152,11 @@ def implementar_temporizador_seguridad():
             elif tiempo_restante < 600:  # 10 minutos
                 color = "#F59E0B"
             
-            st.markdown(f"""
+            st.markdown(f"" "
             <div style="position: sticky; top: 1rem; background: {color}; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; margin-bottom: 1rem;">
                 ⏱️ Tiempo restante: {minutos:02d}:{segundos:02d}
             </div>
-            """, unsafe_allow_html=True)
+            """ , unsafe_allow_html=True)
 
 def panel_monitoreo_cache():
     """Panel para monitorear estado del caché"""
@@ -1263,10 +1263,10 @@ def probar_configuracion_email():
         test_email = st.text_input("Email para prueba:", "test@example.com")
         if st.button("🧪 Probar Envío de Email"):
             subject_test = "📧 Prueba de Email - Preuniversitario CIMMA"
-            body_test = f"""Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
+            body_test = f"" "Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
 Si recibes este email, la configuración SMTP está funcionando correctamente.
 Saludos,
-Sistema de Asistencia Preuniversitario CIMMA"""
+Sistema de Asistencia Preuniversitario CIMMA"" "
             if send_email(test_email, subject_test, body_test):
                 st.success("🎉 ¡Email de prueba enviado exitosamente!")
             else:
@@ -1606,7 +1606,8 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                     asistencias=asistencias,
                     ausencias=ausencias,
                     porcentaje_asistencia=porcentaje_asistencia,
-                    resumen_cursos="\n".join(resumen_cursos),
+                    resumen_cursos="
+".join(resumen_cursos),
                     fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
                     fecha_fin=fecha_fin.strftime('%d/%m/%Y')
                 )
@@ -1910,7 +1911,7 @@ def admin_panel_mejorado():
         - Mantiene todo el historial de asistencia
         - Actualiza automáticamente en todos los reportes
         - No pierde datos históricos
-        """)
+        """ )
         
         # Cargar datos
         cursos = load_courses()
@@ -1948,13 +1949,13 @@ def admin_panel_mejorado():
                     asistencias = datos_estudiante['Asistencia'].sum()
                     porcentaje = (asistencias / total_clases * 100) if total_clases > 0 else 0
                     
-                    st.info(f"""
+                    st.info(f"" "
                     **📊 Historial actual:**
                     - **Curso actual:** {curso_origen}
                     - **Total clases:** {total_clases}
                     - **Asistencias:** {asistencias}
                     - **Porcentaje:** {porcentaje:.1f}%
-                    """)
+                    """ )
         
         with col2:
             st.subheader("🎯 Curso Destino")
@@ -1970,13 +1971,13 @@ def admin_panel_mejorado():
             # Mostrar información del curso destino
             if curso_destino:
                 estudiantes_destino = cursos[curso_destino]["estudiantes"]
-                st.success(f"""
+                st.success(f"" "
                 **📚 Curso destino: {curso_destino}**
                 - **Profesor:** {cursos[curso_destino]['profesor']}
                 - **Día:** {cursos[curso_destino]['dia']}
                 - **Horario:** {cursos[curso_destino]['horario']}
                 - **Estudiantes actuales:** {len(estudiantes_destino)}
-                """)
+                """ )
         
         # Confirmación y ejecución
         st.markdown("---")
@@ -1988,7 +1989,7 @@ def admin_panel_mejorado():
             if estudiante_seleccionado in estudiantes_destino:
                 st.error(f"❌ **{estudiante_seleccionado}** ya existe en el curso **{curso_destino}**")
             else:
-                st.warning(f"""
+                st.warning(f"" "
                 **🔔 ¿Estás seguro de realizar este cambio?**
                 
                 **Estudiante:** {estudiante_seleccionado}
@@ -1998,7 +1999,7 @@ def admin_panel_mejorado():
                 ✅ Mantendrá todo el historial de asistencia
                 ✅ Actualizará todos los reportes futuros
                 ✅ El estudiante aparecerá en el nuevo curso
-                """)
+                """ )
                 
                 # Opción de fecha efectivo
                 fecha_efectiva = st.date_input(
@@ -2017,7 +2018,7 @@ def admin_panel_mejorado():
                         1. El estudiante ya aparece en el nuevo curso
                         2. Los reportes reflejarán el cambio inmediatamente
                         3. El historial anterior se mantiene intacto
-                        """)
+                        """ )
                         
                         # Invalidar caché para reflejar cambios
                         cache_manager.invalidar()
@@ -2035,8 +2036,8 @@ def admin_panel_mejorado():
         st.session_state.curso_seleccionado = "Todos"
     if "estudiante_seleccionado" not in st.session_state:
         st.session_state.estudiante_seleccionado = "Todos"
-    if "sede_seleccionada" not in st.session_state:
-        st.session_state.sede_seleccionada = "Todas"
+    if "sede_seleccionadas" not in st.session_state:
+        st.session_state.sede_seleccionadas = ["Todas"]
     
     # ==============================
     # CARGA DE DATOS
@@ -2143,7 +2144,7 @@ def admin_panel_mejorado():
     if boton_moderno("🧹 Limpiar Filtros", "secundario", "🧹", "clear_filters_admin"):
         st.session_state.curso_seleccionado = "Todos"
         st.session_state.estudiante_seleccionado = "Todos"
-        st.session_state.sede_seleccionada = "Todas"
+        st.session_state.sede_seleccionadas = ["Todas"]
         st.session_state.fecha_inicio = fecha_min
         st.session_state.fecha_fin = fecha_max
         st.rerun()
@@ -2163,9 +2164,9 @@ def admin_panel_mejorado():
         datos_filtrados = datos_filtrados[datos_filtrados['Estudiante'] == st.session_state.estudiante_seleccionado]
         filtros_aplicados.append(f"👤 Estudiante: {st.session_state.estudiante_seleccionado}")
     
-    if st.session_state.sede_seleccionada != "Todas":
-        datos_filtrados = datos_filtrados[datos_filtrados['Sede'] == st.session_state.sede_seleccionada]
-        filtros_aplicados.append(f"🏫 Sede: {st.session_state.sede_seleccionada}")
+    if "Todas" not in st.session_state.sede_seleccionadas and st.session_state.sede_seleccionadas:
+        datos_filtrados = datos_filtrados[datos_filtrados['Sede'].isin(st.session_state.sede_seleccionadas)]
+        filtros_aplicados.append(f"🏫 Sedes: {', '.join(st.session_state.sede_seleccionadas)}")
     
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any():
         datos_filtrados = datos_filtrados[
@@ -2318,7 +2319,7 @@ Este es un resumen automático de asistencia para el/la estudiante {estudiante}.
 Para consultas específicas, por favor contacte a la administración.
 
 Saludos cordiales,
-Preuniversitario CIMMA 2026""",
+Preuniversitario CIMMA 2026""" ,
             height=300,
             key="email_template_admin"
         )
@@ -2678,13 +2679,13 @@ def main_app_mejorada():
                         continue
                     estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
                     subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                    body = f"""Hola {nombre_apoderado},
+                    body = f"" "Hola {nombre_apoderado},
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 📅 Fecha: {fecha_seleccionada}
 👨‍🎓 Estudiante: {estudiante}
 📌 Estado: {estado}
 Saludos cordiales,
-Preuniversitario CIMMA 2026"""
+Preuniversitario CIMMA 2026"" "
                     send_email(correo_destino, subject, body)
                     
                 st.rerun()
@@ -2779,7 +2780,7 @@ def main():
                             code = generate_2fa_code()
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
-                            body = f"""Estimado/a {nombre},
+                            body = f"" "Estimado/a {nombre},
 
 Su código de verificación para acceder al sistema es: 
 
@@ -2788,7 +2789,7 @@ Su código de verificación para acceder al sistema es:
 Este código es válido por 10 minutos.
 
 Saludos,
-Preuniversitario CIMMA"""
+Preuniversitario CIMMA"" "
                             if send_email(email, subject, body):
                                 st.session_state["2fa_code"] = code
                                 st.session_state["2fa_email"] = email
@@ -2873,7 +2874,7 @@ Preuniversitario CIMMA"""
                 </div>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """ , unsafe_allow_html=True)
         return
     
     if st.session_state["user_type"] == "admin":
