@@ -18,11 +18,24 @@ import traceback
 import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
-
+from gspread.exceptions import APIError
 
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
+
+
+
+def open_sheet_with_retry(client, sheet_id, retries=3, delay=5):
+    for attempt in range(retries):
+        try:
+            return client.open_by_key(sheet_id)
+        except APIError as e:
+            if e.response.json().get('error', {}).get('code') == 429:
+                time.sleep(delay * (2 ** attempt))
+                continue
+            raise
+    raise Exception("Max retries exceeded for API quota")
 
 class CacheInteligente:
     """Sistema de caché inteligente con invalidación automática"""
@@ -1267,57 +1280,91 @@ Sistema de Asistencia Preuniversitario CIMMA"""
 
 @cache_manager.cached(ttl=3600, dependencias=['cursos'])
 def load_courses():
-    client = get_client()
-    if not client:
-        return {}
-    clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
-    courses = {}
-    for worksheet in clases_sheet.worksheets():
-        sheet_name = worksheet.title
+    try:
+        client = get_client()
+        if not client:
+            st.error("❌ No se pudo inicializar el cliente de Google Sheets. Verifica las credenciales.")
+            return {}
+        
+        sheet_id = st.secrets.get("google", {}).get("clases_sheet_id", "")
+        if not sheet_id:
+            st.error("❌ No se encontró el ID de la hoja de clases en los secrets.")
+            return {}
+        
         try:
-            colA_raw = worksheet.col_values(1)
-            colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-            colA_upper = [s.upper() for s in colA]
-            idx_prof = colA_upper.index("PROFESOR")
-            profesor = colA[idx_prof + 1]
-            idx_dia = colA_upper.index("DIA")
-            dia = colA[idx_dia + 1]
-            idx_curso = colA_upper.index("CURSO")
-            curso_id = colA[idx_curso + 1]
-            horario = colA[idx_curso + 2]
-            fechas = []
-            estudiantes = []
-            idx_fechas = colA_upper.index("FECHAS")
-            idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
-            for i in range(idx_fechas + 1, idx_estudiantes):
-                if i < len(colA):
-                    fechas.append(colA[i])
-            for i in range(idx_estudiantes + 1, len(colA)):
-                if colA[i]:
-                    estudiantes.append(colA[i])
+            clases_sheet = client.open_by_key(sheet_id)
+        except gspread.exceptions.SpreadsheetNotFound:
+            st.error(f"❌ No se encontró la hoja con ID: {sheet_id}. Verifica el ID.")
+            return {}
+        except gspread.exceptions.APIError as e:
+            error_details = e.response.json().get('error', {}) if hasattr(e.response, 'json') else {}
+            error_message = error_details.get('message', str(e))
+            error_code = error_details.get('code', 'Unknown')
+            st.error(f"❌ Error de API al acceder a la hoja: {error_message} (Código: {error_code})")
+            if error_code == 403:
+                st.info("💡 Verifica que el service account tenga permisos de edición en la hoja.")
+            elif error_code == 429:
+                st.info("💡 Límite de cuota de API alcanzado. Intenta de nuevo más tarde.")
+            return {}
+        
+        courses = {}
+        for worksheet in clases_sheet.worksheets():
+            sheet_name = worksheet.title
             try:
-                colB_raw = worksheet.col_values(2)
-                colB = [cell.strip() for cell in colB_raw if isinstance(cell, str) and cell.strip()]
-                colB_upper = [s.upper() for s in colB]
-                idx_sede = colB_upper.index("SEDE")
-                sede = colB[idx_sede + 1] if (idx_sede + 1) < len(colB) else ""
-            except (ValueError, IndexError):
-                sede = ""
-            if profesor and dia and curso_id and horario and estudiantes:
-                estudiantes = sorted([e for e in estudiantes if e.strip()])
-                courses[sheet_name] = {
-                    "profesor": profesor,
-                    "dia": dia,
-                    "horario": horario,
-                    "curso_id": curso_id,
-                    "fechas": fechas or ["Sin fechas"],
-                    "estudiantes": estudiantes,
-                    "sede": sede
-                }
-        except Exception as e:
-            st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
-            continue
-    return courses
+                colA_raw = worksheet.col_values(1)
+                colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
+                colA_upper = [s.upper() for s in colA]
+                idx_prof = colA_upper.index("PROFESOR")
+                profesor = colA[idx_prof + 1]
+                idx_dia = colA_upper.index("DIA")
+                dia = colA[idx_dia + 1]
+                idx_curso = colA_upper.index("CURSO")
+                curso_id = colA[idx_curso + 1]
+                horario = colA[idx_curso + 2]
+                fechas = []
+                estudiantes = []
+                idx_fechas = colA_upper.index("FECHAS")
+                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
+                for i in range(idx_fechas + 1, idx_estudiantes):
+                    if i < len(colA):
+                        fechas.append(colA[i])
+                for i in range(idx_estudiantes + 1, len(colA)):
+                    if colA[i]:
+                        estudiantes.append(colA[i])
+                try:
+                    colB_raw = worksheet.col_values(2)
+                    colB = [cell.strip() for cell in colB_raw if isinstance(cell, str) and cell.strip()]
+                    colB_upper = [s.upper() for s in colB]
+                    idx_sede = colB_upper.index("SEDE")
+                    sede = colB[idx_sede + 1] if (idx_sede + 1) < len(colB) else ""
+                except (ValueError, IndexError):
+                    sede = ""
+                if profesor and dia and curso_id and horario and estudiantes:
+                    estudiantes = sorted([e for e in estudiantes if e.strip()])
+                    courses[sheet_name] = {
+                        "profesor": profesor,
+                        "dia": dia,
+                        "horario": horario,
+                        "curso_id": curso_id,
+                        "fechas": fechas or ["Sin fechas"],
+                        "estudiantes": estudiantes,
+                        "sede": sede
+                    }
+            except Exception as e:
+                st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
+                continue
+        return courses
+    except Exception as e:
+        st.error(f"❌ Error crítico al cargar cursos: {str(e)}")
+        return {}
+
+
+
+
+
+
+
+
 
 @cache_manager.cached(ttl=7200)  # 2 horas para emails
 def load_emails():
