@@ -2679,13 +2679,13 @@ def main_app_mejorada():
                         continue
                     estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
                     subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                    body = f"" "Hola {nombre_apoderado},
+                    body = f"""Hola {nombre_apoderado},
 Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
 📅 Fecha: {fecha_seleccionada}
 👨‍🎓 Estudiante: {estudiante}
 📌 Estado: {estado}
 Saludos cordiales,
-Preuniversitario CIMMA 2026"" "
+Preuniversitario CIMMA 2026"""
                     send_email(correo_destino, subject, body)
                     
                 st.rerun()
