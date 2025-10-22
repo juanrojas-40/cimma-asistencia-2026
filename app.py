@@ -2118,6 +2118,7 @@ def admin_panel_mejorado():
     # Update session state
     st.session_state.sede_seleccionadas = sede_seleccionadas if sede_seleccionadas else ["Todas"]
     
+    
     # Selectores de fecha
     col1, col2 = st.sidebar.columns(2)
     with col1:
