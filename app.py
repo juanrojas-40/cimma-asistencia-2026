@@ -1405,37 +1405,50 @@ def load_all_asistencia():
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
     for worksheet in asistencia_sheet.worksheets():
-        if worksheet.title in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT"]:
+        sheet_name = worksheet.title
+        if sheet_name in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT", "FECHAS_COMPLETADAS", "CAMBIOS_CURSOS"]:
             continue
         try:
+            print(f"🔍 Procesando hoja '{sheet_name}'...")  # Log temporal
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 5:
+                print(f"⚠️ Hoja '{sheet_name}' omitida: menos de 5 filas.")
                 continue
-            all_values = all_values[3:]
+            all_values = all_values[3:]  # Skip first 3 rows
             headers = all_values[0]
-            headers = [h.strip().upper() for h in headers if h.strip()]
-            curso_col = 0
-            fecha_col = 1
+            headers = [str(h).strip().upper() for h in headers if str(h).strip()]  # Case-insensitive
+            print(f"Headers detectados en '{sheet_name}': {headers}")  # Log temporal
+            
+            curso_col = None
+            fecha_col = None
             estudiante_col = None
             asistencia_col = None
             hora_registro_col = None
             informacion_col = None
+            
             for i, h in enumerate(headers):
-                if "CURSO" in h:
+                h_upper = h.upper()
+                if "CURSO" in h_upper:
                     curso_col = i
-                elif "FECHA" in h:
+                elif "FECHA" in h_upper:
                     fecha_col = i
-                elif "ESTUDIANTE" in h:
+                elif any(term in h_upper for term in ["ESTUDIANTE", "NOMBRE ESTUDIANTE", "ALUMNO"]):
                     estudiante_col = i
-                elif "ASISTENCIA" in h:
+                elif "ASISTENCIA" in h_upper:
                     asistencia_col = i
-                elif "HORA REGISTRO" in h:
+                elif "HORA REGISTRO" in h_upper or "HORA" in h_upper:
                     hora_registro_col = i
-                elif "INFORMACION" in h or "MOTIVO" in h:
+                elif any(term in h_upper for term in ["INFORMACION", "MOTIVO", "OBSERVACION"]):
                     informacion_col = i
-            if asistencia_col is None or estudiante_col is None:
+            
+            print(f"Columnas en '{sheet_name}': Curso={curso_col}, Fecha={fecha_col}, Estudiante={estudiante_col}, Asistencia={asistencia_col}")  # Log temporal
+            
+            if asistencia_col is None or estudiante_col is None or fecha_col is None:
+                print(f"⚠️ Hoja '{sheet_name}' omitida: columnas requeridas no detectadas.")
                 continue
-            for row in all_values[1:]:
+            
+            records_loaded = 0
+            for row in all_values[1:]:  # Skip header row
                 max_index = max(
                     curso_col,
                     fecha_col,
@@ -1446,27 +1459,39 @@ def load_all_asistencia():
                 )
                 if len(row) <= max_index:
                     continue
+                
                 try:
                     asistencia_val = int(row[asistencia_col]) if row[asistencia_col] else 0
                 except (ValueError, TypeError):
                     asistencia_val = 0
-                curso = row[curso_col].strip() if curso_col < len(row) and row[curso_col] else worksheet.title
-                fecha_str = row[fecha_col].strip() if fecha_col < len(row) and row[fecha_col] else ""
-                estudiante = row[estudiante_col].strip() if estudiante_col < len(row) and row[estudiante_col] else ""
-                hora_registro = row[hora_registro_col].strip() if (hora_registro_col is not None and hora_registro_col < len(row) and row[hora_registro_col]) else ""
-                informacion = row[informacion_col].strip() if (informacion_col is not None and informacion_col < len(row) and row[informacion_col]) else ""
-                all_data.append({
-                    "Curso": curso,
-                    "Fecha": fecha_str,
-                    "Estudiante": estudiante,
-                    "Asistencia": asistencia_val,
-                    "Hora Registro": hora_registro,
-                    "Información": informacion
-                })
+                
+                # Fallback: Use sheet name if curso_col is empty
+                curso = row[curso_col].strip() if curso_col is not None and len(row) > curso_col and row[curso_col] else sheet_name
+                fecha_str = row[fecha_col].strip() if len(row) > fecha_col and row[fecha_col] else ""
+                estudiante = row[estudiante_col].strip() if len(row) > estudiante_col and row[estudiante_col] else ""
+                hora_registro = row[hora_registro_col].strip() if (hora_registro_col is not None and len(row) > hora_registro_col and row[hora_registro_col]) else ""
+                informacion = row[informacion_col].strip() if (informacion_col is not None and len(row) > informacion_col and row[informacion_col]) else ""
+                
+                if estudiante and asistencia_val is not None:  # Only add if estudiante is valid
+                    all_data.append({
+                        "Curso": curso,
+                        "Fecha": fecha_str,
+                        "Estudiante": estudiante,
+                        "Asistencia": asistencia_val,
+                        "Hora Registro": hora_registro,
+                        "Información": informacion
+                    })
+                    records_loaded += 1
+            
+            print(f"✅ Hoja '{sheet_name}': {records_loaded} registros cargados.")  # Log temporal
+            
         except Exception as e:
-            st.warning(f"⚠️ Error al procesar hoja '{worksheet.title}': {str(e)[:80]}")
+            print(f"⚠️ Error al procesar hoja '{sheet_name}': {str(e)[:80]}")  # Log temporal
             continue
+    
     df = pd.DataFrame(all_data)
+    print(f"📊 Total registros cargados: {len(df)} cursos únicos: {df['Curso'].unique() if not df.empty else 'Ninguno'}")  # Log temporal
+    
     if not df.empty:
         meses_espanol = {
             'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
@@ -1498,7 +1523,14 @@ def load_all_asistencia():
             except Exception:
                 return pd.NaT
         df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
+    
     return df
+
+
+
+
+
+
 
 # ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
@@ -2118,7 +2150,7 @@ def admin_panel_mejorado():
     # Update session state
     st.session_state.sede_seleccionadas = sede_seleccionadas if sede_seleccionadas else ["Todas"]
     
-    
+
     # Selectores de fecha
     col1, col2 = st.sidebar.columns(2)
     with col1:
