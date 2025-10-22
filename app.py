@@ -1296,16 +1296,12 @@ def load_courses():
                 if colA[i]:
                     estudiantes.append(colA[i])
             try:
-                sede_cell = worksheet.find("SEDE")
-                if sede_cell:
-                    sede = worksheet.cell(sede_cell.row, 2).value
-                    if sede:
-                        sede = sede.strip()
-                    else:
-                        sede = ""
-                else:
-                    sede = ""
-            except:
+                colB_raw = worksheet.col_values(2)
+                colB = [cell.strip() for cell in colB_raw if isinstance(cell, str) and cell.strip()]
+                colB_upper = [s.upper() for s in colB]
+                idx_sede = colB_upper.index("SEDE")
+                sede = colB[idx_sede + 1] if (idx_sede + 1) < len(colB) else ""
+            except (ValueError, IndexError):
                 sede = ""
             if profesor and dia and curso_id and horario and estudiantes:
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
