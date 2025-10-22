@@ -1607,8 +1607,7 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                     asistencias=asistencias,
                     ausencias=ausencias,
                     porcentaje_asistencia=porcentaje_asistencia,
-                    resumen_cursos="
-".join(resumen_cursos),
+                    resumen_cursos="\n".join(resumen_cursos),
                     fecha_inicio=fecha_inicio.strftime('%d/%m/%Y'),
                     fecha_fin=fecha_fin.strftime('%d/%m/%Y')
                 )
