@@ -1295,6 +1295,18 @@ def load_courses():
             for i in range(idx_estudiantes + 1, len(colA)):
                 if colA[i]:
                     estudiantes.append(colA[i])
+            try:
+                sede_cell = worksheet.find("SEDE")
+                if sede_cell:
+                    sede = worksheet.cell(sede_cell.row, 2).value
+                    if sede:
+                        sede = sede.strip()
+                    else:
+                        sede = ""
+                else:
+                    sede = ""
+            except:
+                sede = ""
             if profesor and dia and curso_id and horario and estudiantes:
                 estudiantes = sorted([e for e in estudiantes if e.strip()])
                 courses[sheet_name] = {
@@ -1303,7 +1315,8 @@ def load_courses():
                     "horario": horario,
                     "curso_id": curso_id,
                     "fechas": fechas or ["Sin fechas"],
-                    "estudiantes": estudiantes
+                    "estudiantes": estudiantes,
+                    "sede": sede
                 }
         except Exception as e:
             st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
@@ -1946,7 +1959,7 @@ def admin_panel_mejorado():
                 
                 # Opción de fecha efectivo
                 fecha_efectiva = st.date_input(
-                    "Fecha efectiva del cambio:",
+                    "Fecha efectivo del cambio:",
                     value=datetime.now().date(),
                     help="Los reportes futuros usarán esta fecha para el cambio",
                     key="fecha_efectiva_admin"
@@ -1979,6 +1992,8 @@ def admin_panel_mejorado():
         st.session_state.curso_seleccionado = "Todos"
     if "estudiante_seleccionado" not in st.session_state:
         st.session_state.estudiante_seleccionado = "Todos"
+    if "sede_seleccionada" not in st.session_state:
+        st.session_state.sede_seleccionada = "Todas"
     
     # ==============================
     # CARGA DE DATOS
@@ -2042,6 +2057,18 @@ def admin_panel_mejorado():
     )
     st.session_state.estudiante_seleccionado = estudiante_seleccionado
     
+    # Selector de sede
+    courses = load_courses()
+    df['Sede'] = df['Curso'].map(lambda c: courses.get(c, {}).get('sede', ''))
+    sedes = ["Todas"] + sorted(df['Sede'].unique().tolist())
+    sede_seleccionada = st.sidebar.selectbox(
+        "Seleccionar Sede",
+        sedes,
+        index=sedes.index(st.session_state.sede_seleccionada) if st.session_state.sede_seleccionada in sedes else 0,
+        key="sede_select_admin"
+    )
+    st.session_state.sede_seleccionada = sede_seleccionada
+    
     # Selectores de fecha
     col1, col2 = st.sidebar.columns(2)
     with col1:
@@ -2068,6 +2095,7 @@ def admin_panel_mejorado():
     if boton_moderno("🧹 Limpiar Filtros", "secundario", "🧹", "clear_filters_admin"):
         st.session_state.curso_seleccionado = "Todos"
         st.session_state.estudiante_seleccionado = "Todos"
+        st.session_state.sede_seleccionada = "Todas"
         st.session_state.fecha_inicio = fecha_min
         st.session_state.fecha_fin = fecha_max
         st.rerun()
@@ -2086,6 +2114,10 @@ def admin_panel_mejorado():
     if st.session_state.estudiante_seleccionado != "Todos":
         datos_filtrados = datos_filtrados[datos_filtrados['Estudiante'] == st.session_state.estudiante_seleccionado]
         filtros_aplicados.append(f"👤 Estudiante: {st.session_state.estudiante_seleccionado}")
+    
+    if st.session_state.sede_seleccionada != "Todas":
+        datos_filtrados = datos_filtrados[datos_filtrados['Sede'] == st.session_state.sede_seleccionada]
+        filtros_aplicados.append(f"🏫 Sede: {st.session_state.sede_seleccionada}")
     
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any():
         datos_filtrados = datos_filtrados[
@@ -2185,7 +2217,7 @@ def admin_panel_mejorado():
             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'Sin fecha'
         )
     
-    columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Asistencia']
+    columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Sede', 'Asistencia']
     columnas_extra = ['Hora Registro', 'Información']
     
     for col in columnas_extra:
@@ -2408,7 +2440,7 @@ def main_app_mejorada():
     data = cursos_filtrados[curso_seleccionado]
     
     # Información del curso en tarjetas
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         st.markdown(crear_tarjeta_metricas(
             "Profesor", data['profesor'], "Responsable", "👨‍🏫", "#1A3B8F"
@@ -2420,6 +2452,10 @@ def main_app_mejorada():
     with col3:
         st.markdown(crear_tarjeta_metricas(
             "Horario", data['horario'], "Horario", "⏰", "#F59E0B"
+        ), unsafe_allow_html=True)
+    with col4:
+        st.markdown(crear_tarjeta_metricas(
+            "Sede", data['sede'], "Ubicación", "🏫", "#8B5CF6"
         ), unsafe_allow_html=True)
     
     # ==============================
