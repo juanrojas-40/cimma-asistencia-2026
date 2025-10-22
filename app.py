@@ -708,7 +708,7 @@ def crear_header_moderno():
 
 def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
     """Crea una tarjeta de métricas moderna"""
-    return f"" "
+    return f"""
     <div class="card" style="border-left: 4px solid {color};">
         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
             <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icono}</span>
@@ -731,7 +731,7 @@ def boton_moderno(texto, tipo="primario", icono="", key=None):
     color = colores.get(tipo, "#1A3B8F")
     icono_html = f"<span style='margin-right: 0.5rem;'>{icono}</span>" if icono else ""
     
-    st.markdown(f"" "
+    st.markdown(f"""
     <style>
     .boton-{key} {{
         background: {color} !important;
@@ -1025,7 +1025,7 @@ def generar_alertas_inteligentes(df):
     if alertas:
         for alerta in alertas:
             color = "#FEF3C7" if alerta['severidad'] == 'media' else "#FEE2E2"
-            st.markdown(f"" "
+            st.markdown(f"""
             <div style="background: {color}; padding: 1rem; border-radius: 8px; margin: 0.5rem 0; border-left: 4px solid #F59E0B;">
                 <strong>{alerta['tipo']} {alerta['mensaje']}</strong>
             </div>
@@ -1153,7 +1153,7 @@ def implementar_temporizador_seguridad():
             elif tiempo_restante < 600:  # 10 minutos
                 color = "#F59E0B"
             
-            st.markdown(f"" "
+            st.markdown(f"""
             <div style="position: sticky; top: 1rem; background: {color}; color: white; padding: 0.5rem 1rem; border-radius: 20px; font-weight: 600; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; margin-bottom: 1rem;">
                 ⏱️ Tiempo restante: {minutos:02d}:{segundos:02d}
             </div>
@@ -1264,10 +1264,10 @@ def probar_configuracion_email():
         test_email = st.text_input("Email para prueba:", "test@example.com")
         if st.button("🧪 Probar Envío de Email"):
             subject_test = "📧 Prueba de Email - Preuniversitario CIMMA"
-            body_test = f"" "Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
+            body_test = f"""Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
 Si recibes este email, la configuración SMTP está funcionando correctamente.
 Saludos,
-Sistema de Asistencia Preuniversitario CIMMA"" "
+Sistema de Asistencia Preuniversitario CIMMA"""
             if send_email(test_email, subject_test, body_test):
                 st.success("🎉 ¡Email de prueba enviado exitosamente!")
             else:
@@ -1950,13 +1950,13 @@ def admin_panel_mejorado():
                     asistencias = datos_estudiante['Asistencia'].sum()
                     porcentaje = (asistencias / total_clases * 100) if total_clases > 0 else 0
                     
-                    st.info(f"" "
+                    st.info(f"""
                     **📊 Historial actual:**
                     - **Curso actual:** {curso_origen}
                     - **Total clases:** {total_clases}
                     - **Asistencias:** {asistencias}
                     - **Porcentaje:** {porcentaje:.1f}%
-                    """ )
+                    """)
         
         with col2:
             st.subheader("🎯 Curso Destino")
@@ -1972,13 +1972,13 @@ def admin_panel_mejorado():
             # Mostrar información del curso destino
             if curso_destino:
                 estudiantes_destino = cursos[curso_destino]["estudiantes"]
-                st.success(f"" "
+                st.success(f"""
                 **📚 Curso destino: {curso_destino}**
                 - **Profesor:** {cursos[curso_destino]['profesor']}
                 - **Día:** {cursos[curso_destino]['dia']}
                 - **Horario:** {cursos[curso_destino]['horario']}
                 - **Estudiantes actuales:** {len(estudiantes_destino)}
-                """ )
+                """)
         
         # Confirmación y ejecución
         st.markdown("---")
@@ -1990,7 +1990,7 @@ def admin_panel_mejorado():
             if estudiante_seleccionado in estudiantes_destino:
                 st.error(f"❌ **{estudiante_seleccionado}** ya existe en el curso **{curso_destino}**")
             else:
-                st.warning(f"" "
+                st.warning(f"""
                 **🔔 ¿Estás seguro de realizar este cambio?**
                 
                 **Estudiante:** {estudiante_seleccionado}
@@ -2000,7 +2000,7 @@ def admin_panel_mejorado():
                 ✅ Mantendrá todo el historial de asistencia
                 ✅ Actualizará todos los reportes futuros
                 ✅ El estudiante aparecerá en el nuevo curso
-                """ )
+                """)
                 
                 # Opción de fecha efectivo
                 fecha_efectiva = st.date_input(
