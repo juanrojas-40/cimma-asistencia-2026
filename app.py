@@ -482,6 +482,7 @@ class SistemaAyuda:
         
         ayuda = self.ayudas[seccion]
         
+        
         return f"""
         <div class="ayuda-contextual" style="display: inline-block; margin-left: 8px;">
             <span class="icono-ayuda" style="cursor: help; color: #6B7280; font-size: 0.9em;">
