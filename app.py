@@ -1,4 +1,3 @@
-en codigo agregar un nuevo elemento. ASIGNATURA. Este elemento esta sheets de CLASES 2026 EN COLUMNA C (en cada una de las hojas JR_1,JR_2,,etc), este elemento debe aparecer en panel de profesor y ademas un filtro en panel de administrador para ver analitica u otro. import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import json
@@ -23,6 +22,7 @@ from gspread.exceptions import APIError
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
+
 
 def open_sheet_with_retry(client, sheet_id, retries=3, delay=5):
     for attempt in range(retries):
