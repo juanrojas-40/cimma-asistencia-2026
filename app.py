@@ -21,7 +21,6 @@ import functools
 from gspread.exceptions import APIError
 import threading
 from queue import Queue
-import redis
 import pickle
 import os
 from collections import defaultdict
