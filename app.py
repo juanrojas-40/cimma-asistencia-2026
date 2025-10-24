@@ -1,3 +1,4 @@
+import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import json
@@ -20,9 +21,36 @@ import functools
 from gspread.exceptions import APIError
 
 # ==============================
-# SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
+# CONFIGURACIÓN INICIAL Y MANEJO DE SECRETS
 # ==============================
 
+def verificar_secrets():
+    """Verifica que todos los secrets necesarios estén configurados"""
+    secrets_requeridos = {
+        "google": ["credentials", "asistencia_sheet_id", "clases_sheet_id"],
+        "EMAIL": ["smtp_server", "smtp_port", "sender_email", "sender_password"]
+    }
+    
+    for categoria, secrets in secrets_requeridos.items():
+        if categoria not in st.secrets:
+            st.error(f"❌ No se encontró la categoría '{categoria}' en los secrets")
+            return False
+        
+        for secret in secrets:
+            if secret not in st.secrets[categoria]:
+                st.error(f"❌ No se encontró el secret '{categoria}.{secret}'")
+                return False
+    
+    # Verificar profesores o administradores (al menos uno debe estar configurado)
+    if "profesores" not in st.secrets and "administradores" not in st.secrets:
+        st.error("❌ No se encontraron secrets de profesores ni administradores")
+        return False
+    
+    return True
+
+# ==============================
+# SISTEMA DE CACHÉ INTELIGENTE
+# ==============================
 
 def open_sheet_with_retry(client, sheet_id, retries=3, delay=5):
     for attempt in range(retries):
@@ -138,7 +166,12 @@ class SistemaFechasCompletadas:
     
     def __init__(self):
         self.client = None
-        self.sheet_id = st.secrets["google"]["asistencia_sheet_id"]
+        # Manejo seguro de secrets
+        try:
+            self.sheet_id = st.secrets["google"]["asistencia_sheet_id"]
+        except KeyError:
+            st.error("❌ No se encontró 'asistencia_sheet_id' en los secrets de Google")
+            self.sheet_id = None
     
     def _get_client(self):
         """Obtiene el cliente de Google Sheets de forma lazy"""
@@ -150,6 +183,9 @@ class SistemaFechasCompletadas:
     def obtener_fechas_completadas(self, curso):
         """Obtiene las fechas ya registradas para un curso"""
         try:
+            if not self.sheet_id:
+                return []
+                
             client = self._get_client()
             if not client:
                 return []
@@ -176,6 +212,9 @@ class SistemaFechasCompletadas:
     def marcar_fecha_completada(self, curso, fecha):
         """Marca una fecha como completada"""
         try:
+            if not self.sheet_id:
+                return False
+                
             client = self._get_client()
             if not client:
                 return False
@@ -218,6 +257,9 @@ class SistemaFechasCompletadas:
     def reactivar_fecha(self, curso, fecha):
         """Reactivar una fecha completada (solo administradores)"""
         try:
+            if not self.sheet_id:
+                return False
+                
             client = self._get_client()
             if not client:
                 return False
@@ -257,11 +299,11 @@ class SistemaFechasCompletadas:
 sistema_fechas = SistemaFechasCompletadas()
 
 # ==============================
-# COMPONENTES INFORMATIVOS PARA FECHAS (CORREGIDO)
+# COMPONENTES INFORMATIVOS PARA FECHAS
 # ==============================
 
 def crear_tooltip_fechas():
-    """Función para crear estilos CSS de tooltips - VERSIÓN CORREGIDA"""
+    """Función para crear estilos CSS de tooltips"""
     st.markdown("""
     <style>
     .tooltip-fechas {
@@ -313,44 +355,6 @@ def crear_tooltip_fechas():
     </style>
     """, unsafe_allow_html=True)
 
-def tooltip_reactivar_fechas():
-    """Tooltip para la función de reactivar fechas - VERSIÓN CORREGIDA"""
-    return """
-    <div class="tooltip-fechas" style="display: inline-block; margin-left: 8px;">
-        <span style="color: #6B7280; font-size: 1.2em; cursor: help;">ℹ️</span>
-        <div class="tooltiptext">
-            <div style="font-weight: 600; margin-bottom: 12px; font-size: 1.1em; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 8px;">
-                🔄 Reactivar Fecha
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong>📝 Qué hace:</strong>
-                <p style="margin: 4px 0 8px 0; font-size: 0.9em;">Cambia una fecha de "COMPLETADA" a "PENDIENTE" para permitir nuevo registro de asistencia.</p>
-            </div>
-            
-            <div style="margin-bottom: 8px;">
-                <strong class="ventaja">✅ Ventajas:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Totalmente reversible</li>
-                    <li>Mantiene todo el historial</li>
-                    <li>Sin pérdida de datos</li>
-                    <li>Ideal para correcciones</li>
-                </ul>
-            </div>
-            
-            <div>
-                <strong class="alerta">🎯 Cuándo usar:</strong>
-                <ul style="margin: 4px 0; padding-left: 16px; font-size: 0.85em;">
-                    <li>Error en registro original</li>
-                    <li>Asistencia incompleta</li>
-                    <li>Cambios en calendario</li>
-                    <li>Verificación de datos</li>
-                </ul>
-            </div>
-        </div>
-    </div>
-    """
-                    
 def mostrar_panel_informativo_fechas():
     """Muestra un panel informativo completo sobre las funciones de fechas"""
     
@@ -359,7 +363,7 @@ def mostrar_panel_informativo_fechas():
         ### 🔄 Reactivar Fechas - Guía Completa
         
         **¿Cuándo y por qué reactivar una fecha?** Esta guía te explica todo:
-        """ )
+        """)
         
         col1, col2 = st.columns(2)
         
@@ -374,7 +378,7 @@ def mostrar_panel_informativo_fechas():
             - La fecha vuelve a estar disponible para registro
             - Los profesores pueden tomar asistencia nuevamente
             - El historial anterior se mantiene
-            """ )
+            """)
         
         with col2:
             st.markdown("""
@@ -384,7 +388,7 @@ def mostrar_panel_informativo_fechas():
             **✅ Mantiene auditoría completa**
             **✅ Sin pérdida de datos**
             **✅ Ideal para correcciones**
-            """ )
+            """)
         
         st.markdown("""
         ---
@@ -423,7 +427,7 @@ def mostrar_panel_informativo_fechas():
         
         **¿Afecta a los reportes enviados?**
         Los reportes futuros reflejarán los datos actualizados.
-        """ )
+        """)
 
 # ==============================
 # SISTEMA DE AYUDA CONTEXTUAL
@@ -480,7 +484,6 @@ class SistemaAyuda:
         
         ayuda = self.ayudas[seccion]
         
-
         return f"""
         <div class="ayuda-contextual" style="display: inline-block; margin-left: 8px;">
             <span class="icono-ayuda" style="cursor: help; color: #6B7280; font-size: 0.9em;">
@@ -1172,6 +1175,12 @@ def implementar_temporizador_seguridad():
     """Implementa un temporizador de seguridad en tiempo real"""
     
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
+        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+            st.error("❌ Sesión expirada por límite de tiempo.")
+            st.session_state.clear()
+            st.rerun()
+            return
+        
         tiempo_restante = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
         if tiempo_restante > 0:
             minutos = int(tiempo_restante // 60)
@@ -1211,6 +1220,11 @@ def panel_monitoreo_cache():
 @st.cache_resource
 def get_client():
     try:
+        # Verificar que los secrets estén disponibles
+        if "google" not in st.secrets or "credentials" not in st.secrets["google"]:
+            st.error("❌ No se encontraron las credenciales de Google en los secrets.")
+            return None
+            
         creds_dict = json.loads(st.secrets["google"]["credentials"])
         creds = Credentials.from_service_account_info(creds_dict, scopes=[
             "https://spreadsheets.google.com/feeds",
@@ -1228,6 +1242,11 @@ def get_chile_time():
 def send_email(to_email: str, subject: str, body: str) -> bool:
     """Envía email con mejor feedback de diagnóstico"""
     try:
+        # Verificar configuración de email
+        if "EMAIL" not in st.secrets:
+            st.error("❌ No se encontró la configuración de EMAIL en los secrets.")
+            return False
+            
         smtp_server = st.secrets["EMAIL"]["smtp_server"]
         smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
         sender_email = st.secrets["EMAIL"]["sender_email"]
@@ -1259,51 +1278,8 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         st.error(error_msg)
         return False
 
-def test_smtp_connection():
-    try:
-        smtp_server = st.secrets["EMAIL"]["smtp_server"]
-        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
-        
-        # Test de conexión básica
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(5)
-        result = sock.connect_ex((smtp_server, smtp_port))
-        sock.close()
-        
-        if result == 0:
-            st.success(f"✅ Puerto {smtp_port} accesible en {smtp_server}")
-            return True
-        else:
-            st.error(f"❌ No se puede conectar a {smtp_server}:{smtp_port}")
-            st.info("💡 Verifica firewall y configuración de red")
-            return False
-    except Exception as e:
-        st.error(f"❌ Error de conexión: {e}")
-        return False
-
 def generate_2fa_code():
     return ''.join(random.choices(string.digits, k=6))
-
-def probar_configuracion_email():
-    st.subheader("🧪 Probar Configuración de Email")
-    try:
-        smtp_server = st.secrets["EMAIL"]["smtp_server"]
-        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
-        sender_email = st.secrets["EMAIL"]["sender_email"]
-        st.success("✅ Secrets de email cargados correctamente")
-        test_email = st.text_input("Email para prueba:", "test@example.com")
-        if st.button("🧪 Probar Envío de Email"):
-            subject_test = "📧 Prueba de Email - Preuniversitario CIMMA"
-            body_test = f"""Este es un email de prueba enviado el {datetime.now().strftime('%d/%m/%Y %H:%M')}.
-Si recibes este email, la configuración SMTP está funcionando correctamente.
-Saludos,
-Sistema de Asistencia Preuniversitario CIMMA"""
-            if send_email(test_email, subject_test, body_test):
-                st.success("🎉 ¡Email de prueba enviado exitosamente!")
-            else:
-                st.error("❌ Falló el envío del email de prueba")
-    except Exception as e:
-        st.error(f"❌ Error en la configuración: {e}")
 
 # ==============================
 # CARGA DE DATOS CON CACHÉ INTELIGENTE
@@ -1317,10 +1293,12 @@ def load_courses():
             st.error("❌ No se pudo inicializar el cliente de Google Sheets. Verifica las credenciales.")
             return {}
         
-        sheet_id = st.secrets.get("google", {}).get("clases_sheet_id", "")
-        if not sheet_id:
+        # Verificar que el sheet_id esté disponible
+        if "google" not in st.secrets or "clases_sheet_id" not in st.secrets["google"]:
             st.error("❌ No se encontró el ID de la hoja de clases en los secrets.")
             return {}
+            
+        sheet_id = st.secrets["google"]["clases_sheet_id"]
         
         try:
             clases_sheet = client.open_by_key(sheet_id)
@@ -1421,6 +1399,12 @@ def load_emails():
         client = get_client()
         if not client:
             return {}, {}
+            
+        # Verificar que el sheet_id esté disponible
+        if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+            st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+            return {}, {}
+            
         asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
         sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
         if "MAILS" not in sheet_names:
@@ -1450,6 +1434,12 @@ def load_all_asistencia():
     client = get_client()
     if not client:
         return pd.DataFrame()
+        
+    # Verificar que el sheet_id esté disponible
+    if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+        st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+        return pd.DataFrame()
+        
     asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
     all_data = []
     for worksheet in asistencia_sheet.worksheets():
@@ -1457,15 +1447,12 @@ def load_all_asistencia():
         if sheet_name in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT", "FECHAS_COMPLETADAS", "CAMBIOS_CURSOS"]:
             continue
         try:
-            print(f"🔍 Procesando hoja '{sheet_name}'...")  # Log temporal
             all_values = worksheet.get_all_values()
             if not all_values or len(all_values) < 5:
-                print(f"⚠️ Hoja '{sheet_name}' omitida: menos de 5 filas.")
                 continue
             all_values = all_values[3:]  # Skip first 3 rows
             headers = all_values[0]
             headers = [str(h).strip().upper() for h in headers if str(h).strip()]  # Case-insensitive
-            print(f"Headers detectados en '{sheet_name}': {headers}")  # Log temporal
             
             curso_col = None
             fecha_col = None
@@ -1489,10 +1476,7 @@ def load_all_asistencia():
                 elif any(term in h_upper for term in ["INFORMACION", "MOTIVO", "OBSERVACION"]):
                     informacion_col = i
             
-            print(f"Columnas en '{sheet_name}': Curso={curso_col}, Fecha={fecha_col}, Estudiante={estudiante_col}, Asistencia={asistencia_col}")  # Log temporal
-            
             if asistencia_col is None or estudiante_col is None or fecha_col is None:
-                print(f"⚠️ Hoja '{sheet_name}' omitida: columnas requeridas no detectadas.")
                 continue
             
             records_loaded = 0
@@ -1531,14 +1515,10 @@ def load_all_asistencia():
                     })
                     records_loaded += 1
             
-            print(f"✅ Hoja '{sheet_name}': {records_loaded} registros cargados.")  # Log temporal
-            
         except Exception as e:
-            print(f"⚠️ Error al procesar hoja '{sheet_name}': {str(e)[:80]}")  # Log temporal
             continue
     
     df = pd.DataFrame(all_data)
-    print(f"📊 Total registros cargados: {len(df)} cursos únicos: {df['Curso'].unique() if not df.empty else 'Ninguno'}")  # Log temporal
     
     if not df.empty:
         meses_espanol = {
@@ -1752,7 +1732,19 @@ def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiv
             st.error("❌ Error de conexión con Google Sheets")
             return False
         
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        # Verificar que los sheet_ids estén disponibles
+        if "google" not in st.secrets:
+            st.error("❌ No se encontraron los secrets de Google.")
+            return False
+            
+        asistencia_sheet_id = st.secrets["google"].get("asistencia_sheet_id")
+        clases_sheet_id = st.secrets["google"].get("clases_sheet_id")
+        
+        if not asistencia_sheet_id or not clases_sheet_id:
+            st.error("❌ No se encontraron los IDs de las hojas en los secrets.")
+            return False
+        
+        asistencia_sheet = client.open_by_key(asistencia_sheet_id)
         
         # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
         try:
@@ -1769,7 +1761,7 @@ def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiv
             st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
         
         # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
-        clases_sheet = client.open_by_key(st.secrets["google"]["clases_sheet_id"])
+        clases_sheet = client.open_by_key(clases_sheet_id)
         
         try:
             # Remover de curso origen
@@ -1985,7 +1977,7 @@ def admin_panel_mejorado():
         - Mantiene todo el historial de asistencia
         - Actualiza automáticamente en todos los reportes
         - No pierde datos históricos
-        """ )
+        """)
         
         # Cargar datos
         cursos = load_courses()
@@ -2093,7 +2085,7 @@ def admin_panel_mejorado():
                         1. El estudiante ya aparece en el nuevo curso
                         2. Los reportes reflejarán el cambio inmediatamente
                         3. El historial anterior se mantiene intacto
-                        """ )
+                        """)
                         
                         # Invalidar caché para reflejar cambios
                         cache_manager.invalidar()
@@ -2415,7 +2407,7 @@ Este es un resumen automático de asistencia para el/la estudiante {estudiante}.
 Para consultas específicas, por favor contacte a la administración.
 
 Saludos cordiales,
-Preuniversitario CIMMA 2026""" ,
+Preuniversitario CIMMA 2026""",
             height=300,
             key="email_template_admin"
         )
@@ -2661,6 +2653,12 @@ def main_app_mejorada():
                 if not client:
                     st.error("Error connecting to Google Sheets")
                     return
+                    
+                # Verificar que el sheet_id esté disponible
+                if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+                    st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+                    return
+                    
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
                 try:
                     sheet = asistencia_sheet.worksheet(curso_seleccionado)
@@ -2744,6 +2742,12 @@ def main_app_mejorada():
                 if not client:
                     st.error("Error connecting to Google Sheets")
                     return
+                    
+                # Verificar que el sheet_id esté disponible
+                if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+                    st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+                    return
+                    
                 asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
                 try:
                     sheet = asistencia_sheet.worksheet(curso_seleccionado)
@@ -2803,6 +2807,12 @@ Preuniversitario CIMMA 2026"""
             if not client:
                 st.error("Error connecting to Google Sheets")
                 return
+                
+            # Verificar que el sheet_id esté disponible
+            if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+                st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+                return
+                
             sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
             try:
                 mejoras_sheet = sheet.worksheet("MEJORAS")
@@ -2825,6 +2835,24 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+    
+    # Verificar secrets antes de continuar
+    if not verificar_secrets():
+        st.error("""
+        ❌ **Configuración incompleta**
+        
+        Por favor, asegúrate de que todos los secrets requeridos estén configurados en Streamlit:
+        
+        **Secrets requeridos:**
+        - `google.credentials` (Service Account JSON)
+        - `google.asistencia_sheet_id` (ID de la hoja de asistencia)
+        - `google.clases_sheet_id` (ID de la hoja de clases)
+        - `EMAIL.smtp_server`, `EMAIL.smtp_port`, `EMAIL.sender_email`, `EMAIL.sender_password`
+        - `profesores` o `administradores` (usuarios y contraseñas)
+        
+        Consulta la documentación para más detalles.
+        """)
+        return
     
     # Aplicar tema moderno
     aplicar_tema_moderno()
