@@ -2790,13 +2790,16 @@ def main_app_mejorada():
                 
                 # Envío de emails
                 emails, nombres_apoderados = load_emails()
+                emails_enviados = 0
+                emails_fallidos = 0
+                
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
                     correo_destino = emails.get(nombre_lower)
                     nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
                     if not correo_destino:
                         continue
-                    estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
+                    
                     estado_html = "ASISTIÓ" if presente else "NO ASISTIÓ"
                     estado_color = "#28a745" if presente else "#dc3545"
                     estado_icono = "✅" if presente else "❌"
@@ -2855,13 +2858,25 @@ def main_app_mejorada():
                     </div>
                     """
 
-                    # Ruta del logo GIF (ajusta la ruta según donde esté ubicado tu logo)
+                    # Ruta del logo GIF
                     logo_path = "LOGO.gif"
                     
-                    send_email(correo_destino, subject, body_html, logo_path)
+                    try:
+                        send_email(correo_destino, subject, body_html, logo_path)
+                        emails_enviados += 1
+                    except Exception as e:
+                        st.error(f"❌ Error al enviar email a {correo_destino}: {e}")
+                        emails_fallidos += 1
+                
+                # Mostrar resumen de envíos
+                if emails_enviados > 0:
+                    st.success(f"📧 Se enviaron {emails_enviados} correos exitosamente")
+                if emails_fallidos > 0:
+                    st.error(f"❌ Falló el envío de {emails_fallidos} correos")
                     
-                    st.rerun()
-    
+            except Exception as e:
+                st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
+
     # Sección de sugerencias
     st.divider()
     st.markdown('<h3 class="section-header">💡 Sugerencias de Mejora</h3>', unsafe_allow_html=True)
@@ -2887,7 +2902,10 @@ def main_app_mejorada():
             mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
-            st.error(f"Error al guardar sugerencia: {e}")
+            st.error(f"Error al enviar sugerencia: {e}")
+
+
+
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
