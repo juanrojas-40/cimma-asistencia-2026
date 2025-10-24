@@ -958,6 +958,117 @@ class SistemaFechasCompletadas:
             st.error("❌ No se encontró 'asistencia_sheet_id' en los secrets de Google")
             self.sheet_id = None
     
+    # 🔥 AGREGAR ESTE MÉTODO NUEVO
+    def obtener_estadisticas_fechas(self, curso, fechas_totales):
+        """Obtiene estadísticas de fechas completadas vs pendientes"""
+        fechas_completadas = self.obtener_fechas_completadas(curso)
+        fechas_pendientes = [f for f in fechas_totales if f not in fechas_completadas]
+        
+        return {
+            "completadas": len(fechas_completadas),
+            "pendientes": len(fechas_pendientes),
+            "total": len(fechas_totales),
+            "porcentaje_completado": (len(fechas_completadas) / len(fechas_totales) * 100) if fechas_totales else 0,
+            "fechas_completadas": fechas_completadas,
+            "fechas_pendientes": fechas_pendientes
+        }
+    
+    def _get_client(self):
+        """Obtiene el cliente de Google Sheets de forma lazy"""
+        if self.client is None:
+            self.client = get_client()
+        return self.client
+    
+    @cache_manager.cached(ttl=900)
+    def obtener_fechas_completadas(self, curso):
+        """Obtiene las fechas ya registradas para un curso - Versión híbrida"""
+        
+        # Intentar Supabase primero
+        if gestor_bd.conectado:
+            try:
+                query = gestor_bd.supabase.table("asistencia").select("fecha").eq("curso", curso)
+                result = query.execute()
+                
+                if result.data:
+                    fechas_unicas = list(set([item["fecha"] for item in result.data]))
+                    return fechas_unicas
+                    
+            except Exception as e:
+                print(f"❌ Error obteniendo fechas de Supabase: {e}")
+        
+        # Fallback a Google Sheets (método original)
+        try:
+            if not self.sheet_id:
+                return []
+                
+            client = self._get_client()
+            if not client:
+                return []
+                
+            sheet = client.open_by_key(self.sheet_id)
+            try:
+                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+            except gspread.exceptions.WorksheetNotFound:
+                return []
+            
+            records = fechas_sheet.get_all_records()
+            fechas_curso = [
+                row["Fecha"] for row in records 
+                if row["Curso"] == curso and row["Completada"] == "SI"
+            ]
+            return fechas_curso
+        except Exception as e:
+            st.error(f"Error al cargar fechas completadas: {e}")
+            return []
+    
+    def marcar_fecha_completada(self, curso, fecha):
+        """Marca una fecha como completada (usa sistema híbrido)"""
+        def _marcar_real():
+            # En Supabase, las fechas se marcan automáticamente al tener registros
+            # Para Sheets, mantenemos el sistema original
+            try:
+                if not self.sheet_id:
+                    return False
+                    
+                client = self._get_client()
+                if not client:
+                    return False
+                    
+                sheet = client.open_by_key(self.sheet_id)
+                try:
+                    fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+                except gspread.exceptions.WorksheetNotFound:
+                    fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
+                    fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
+                
+                records = fechas_sheet.get_all_records()
+                existe = any(
+                    row["Curso"] == curso and row["Fecha"] == fecha 
+                    for row in records
+                )
+                
+                if not existe:
+                    fechas_sheet.append_row([
+                        curso,
+                        fecha,
+                        "SI",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    ])
+                else:
+                    for i, row in enumerate(records, start=2):
+                        if row["Curso"] == curso and row["Fecha"] == fecha:
+                            fechas_sheet.update_cell(i, 3, "SI")
+                            break
+                
+                return True
+            except Exception as e:
+                st.error(f"Error al marcar fecha como completada: {e}")
+                return False
+        
+        sistema_colas.agregar_escritura(_marcar_real)
+        cache_manager.invalidar()
+        return True
+    
     def _get_client(self):
         """Obtiene el cliente de Google Sheets de forma lazy"""
         if self.client is None:
