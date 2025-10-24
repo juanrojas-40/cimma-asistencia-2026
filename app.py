@@ -1,4 +1,4 @@
-import streamlit as st
+en codigo agregar un nuevo elemento. ASIGNATURA. Este elemento esta sheets de CLASES 2026 EN COLUMNA C (en cada una de las hojas JR_1,JR_2,,etc), este elemento debe aparecer en panel de profesor y ademas un filtro en panel de administrador para ver analitica u otro. import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import json
@@ -23,8 +23,6 @@ from gspread.exceptions import APIError
 # ==============================
 # SISTEMA DE CACHÉ INTELIGENTE (DEFINIR PRIMERO)
 # ==============================
-
-
 
 def open_sheet_with_retry(client, sheet_id, retries=3, delay=5):
     for attempt in range(retries):
@@ -708,14 +706,20 @@ def crear_header_moderno():
 
 def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
     """Crea una tarjeta de métricas moderna"""
+    # Truncar valor si es muy largo para asignaturas
+    if len(str(valor)) > 20:
+        valor_display = str(valor)[:20] + "..."
+    else:
+        valor_display = str(valor)
+        
     return f"""
-    <div class="card" style="border-left: 4px solid {color};">
+    <div class="card" style="border-left: 4px solid {color}; min-height: 120px;">
         <div style="display: flex; align-items: center; margin-bottom: 0.5rem;">
             <span style="font-size: 1.5rem; margin-right: 0.5rem;">{icono}</span>
-            <h3 style="margin: 0; color: {color}; font-weight: 600;">{titulo}</h3>
+            <h3 style="margin: 0; color: {color}; font-weight: 600; font-size: 0.9rem;">{titulo}</h3>
         </div>
-        <div style="font-size: 2rem; font-weight: 700; color: {color};">{valor}</div>
-        <div style="color: #6B7280; font-size: 0.9rem;">{subtitulo}</div>
+        <div style="font-size: 1.2rem; font-weight: 700; color: {color}; word-wrap: break-word;">{valor_display}</div>
+        <div style="color: #6B7280; font-size: 0.8rem;">{subtitulo}</div>
     </div>
     """ 
 
@@ -848,6 +852,32 @@ def crear_dashboard_avanzado(df):
     with col2:
         # Distribución de Asistencia
         crear_distribucion_asistencia(df)
+    
+    # ==================== ANÁLISIS POR ASIGNATURA ====================
+    if 'Asignatura' in df.columns and len(df['Asignatura'].unique()) > 1:
+        st.subheader("📚 Análisis por Asignatura")
+        
+        asistencia_por_asignatura = df.groupby('Asignatura')['Asistencia'].agg(['sum', 'count']).reset_index()
+        asistencia_por_asignatura['Porcentaje'] = (asistencia_por_asignatura['sum'] / asistencia_por_asignatura['count'] * 100)
+        asistencia_por_asignatura = asistencia_por_asignatura.sort_values('Porcentaje', ascending=False)
+        
+        fig_asignatura = px.bar(
+            asistencia_por_asignatura,
+            x='Asignatura',
+            y='Porcentaje',
+            title='📊 Asistencia por Asignatura',
+            color='Porcentaje',
+            color_continuous_scale=['#EF4444', '#F59E0B', '#10B981'],
+            template='plotly_white'
+        )
+        
+        fig_asignatura.update_layout(
+            xaxis_tickangle=-45,
+            coloraxis_showscale=False,
+            showlegend=False
+        )
+        
+        st.plotly_chart(fig_asignatura, use_container_width=True)
     
     # ==================== ALERTAS INTELIGENTES ====================
     st.subheader("🚨 Alertas Inteligentes")
@@ -1312,9 +1342,33 @@ def load_courses():
         for worksheet in clases_sheet.worksheets():
             sheet_name = worksheet.title
             try:
+                # Leer columnas A y C
                 colA_raw = worksheet.col_values(1)
+                colC_raw = worksheet.col_values(3)  # Columna C para ASIGNATURA
+                
                 colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
+                colC = [cell.strip() for cell in colC_raw if isinstance(cell, str) and cell.strip()]
+                
                 colA_upper = [s.upper() for s in colA]
+                colC_upper = [s.upper() for s in colC]
+                
+                # Buscar ASIGNATURA en columna C
+                idx_asignatura = None
+                asignatura = ""
+                try:
+                    idx_asignatura = colC_upper.index("ASIGNATURA")
+                    if idx_asignatura + 1 < len(colC):
+                        asignatura = colC[idx_asignatura + 1]
+                except ValueError:
+                    # Si no encuentra ASIGNATURA, buscar en otras posiciones
+                    for i, cell in enumerate(colC_upper):
+                        if "ASIGNATURA" in cell:
+                            idx_asignatura = i
+                            if i + 1 < len(colC):
+                                asignatura = colC[i + 1]
+                            break
+                
+                # Resto del código existente para leer otras columnas...
                 idx_prof = colA_upper.index("PROFESOR")
                 profesor = colA[idx_prof + 1]
                 idx_dia = colA_upper.index("DIA")
@@ -1340,6 +1394,7 @@ def load_courses():
                     sede = colB[idx_sede + 1] if (idx_sede + 1) < len(colB) else ""
                 except (ValueError, IndexError):
                     sede = ""
+                
                 if profesor and dia and curso_id and horario and estudiantes:
                     estudiantes = sorted([e for e in estudiantes if e.strip()])
                     courses[sheet_name] = {
@@ -1349,7 +1404,8 @@ def load_courses():
                         "curso_id": curso_id,
                         "fechas": fechas or ["Sin fechas"],
                         "estudiantes": estudiantes,
-                        "sede": sede
+                        "sede": sede,
+                        "asignatura": asignatura  # Nuevo campo agregado
                     }
             except Exception as e:
                 st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
@@ -1358,14 +1414,6 @@ def load_courses():
     except Exception as e:
         st.error(f"❌ Error crítico al cargar cursos: {str(e)}")
         return {}
-
-
-
-
-
-
-
-
 
 @cache_manager.cached(ttl=7200)  # 2 horas para emails
 def load_emails():
@@ -1525,12 +1573,6 @@ def load_all_asistencia():
         df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
     
     return df
-
-
-
-
-
-
 
 # ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
@@ -2009,6 +2051,7 @@ def admin_panel_mejorado():
                 - **Día:** {cursos[curso_destino]['dia']}
                 - **Horario:** {cursos[curso_destino]['horario']}
                 - **Estudiantes actuales:** {len(estudiantes_destino)}
+                - **Asignatura:** {cursos[curso_destino].get('asignatura', 'No especificada')}
                 """)
         
         # Confirmación y ejecución
@@ -2070,6 +2113,8 @@ def admin_panel_mejorado():
         st.session_state.estudiante_seleccionado = "Todos"
     if "sede_seleccionadas" not in st.session_state:
         st.session_state.sede_seleccionadas = ["Todas"]
+    if "asignatura_seleccionadas" not in st.session_state:
+        st.session_state.asignatura_seleccionadas = ["Todas"]
     
     # ==============================
     # CARGA DE DATOS
@@ -2150,6 +2195,18 @@ def admin_panel_mejorado():
     # Update session state
     st.session_state.sede_seleccionadas = sede_seleccionadas if sede_seleccionadas else ["Todas"]
     
+    # Selector de asignaturas (MULTISELECT) - NUEVO FILTRO
+    df['Asignatura'] = df['Curso'].map(lambda c: courses.get(c, {}).get('asignatura', ''))
+    asignaturas = ["Todas"] + sorted(df['Asignatura'].unique().tolist())
+    
+    asignatura_seleccionadas = st.sidebar.multiselect(
+        "Seleccionar Asignaturas",
+        asignaturas,
+        default=st.session_state.asignatura_seleccionadas,
+        key="asignatura_select_admin"
+    )
+    # Actualizar estado de sesión
+    st.session_state.asignatura_seleccionadas = asignatura_seleccionadas if asignatura_seleccionadas else ["Todas"]
 
     # Selectores de fecha
     col1, col2 = st.sidebar.columns(2)
@@ -2178,6 +2235,7 @@ def admin_panel_mejorado():
         st.session_state.curso_seleccionado = "Todos"
         st.session_state.estudiante_seleccionado = "Todos"
         st.session_state.sede_seleccionadas = ["Todas"]
+        st.session_state.asignatura_seleccionadas = ["Todas"]
         st.session_state.fecha_inicio = fecha_min
         st.session_state.fecha_fin = fecha_max
         st.rerun()
@@ -2200,6 +2258,11 @@ def admin_panel_mejorado():
     if "Todas" not in st.session_state.sede_seleccionadas and st.session_state.sede_seleccionadas:
         datos_filtrados = datos_filtrados[datos_filtrados['Sede'].isin(st.session_state.sede_seleccionadas)]
         filtros_aplicados.append(f"🏫 Sedes: {', '.join(st.session_state.sede_seleccionadas)}")
+    
+    # NUEVO FILTRO POR ASIGNATURA
+    if "Todas" not in st.session_state.asignatura_seleccionadas and st.session_state.asignatura_seleccionadas:
+        datos_filtrados = datos_filtrados[datos_filtrados['Asignatura'].isin(st.session_state.asignatura_seleccionadas)]
+        filtros_aplicados.append(f"📚 Asignaturas: {', '.join(st.session_state.asignatura_seleccionadas)}")
     
     if 'Fecha' in datos_filtrados.columns and datos_filtrados['Fecha'].notna().any():
         datos_filtrados = datos_filtrados[
@@ -2299,7 +2362,7 @@ def admin_panel_mejorado():
             lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else 'Sin fecha'
         )
     
-    columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Sede', 'Asistencia']
+    columnas_a_mostrar = ['Fecha_Formateada', 'Estudiante', 'Curso', 'Asignatura', 'Sede', 'Asistencia']
     columnas_extra = ['Hora Registro', 'Información']
     
     for col in columnas_extra:
@@ -2521,8 +2584,8 @@ def main_app_mejorada():
     curso_seleccionado = st.selectbox("🎓 Selecciona tu curso", list(cursos_filtrados.keys()), key="curso_select_profesor")
     data = cursos_filtrados[curso_seleccionado]
     
-    # Información del curso en tarjetas
-    col1, col2, col3, col4 = st.columns(4)
+    # Información del curso en tarjetas - ACTUALIZADO CON ASIGNATURA
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.markdown(crear_tarjeta_metricas(
             "Profesor", data['profesor'], "Responsable", "👨‍🏫", "#1A3B8F"
@@ -2538,6 +2601,10 @@ def main_app_mejorada():
     with col4:
         st.markdown(crear_tarjeta_metricas(
             "Sede", data['sede'], "Ubicación", "🏫", "#8B5CF6"
+        ), unsafe_allow_html=True)
+    with col5:
+        st.markdown(crear_tarjeta_metricas(
+            "Asignatura", data.get('asignatura', 'No especificada'), "Materia", "📚", "#EC4899"
         ), unsafe_allow_html=True)
     
     # ==============================
