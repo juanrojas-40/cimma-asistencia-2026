@@ -2860,7 +2860,7 @@ def main_app_mejorada():
                     
                     send_email(correo_destino, subject, body_html, logo_path)
                     
-                st.rerun()
+            st.rerun()
     
     # Sección de sugerencias
     st.divider()
