@@ -21,6 +21,7 @@ import functools
 from gspread.exceptions import APIError
 import threading
 from queue import Queue
+import redis
 import pickle
 import os
 from collections import defaultdict
@@ -79,7 +80,6 @@ class GestorBaseDatos:
                     result = self.supabase.table('estudiantes').select("*", count="exact").limit(1).execute()
                     self.conectado = True
                     self.modo_actual = "hibrido"
-                    st.success("✅ Conectado a Supabase correctamente")
                     return True
                 except Exception as test_error:
                     st.warning(f"⚠️ Supabase configurado pero error de conexión: {test_error}")
