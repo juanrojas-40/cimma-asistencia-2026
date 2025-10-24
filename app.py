@@ -16,9 +16,341 @@ import socket
 from email.utils import formatdate
 import traceback
 import plotly.express as px
-import time  # Para manejar tiempos y temporizadores
+import time as time_module
 import functools
 from gspread.exceptions import APIError
+import threading
+from queue import Queue
+import redis
+import pickle
+import os
+from collections import defaultdict
+
+# ==============================
+# SISTEMAS DE CONCURRENCIA (NUEVOS)
+# ==============================
+
+class SistemaColasEscritura:
+    """Sistema de colas para manejar escrituras a Sheets"""
+    
+    def __init__(self):
+        self.cola_escrituras = Queue()
+        self.en_ejecucion = False
+        self.lock = threading.Lock()
+        self.estadisticas = {
+            'procesadas': 0,
+            'fallidas': 0,
+            'pendientes': 0
+        }
+    
+    def iniciar_worker(self):
+        """Inicia el worker que procesa las colas"""
+        if not self.en_ejecucion:
+            self.en_ejecucion = True
+            threading.Thread(target=self._procesar_colas, daemon=True).start()
+            print("✅ Worker de colas iniciado")
+    
+    def agregar_escritura(self, funcion, *args, **kwargs):
+        """Agrega una escritura a la cola"""
+        with self.lock:
+            self.cola_escrituras.put({
+                'funcion': funcion,
+                'args': args,
+                'kwargs': kwargs,
+                'timestamp': time_module.time(),
+                'intentos': 0,
+                'id': f"{funcion.__name__}_{time_module.time()}"
+            })
+            self.estadisticas['pendientes'] = self.cola_escrituras.qsize()
+    
+    def _procesar_colas(self):
+        """Procesa las escrituras en la cola"""
+        while self.en_ejecucion:
+            try:
+                if not self.cola_escrituras.empty():
+                    tarea = self.cola_escrituras.get()
+                    
+                    # Implementar retry con backoff exponencial
+                    exito = self._ejecutar_con_retry(tarea)
+                    
+                    if exito:
+                        self.estadisticas['procesadas'] += 1
+                    else:
+                        self.estadisticas['fallidas'] += 1
+                        if tarea['intentos'] < 3:
+                            # Reintentar después
+                            time_module.sleep(2 ** tarea['intentos'])
+                            self.cola_escrituras.put(tarea)
+                    
+                    self.cola_escrituras.task_done()
+                    self.estadisticas['pendientes'] = self.cola_escrituras.qsize()
+                
+                time_module.sleep(0.5)  # Controlar tasa de procesamiento
+                
+            except Exception as e:
+                print(f"Error en worker de colas: {e}")
+                time_module.sleep(2)
+    
+    def _ejecutar_con_retry(self, tarea):
+        """Ejecuta una tarea con reintentos"""
+        try:
+            tarea['intentos'] += 1
+            tarea['funcion'](*tarea['args'], **tarea['kwargs'])
+            print(f"✅ Tarea {tarea['id']} procesada (intento {tarea['intentos']})")
+            return True
+        except Exception as e:
+            print(f"❌ Error en tarea {tarea['id']} (intento {tarea['intentos']}): {e}")
+            return False
+    
+    def obtener_estadisticas(self):
+        """Obtiene estadísticas de la cola"""
+        with self.lock:
+            return self.estadisticas.copy()
+
+# Instancia global del sistema de colas
+sistema_colas = SistemaColasEscritura()
+
+# ==============================
+# CACHÉ DISTRIBUIDO
+# ==============================
+
+class CacheDistribuido:
+    """Sistema de caché distribuido para múltiples instancias"""
+    
+    def __init__(self):
+        self.redis_client = None
+        self.cache_local = {}
+        self._conectar_redis()
+    
+    def _conectar_redis(self):
+        """Conectar a Redis si está disponible"""
+        try:
+            # En producción, usar Redis para caché distribuido
+            redis_url = os.getenv('REDIS_URL')
+            if redis_url:
+                self.redis_client = redis.from_url(redis_url)
+                self.redis_client.ping()
+                print("✅ Conectado a Redis para caché distribuido")
+            else:
+                print("ℹ️ Redis no configurado, usando caché local")
+        except Exception as e:
+            print(f"❌ Redis no disponible, usando caché local: {e}")
+    
+    def get(self, clave):
+        """Obtener valor del caché"""
+        # Intentar Redis primero
+        if self.redis_client:
+            try:
+                valor = self.redis_client.get(clave)
+                if valor:
+                    return pickle.loads(valor)
+            except Exception as e:
+                print(f"Error Redis get: {e}")
+        
+        # Fallback a caché local
+        return self.cache_local.get(clave)
+    
+    def set(self, clave, valor, ttl=3600):
+        """Guardar valor en caché"""
+        # Guardar en Redis si disponible
+        if self.redis_client:
+            try:
+                self.redis_client.setex(
+                    clave, 
+                    ttl, 
+                    pickle.dumps(valor)
+                )
+            except Exception as e:
+                print(f"Error Redis set: {e}")
+        
+        # Siempre guardar en local como backup
+        self.cache_local[clave] = {
+            'data': valor,
+            'expira': time_module.time() + ttl
+        }
+    
+    def invalidar(self, clave=None):
+        """Invalidar caché"""
+        if clave:
+            if self.redis_client:
+                try:
+                    self.redis_client.delete(clave)
+                except:
+                    pass
+            self.cache_local.pop(clave, None)
+        else:
+            if self.redis_client:
+                try:
+                    self.redis_client.flushdb()
+                except:
+                    pass
+            self.cache_local.clear()
+    
+    def limpiar_expirados(self):
+        """Limpiar entradas expiradas del caché local"""
+        ahora = time_module.time()
+        expirados = [k for k, v in self.cache_local.items() if v['expira'] < ahora]
+        for clave in expirados:
+            del self.cache_local[clave]
+
+# Instancia global de caché distribuido
+cache_distribuido = CacheDistribuido()
+
+# ==============================
+# RATE LIMITING
+# ==============================
+
+class RateLimiter:
+    """Controla la tasa de peticiones a Sheets API"""
+    
+    def __init__(self, max_requests=250, periodo=60):  # 250 requests/minuto
+        self.max_requests = max_requests
+        self.periodo = periodo
+        self.peticiones = defaultdict(list)
+        self.lock = threading.Lock()
+    
+    def puede_procesar(self, usuario):
+        """Verifica si se puede procesar una petición"""
+        with self.lock:
+            ahora = time_module.time()
+            
+            # Limpiar peticiones antiguas
+            self.peticiones[usuario] = [
+                t for t in self.peticiones[usuario] 
+                if ahora - t < self.periodo
+            ]
+            
+            # Verificar límite
+            if len(self.peticiones[usuario]) < self.max_requests:
+                self.peticiones[usuario].append(ahora)
+                return True
+            
+            return False
+    
+    def esperar_disponibilidad(self, usuario, timeout=30):
+        """Espera hasta que haya disponibilidad"""
+        inicio = time_module.time()
+        while time_module.time() - inicio < timeout:
+            if self.puede_procesar(usuario):
+                return True
+            time_module.sleep(1)
+        return False
+
+# Rate limiter global
+rate_limiter = RateLimiter()
+
+# Decorador para aplicar rate limiting
+def rate_limited(func):
+    def wrapper(*args, **kwargs):
+        usuario = st.session_state.get("user_name", "anonimo")
+        if rate_limiter.esperar_disponibilidad(usuario):
+            return func(*args, **kwargs)
+        else:
+            raise Exception("Límite de tasa excedido. Intenta más tarde.")
+    return wrapper
+
+# ==============================
+# SISTEMA RESILIENTE
+# ==============================
+
+class SistemaResiliente:
+    """Sistema con fallbacks para alta disponibilidad"""
+    
+    def __init__(self):
+        self.estado_api = "activa"
+        self.ultimo_error = None
+        self.reintentos = 0
+    
+    def cargar_datos_con_fallback(self, funcion_principal, clave_cache, ttl=300, usuario=None):
+        """Carga datos con múltiples fallbacks"""
+        if usuario is None:
+            usuario = st.session_state.get("user_name", "default")
+        
+        # 1. Intentar caché distribuido
+        datos = cache_distribuido.get(f"{clave_cache}_{usuario}")
+        if datos:
+            print(f"✅ Cache hit para {clave_cache}_{usuario}")
+            return datos
+        
+        # 2. Intentar API con rate limiting
+        if self.estado_api == "activa":
+            try:
+                if rate_limiter.puede_procesar(usuario):
+                    datos = funcion_principal()
+                    if datos is not None and (not hasattr(datos, 'empty') or not datos.empty):
+                        cache_distribuido.set(f"{clave_cache}_{usuario}", datos, ttl)
+                        self.reintentos = 0
+                        return datos
+                    else:
+                        print(f"⚠️ Datos vacíos para {clave_cache}")
+            except Exception as e:
+                print(f"❌ Error API {clave_cache}, activando fallback: {e}")
+                self.estado_api = "degradada"
+                self.ultimo_error = str(e)
+                self.reintentos += 1
+        
+        # 3. Fallback a datos locales/cache antiguo
+        datos = cache_distribuido.get(f"{clave_cache}_fallback")
+        if datos:
+            st.warning("⚠️ Usando datos en caché (API temporalmente no disponible)")
+            return datos
+        
+        # 4. Último recurso: datos vacíos
+        st.error("❌ Servicio temporalmente no disponible")
+        return {} if "dict" in str(type(funcion_principal)) else pd.DataFrame()
+
+    def restaurar_conexion(self):
+        """Intentar restaurar conexión a API"""
+        if self.estado_api == "degradada" and self.reintentos > 3:
+            self.estado_api = "activa"
+            self.reintentos = 0
+            print("🔄 Intentando restaurar conexión API")
+
+sistema_resiliente = SistemaResiliente()
+
+# ==============================
+# MONITOREO DE CONCURRENCIA
+# ==============================
+
+class MonitorConcurrencia:
+    """Monitorea el uso del sistema en tiempo real"""
+    
+    def __init__(self):
+        self.usuarios_activos = set()
+        self.peticiones_totales = 0
+        self.errores = 0
+        self.inicio_sistema = time_module.time()
+        self.lock = threading.Lock()
+    
+    def registrar_usuario(self, usuario):
+        with self.lock:
+            self.usuarios_activos.add(usuario)
+    
+    def remover_usuario(self, usuario):
+        with self.lock:
+            self.usuarios_activos.discard(usuario)
+    
+    def registrar_peticion(self):
+        with self.lock:
+            self.peticiones_totales += 1
+    
+    def registrar_error(self):
+        with self.lock:
+            self.errores += 1
+    
+    def obtener_metricas(self):
+        with self.lock:
+            uptime = time_module.time() - self.inicio_sistema
+            return {
+                'usuarios_activos': len(self.usuarios_activos),
+                'peticiones_totales': self.peticiones_totales,
+                'errores': self.errores,
+                'tasa_error': (self.errores / self.peticiones_totales * 100) if self.peticiones_totales > 0 else 0,
+                'uptime_horas': uptime / 3600,
+                'peticiones_por_hora': self.peticiones_totales / (uptime / 3600) if uptime > 0 else 0
+            }
+
+monitor = MonitorConcurrencia()
 
 # ==============================
 # CONFIGURACIÓN INICIAL Y MANEJO DE SECRETS
@@ -49,25 +381,13 @@ def verificar_secrets():
     return True
 
 # ==============================
-# SISTEMA DE CACHÉ INTELIGENTE
+# SISTEMA DE CACHÉ INTELIGENTE (MEJORADO)
 # ==============================
-
-def open_sheet_with_retry(client, sheet_id, retries=3, delay=5):
-    for attempt in range(retries):
-        try:
-            return client.open_by_key(sheet_id)
-        except APIError as e:
-            if e.response.json().get('error', {}).get('code') == 429:
-                time.sleep(delay * (2 ** attempt))
-                continue
-            raise
-    raise Exception("Max retries exceeded for API quota")
 
 class CacheInteligente:
     """Sistema de caché inteligente con invalidación automática"""
     
     def __init__(self):
-        self.cache_data = {}
         self.stats = {
             'hits': 0,
             'misses': 0,
@@ -75,90 +395,448 @@ class CacheInteligente:
         }
     
     def cached(self, ttl=1800, max_size=100, dependencias=None):
-        """Decorador de caché inteligente"""
+        """Decorador de caché inteligente que usa el sistema distribuido"""
         def decorator(func):
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
+                monitor.registrar_peticion()
+                
                 # Generar clave única
                 cache_key = f"{func.__name__}_{str(args)}_{str(kwargs)}"
                 
-                # Verificar si está en caché y es válido
-                if (cache_key in self.cache_data and 
-                    datetime.now() < self.cache_data[cache_key]['expira'] and
-                    not self._dependencias_invalidadas(cache_key, dependencias)):
-                    
+                # Verificar si está en caché distribuido
+                cached_data = cache_distribuido.get(cache_key)
+                if cached_data is not None:
                     self.stats['hits'] += 1
-                    return self.cache_data[cache_key]['data']
+                    return cached_data
                 
-                # Cache miss - ejecutar función
+                # Cache miss - ejecutar función con rate limiting
                 self.stats['misses'] += 1
-                result = func(*args, **kwargs)
-                
-                # Guardar en caché
-                self.cache_data[cache_key] = {
-                    'data': result,
-                    'expira': datetime.now() + timedelta(seconds=ttl),
-                    'timestamp': datetime.now(),
-                    'dependencias': dependencias or []
-                }
-                
-                # Limpiar caché si excede tamaño máximo
-                self._limpiar_cache_excedente(max_size)
-                
-                return result
+                try:
+                    usuario = st.session_state.get("user_name", "default")
+                    if rate_limiter.puede_procesar(usuario):
+                        result = func(*args, **kwargs)
+                        
+                        # Guardar en caché distribuido
+                        cache_distribuido.set(cache_key, result, ttl)
+                        
+                        return result
+                    else:
+                        raise Exception("Rate limit excedido")
+                        
+                except Exception as e:
+                    monitor.registrar_error()
+                    raise e
             return wrapper
         return decorator
     
-    def _dependencias_invalidadas(self, cache_key, dependencias):
-        """Verifica si las dependencias han cambiado"""
-        if not dependencias:
-            return False
-        
-        for dep in dependencias:
-            if dep in self.cache_data:
-                # Si la dependencia es más reciente, invalidar
-                if (self.cache_data[dep]['timestamp'] > 
-                    self.cache_data[cache_key]['timestamp']):
-                    self.invalidar(cache_key)
-                    return True
-        return False
-    
     def invalidar(self, clave=None):
         """Invalida caché específico o completo"""
+        cache_distribuido.invalidar(clave)
         if clave:
-            if clave in self.cache_data:
-                del self.cache_data[clave]
-                self.stats['invalidaciones'] += 1
+            self.stats['invalidaciones'] += 1
         else:
-            self.cache_data.clear()
-            self.stats['invalidaciones'] += len(self.cache_data)
+            self.stats['invalidaciones'] += 1
     
     def get_stats(self):
         """Estadísticas de uso del caché"""
         total_requests = self.stats['hits'] + self.stats['misses']
         hit_rate = (self.stats['hits'] / total_requests * 100) if total_requests > 0 else 0
         return {
-            'total_entradas': len(self.cache_data),
             'hit_rate': f"{hit_rate:.1f}%",
             **self.stats
         }
-    
-    def _limpiar_cache_excedente(self, max_size):
-        """Limpia caché si excede el tamaño máximo"""
-        if len(self.cache_data) > max_size:
-            # Eliminar las entradas más antiguas
-            claves_ordenadas = sorted(
-                self.cache_data.keys(),
-                key=lambda k: self.cache_data[k]['timestamp']
-            )
-            for clave in claves_ordenadas[:len(self.cache_data) - max_size]:
-                del self.cache_data[clave]
 
-# Instancia global de caché
+# Instancia global de caché (mejorada)
 cache_manager = CacheInteligente()
 
 # ==============================
-# SISTEMA DE FECHAS COMPLETADAS
+# CONFIGURACIÓN Y CONEXIONES (OPTIMIZADAS)
+# ==============================
+
+@st.cache_resource
+def get_client_pool():
+    """Pool de conexiones a Sheets optimizado para múltiples usuarios"""
+    clients = {}
+    client_lock = threading.Lock()
+    
+    def get_client_for_user(user_id):
+        with client_lock:
+            if user_id not in clients:
+                try:
+                    creds_dict = json.loads(st.secrets["google"]["credentials"])
+                    creds = Credentials.from_service_account_info(creds_dict, scopes=[
+                        "https://spreadsheets.google.com/feeds",
+                        "https://www.googleapis.com/auth/drive"
+                    ])
+                    clients[user_id] = gspread.authorize(creds)
+                    print(f"✅ Cliente creado para usuario: {user_id}")
+                except Exception as e:
+                    st.error(f"Error creating client for {user_id}: {e}")
+                    return None
+            return clients[user_id]
+    
+    return get_client_for_user
+
+# Pool global de clientes
+client_pool = get_client_pool()
+
+def get_client():
+    """Obtiene cliente para el usuario actual"""
+    user_id = st.session_state.get("user_name", "default")
+    return client_pool(user_id)
+
+def get_chile_time():
+    chile_tz = pytz.timezone("America/Santiago")
+    return datetime.now(chile_tz)
+
+def send_email(to_email: str, subject: str, body: str) -> bool:
+    """Envía email con mejor feedback de diagnóstico"""
+    try:
+        # Verificar configuración de email
+        if "EMAIL" not in st.secrets:
+            st.error("❌ No se encontró la configuración de EMAIL en los secrets.")
+            return False
+            
+        smtp_server = st.secrets["EMAIL"]["smtp_server"]
+        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
+        sender_email = st.secrets["EMAIL"]["sender_email"]
+        sender_password = st.secrets["EMAIL"]["sender_password"]
+        
+        # Crear mensaje
+        msg = MIMEMultipart()
+        msg["From"] = sender_email
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg["Date"] = formatdate(localtime=True)
+        msg.attach(MIMEText(body, "plain"))
+        
+        # Enviar email
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        
+        # LOG DE ÉXITO
+        print(f"✅ Email enviado exitosamente a: {to_email}")
+        return True
+        
+    except Exception as e:
+        # LOG DE ERROR DETALLADO
+        error_msg = f"❌ Error enviando email a {to_email}: {str(e)}"
+        print(error_msg)
+        st.error(error_msg)
+        return False
+
+def generate_2fa_code():
+    return ''.join(random.choices(string.digits, k=6))
+
+# ==============================
+# CARGA DE DATOS OPTIMIZADA
+# ==============================
+
+@cache_manager.cached(ttl=3600)
+def load_courses_optimized():
+    """Versión optimizada de carga de cursos"""
+    try:
+        client = get_client()
+        if not client:
+            st.error("❌ No se pudo inicializar el cliente de Google Sheets. Verifica las credenciales.")
+            return {}
+        
+        # Verificar que el sheet_id esté disponible
+        if "google" not in st.secrets or "clases_sheet_id" not in st.secrets["google"]:
+            st.error("❌ No se encontró el ID de la hoja de clases en los secrets.")
+            return {}
+            
+        sheet_id = st.secrets["google"]["clases_sheet_id"]
+        
+        try:
+            clases_sheet = client.open_by_key(sheet_id)
+        except gspread.exceptions.SpreadsheetNotFound:
+            st.error(f"❌ No se encontró la hoja con ID: {sheet_id}. Verifica el ID.")
+            return {}
+        except gspread.exceptions.APIError as e:
+            error_details = e.response.json().get('error', {}) if hasattr(e.response, 'json') else {}
+            error_message = error_details.get('message', str(e))
+            error_code = error_details.get('code', 'Unknown')
+            st.error(f"❌ Error de API al acceder a la hoja: {error_message} (Código: {error_code})")
+            if error_code == 403:
+                st.info("💡 Verifica que el service account tenga permisos de edición en la hoja.")
+            elif error_code == 429:
+                st.info("💡 Límite de cuota de API alcanzado. Intenta de nuevo más tarde.")
+            return {}
+        
+        courses = {}
+        for worksheet in clases_sheet.worksheets():
+            sheet_name = worksheet.title
+            try:
+                # Leer columnas A y C
+                colA_raw = worksheet.col_values(1)
+                colC_raw = worksheet.col_values(3)  # Columna C para ASIGNATURA
+                
+                colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
+                colC = [cell.strip() for cell in colC_raw if isinstance(cell, str) and cell.strip()]
+                
+                colA_upper = [s.upper() for s in colA]
+                colC_upper = [s.upper() for s in colC]
+                
+                # Buscar ASIGNATURA en columna C
+                idx_asignatura = None
+                asignatura = ""
+                try:
+                    idx_asignatura = colC_upper.index("ASIGNATURA")
+                    if idx_asignatura + 1 < len(colC):
+                        asignatura = colC[idx_asignatura + 1]
+                except ValueError:
+                    # Si no encuentra ASIGNATURA, buscar en otras posiciones
+                    for i, cell in enumerate(colC_upper):
+                        if "ASIGNATURA" in cell:
+                            idx_asignatura = i
+                            if i + 1 < len(colC):
+                                asignatura = colC[i + 1]
+                            break
+                
+                # Resto del código existente para leer otras columnas...
+                idx_prof = colA_upper.index("PROFESOR")
+                profesor = colA[idx_prof + 1]
+                idx_dia = colA_upper.index("DIA")
+                dia = colA[idx_dia + 1]
+                idx_curso = colA_upper.index("CURSO")
+                curso_id = colA[idx_curso + 1]
+                horario = colA[idx_curso + 2]
+                fechas = []
+                estudiantes = []
+                idx_fechas = colA_upper.index("FECHAS")
+                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
+                for i in range(idx_fechas + 1, idx_estudiantes):
+                    if i < len(colA):
+                        fechas.append(colA[i])
+                for i in range(idx_estudiantes + 1, len(colA)):
+                    if colA[i]:
+                        estudiantes.append(colA[i])
+                try:
+                    colB_raw = worksheet.col_values(2)
+                    colB = [cell.strip() for cell in colB_raw if isinstance(cell, str) and cell.strip()]
+                    colB_upper = [s.upper() for s in colB]
+                    idx_sede = colB_upper.index("SEDE")
+                    sede = colB[idx_sede + 1] if (idx_sede + 1) < len(colB) else ""
+                except (ValueError, IndexError):
+                    sede = ""
+                
+                if profesor and dia and curso_id and horario and estudiantes:
+                    estudiantes = sorted([e for e in estudiantes if e.strip()])
+                    courses[sheet_name] = {
+                        "profesor": profesor,
+                        "dia": dia,
+                        "horario": horario,
+                        "curso_id": curso_id,
+                        "fechas": fechas or ["Sin fechas"],
+                        "estudiantes": estudiantes,
+                        "sede": sede,
+                        "asignatura": asignatura  # Nuevo campo agregado
+                    }
+            except Exception as e:
+                print(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
+                continue
+        return courses
+    except Exception as e:
+        st.error(f"❌ Error crítico al cargar cursos: {str(e)}")
+        return {}
+
+def load_courses():
+    """Wrapper con resiliencia para carga de cursos"""
+    return sistema_resiliente.cargar_datos_con_fallback(
+        load_courses_optimized, 
+        'cursos', 
+        600,  # 10 minutos
+        st.session_state.get("user_name", "default")
+    )
+
+@cache_manager.cached(ttl=7200)
+def load_emails_optimized():
+    """Versión optimizada de carga de emails"""
+    try:
+        client = get_client()
+        if not client:
+            return {}, {}
+            
+        # Verificar que el sheet_id esté disponible
+        if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+            st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+            return {}, {}
+            
+        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+        sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
+        if "MAILS" not in sheet_names:
+            return {}, {}
+        mails_sheet = asistencia_sheet.worksheet("MAILS")
+        data = mails_sheet.get_all_records()
+        if not data:
+            return {}, {}
+        emails = {}
+        nombres_apoderados = {}
+        for row in data:
+            nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
+            nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
+            mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
+            if not nombre_estudiante:
+                continue
+            if mail_apoderado:
+                emails[nombre_estudiante] = mail_apoderado
+                nombres_apoderados[nombre_estudiante] = nombre_apoderado
+        return emails, nombres_apoderados
+    except Exception as e:
+        st.error(f"❌ Error cargando emails: {e}")
+        return {}, {}
+
+def load_emails():
+    """Wrapper con resiliencia para carga de emails"""
+    return sistema_resiliente.cargar_datos_con_fallback(
+        load_emails_optimized, 
+        'emails', 
+        7200,  # 2 horas
+        st.session_state.get("user_name", "default")
+    )
+
+@cache_manager.cached(ttl=1800)
+def load_all_asistencia_optimized():
+    """Versión optimizada de carga de asistencia"""
+    client = get_client()
+    if not client:
+        return pd.DataFrame()
+        
+    # Verificar que el sheet_id esté disponible
+    if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
+        st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
+        return pd.DataFrame()
+        
+    asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
+    all_data = []
+    for worksheet in asistencia_sheet.worksheets():
+        sheet_name = worksheet.title
+        if sheet_name in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT", "FECHAS_COMPLETADAS", "CAMBIOS_CURSOS"]:
+            continue
+        try:
+            all_values = worksheet.get_all_values()
+            if not all_values or len(all_values) < 5:
+                continue
+            all_values = all_values[3:]  # Skip first 3 rows
+            headers = all_values[0]
+            headers = [str(h).strip().upper() for h in headers if str(h).strip()]  # Case-insensitive
+            
+            curso_col = None
+            fecha_col = None
+            estudiante_col = None
+            asistencia_col = None
+            hora_registro_col = None
+            informacion_col = None
+            
+            for i, h in enumerate(headers):
+                h_upper = h.upper()
+                if "CURSO" in h_upper:
+                    curso_col = i
+                elif "FECHA" in h_upper:
+                    fecha_col = i
+                elif any(term in h_upper for term in ["ESTUDIANTE", "NOMBRE ESTUDIANTE", "ALUMNO"]):
+                    estudiante_col = i
+                elif "ASISTENCIA" in h_upper:
+                    asistencia_col = i
+                elif "HORA REGISTRO" in h_upper or "HORA" in h_upper:
+                    hora_registro_col = i
+                elif any(term in h_upper for term in ["INFORMACION", "MOTIVO", "OBSERVACION"]):
+                    informacion_col = i
+            
+            if asistencia_col is None or estudiante_col is None or fecha_col is None:
+                continue
+            
+            records_loaded = 0
+            for row in all_values[1:]:  # Skip header row
+                max_index = max(
+                    curso_col,
+                    fecha_col,
+                    estudiante_col,
+                    asistencia_col,
+                    hora_registro_col or 0,
+                    informacion_col or 0
+                )
+                if len(row) <= max_index:
+                    continue
+                
+                try:
+                    asistencia_val = int(row[asistencia_col]) if row[asistencia_col] else 0
+                except (ValueError, TypeError):
+                    asistencia_val = 0
+                
+                # Fallback: Use sheet name if curso_col is empty
+                curso = row[curso_col].strip() if curso_col is not None and len(row) > curso_col and row[curso_col] else sheet_name
+                fecha_str = row[fecha_col].strip() if len(row) > fecha_col and row[fecha_col] else ""
+                estudiante = row[estudiante_col].strip() if len(row) > estudiante_col and row[estudiante_col] else ""
+                hora_registro = row[hora_registro_col].strip() if (hora_registro_col is not None and len(row) > hora_registro_col and row[hora_registro_col]) else ""
+                informacion = row[informacion_col].strip() if (informacion_col is not None and len(row) > informacion_col and row[informacion_col]) else ""
+                
+                if estudiante and asistencia_val is not None:  # Only add if estudiante is valid
+                    all_data.append({
+                        "Curso": curso,
+                        "Fecha": fecha_str,
+                        "Estudiante": estudiante,
+                        "Asistencia": asistencia_val,
+                        "Hora Registro": hora_registro,
+                        "Información": informacion
+                    })
+                    records_loaded += 1
+            
+        except Exception as e:
+            continue
+    
+    df = pd.DataFrame(all_data)
+    
+    if not df.empty:
+        meses_espanol = {
+            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
+            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
+            'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
+            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
+            'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
+        }
+        def convertir_fecha_manual(fecha_str):
+            if not fecha_str or pd.isna(fecha_str) or fecha_str.strip() == "":
+                return pd.NaT
+            fecha_str = str(fecha_str).strip().lower()
+            try:
+                if ' de ' in fecha_str:
+                    partes = fecha_str.split(' de ')
+                    if len(partes) == 3:
+                        dia = partes[0].strip().zfill(2)
+                        mes_str = partes[1].strip()
+                        año = partes[2].strip()
+                        for mes_es, mes_num in meses_espanol.items():
+                            if mes_es in mes_str:
+                                fecha_iso = f"{año}-{mes_num}-{dia}"
+                                return pd.to_datetime(fecha_iso, format='%Y-%m-%d', errors='coerce')
+                elif '/' in fecha_str:
+                    return pd.to_datetime(fecha_str, format='%d/%m/%Y', errors='coerce')
+                elif '-' in fecha_str and len(fecha_str) == 10:
+                    return pd.to_datetime(fecha_str, format='%Y-%m-%d', errors='coerce')
+                return pd.to_datetime(fecha_str, errors='coerce')
+            except Exception:
+                return pd.NaT
+        df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
+    
+    return df
+
+def load_all_asistencia():
+    """Wrapper con resiliencia para carga de asistencia"""
+    return sistema_resiliente.cargar_datos_con_fallback(
+        load_all_asistencia_optimized, 
+        'asistencia', 
+        1800,  # 30 minutos
+        st.session_state.get("user_name", "default")
+    )
+
+# ==============================
+# SISTEMA DE FECHAS COMPLETADAS (OPTIMIZADO)
 # ==============================
 
 class SistemaFechasCompletadas:
@@ -210,76 +888,92 @@ class SistemaFechasCompletadas:
             return []
     
     def marcar_fecha_completada(self, curso, fecha):
-        """Marca una fecha como completada"""
-        try:
-            if not self.sheet_id:
-                return False
-                
-            client = self._get_client()
-            if not client:
-                return False
-                
-            sheet = client.open_by_key(self.sheet_id)
+        """Marca una fecha como completada (usa cola)"""
+        def _marcar_real():
             try:
-                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
-            except gspread.exceptions.WorksheetNotFound:
-                fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
-                fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
-            
-            # Verificar si ya existe
-            records = fechas_sheet.get_all_records()
-            existe = any(
-                row["Curso"] == curso and row["Fecha"] == fecha 
-                for row in records
-            )
-            
-            if not existe:
-                fechas_sheet.append_row([
-                    curso,
-                    fecha,
-                    "SI",
-                    datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                ])
-            else:
-                # Si existe, actualizar a "SI"
-                for i, row in enumerate(records, start=2):
-                    if row["Curso"] == curso and row["Fecha"] == fecha:
-                        fechas_sheet.update_cell(i, 3, "SI")
-                        break
-            
-            # Invalidar caché
-            cache_manager.invalidar()
-            return True
-        except Exception as e:
-            st.error(f"Error al marcar fecha como completada: {e}")
-            return False
+                if not self.sheet_id:
+                    return False
+                    
+                client = self._get_client()
+                if not client:
+                    return False
+                    
+                sheet = client.open_by_key(self.sheet_id)
+                try:
+                    fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
+                except gspread.exceptions.WorksheetNotFound:
+                    fechas_sheet = sheet.add_worksheet("FECHAS_COMPLETADAS", 1000, 4)
+                    fechas_sheet.append_row(["Curso", "Fecha", "Completada", "Timestamp"])
+                
+                # Verificar si ya existe
+                records = fechas_sheet.get_all_records()
+                existe = any(
+                    row["Curso"] == curso and row["Fecha"] == fecha 
+                    for row in records
+                )
+                
+                if not existe:
+                    fechas_sheet.append_row([
+                        curso,
+                        fecha,
+                        "SI",
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    ])
+                else:
+                    # Si existe, actualizar a "SI"
+                    for i, row in enumerate(records, start=2):
+                        if row["Curso"] == curso and row["Fecha"] == fecha:
+                            fechas_sheet.update_cell(i, 3, "SI")
+                            break
+                
+                return True
+            except Exception as e:
+                st.error(f"Error al marcar fecha como completada: {e}")
+                return False
+        
+        # Usar sistema de colas para la escritura
+        sistema_colas.agregar_escritura(_marcar_real)
+        
+        # Invalidar caché inmediatamente
+        cache_distribuido.invalidar()
+        cache_manager.invalidar()
+        
+        return True  # Asumir éxito, la cola se encarga
     
     def reactivar_fecha(self, curso, fecha):
-        """Reactivar una fecha completada (solo administradores)"""
-        try:
-            if not self.sheet_id:
-                return False
+        """Reactivar una fecha completada (solo administradores) - usa cola"""
+        def _reactivar_real():
+            try:
+                if not self.sheet_id:
+                    return False
+                    
+                client = self._get_client()
+                if not client:
+                    return False
+                    
+                sheet = client.open_by_key(self.sheet_id)
+                fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
                 
-            client = self._get_client()
-            if not client:
-                return False
+                # Buscar y actualizar el registro
+                records = fechas_sheet.get_all_records()
+                for i, row in enumerate(records, start=2):  # start=2 porque la fila 1 son headers
+                    if row["Curso"] == curso and row["Fecha"] == fecha:
+                        fechas_sheet.update_cell(i, 3, "NO")  # Columna "Completada"
+                        break
                 
-            sheet = client.open_by_key(self.sheet_id)
-            fechas_sheet = sheet.worksheet("FECHAS_COMPLETADAS")
-            
-            # Buscar y actualizar el registro
-            records = fechas_sheet.get_all_records()
-            for i, row in enumerate(records, start=2):  # start=2 porque la fila 1 son headers
-                if row["Curso"] == curso and row["Fecha"] == fecha:
-                    fechas_sheet.update_cell(i, 3, "NO")  # Columna "Completada"
-                    break
-            
-            # Invalidar caché
-            cache_manager.invalidar()
-            return True
-        except Exception as e:
-            st.error(f"Error al reactivar fecha: {e}")
-            return False
+                return True
+            except Exception as e:
+                st.error(f"Error al reactivar fecha: {e}")
+                return False
+        
+        # Usar sistema de colas
+        sistema_colas.agregar_escritura(_reactivar_real)
+        
+        # Invalidar caché
+        cache_distribuido.invalidar()
+        cache_manager.invalidar()
+        
+        return True
     
     def obtener_estadisticas_fechas(self, curso, fechas_totales):
         """Obtiene estadísticas de fechas completadas vs pendientes"""
@@ -1175,13 +1869,13 @@ def implementar_temporizador_seguridad():
     """Implementa un temporizador de seguridad en tiempo real"""
     
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+        if time_module.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo.")
             st.session_state.clear()
             st.rerun()
             return
         
-        tiempo_restante = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
+        tiempo_restante = st.session_state['timeout_duration'] - (time_module.time() - st.session_state['login_time'])
         if tiempo_restante > 0:
             minutos = int(tiempo_restante // 60)
             segundos = int(tiempo_restante % 60)
@@ -1198,361 +1892,58 @@ def implementar_temporizador_seguridad():
             </div>
             """ , unsafe_allow_html=True)
 
+# ==============================
+# PANELES DE MONITOREO MEJORADOS
+# ==============================
+
 def panel_monitoreo_cache():
     """Panel para monitorear estado del caché"""
     with st.sidebar.expander("📊 Estado del Caché"):
         stats = cache_manager.get_stats()
         
-        st.metric("Entradas en Caché", stats['total_entradas'])
         st.metric("Hit Rate", stats['hit_rate'])
         st.metric("Cache Hits", stats['hits'])
         st.metric("Cache Misses", stats['misses'])
         
         if st.button("🔄 Limpiar Caché", use_container_width=True):
             cache_manager.invalidar()
+            cache_distribuido.invalidar()
             st.success("Caché limpiado")
             st.rerun()
 
-# ==============================
-# CONFIGURACIÓN Y CONEXIONES
-# ==============================
-
-@st.cache_resource
-def get_client():
-    try:
-        # Verificar que los secrets estén disponibles
-        if "google" not in st.secrets or "credentials" not in st.secrets["google"]:
-            st.error("❌ No se encontraron las credenciales de Google en los secrets.")
-            return None
-            
-        creds_dict = json.loads(st.secrets["google"]["credentials"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=[
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ])
-        return gspread.authorize(creds)
-    except (KeyError, json.JSONDecodeError) as e:
-        st.error(f"Error loading Google credentials: {e}")
-        return None
-
-def get_chile_time():
-    chile_tz = pytz.timezone("America/Santiago")
-    return datetime.now(chile_tz)
-
-def send_email(to_email: str, subject: str, body: str) -> bool:
-    """Envía email con mejor feedback de diagnóstico"""
-    try:
-        # Verificar configuración de email
-        if "EMAIL" not in st.secrets:
-            st.error("❌ No se encontró la configuración de EMAIL en los secrets.")
-            return False
-            
-        smtp_server = st.secrets["EMAIL"]["smtp_server"]
-        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
-        sender_email = st.secrets["EMAIL"]["sender_email"]
-        sender_password = st.secrets["EMAIL"]["sender_password"]
+def panel_monitoreo_sistema():
+    """Panel de monitoreo del sistema en tiempo real"""
+    with st.sidebar.expander("🚀 Estado del Sistema"):
+        # Métricas de concurrencia
+        metricas = monitor.obtener_metricas()
+        stats_colas = sistema_colas.obtener_estadisticas()
         
-        # Crear mensaje
-        msg = MIMEMultipart()
-        msg["From"] = sender_email
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg["Date"] = formatdate(localtime=True)
-        msg.attach(MIMEText(body, "plain"))
+        st.metric("👥 Usuarios Activos", metricas['usuarios_activos'])
+        st.metric("📊 Peticiones Totales", metricas['peticiones_totales'])
+        st.metric("❌ Tasa de Error", f"{metricas['tasa_error']:.1f}%")
+        st.metric("📝 Cola Escrituras", stats_colas['pendientes'])
+        st.metric("✅ Escrituras Exitosas", stats_colas['procesadas'])
         
-        # Enviar email
-        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
+        # Estado de APIs
+        estado_api = "✅ Activa" if sistema_resiliente.estado_api == "activa" else "⚠️ Degradada"
+        st.metric("📡 Estado Sheets API", estado_api)
         
-        # LOG DE ÉXITO
-        print(f"✅ Email enviado exitosamente a: {to_email}")
-        return True
+        # Botones de control
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔄 Recargar", use_container_width=True):
+                cache_distribuido.invalidar()
+                sistema_resiliente.restaurar_conexion()
+                st.rerun()
         
-    except Exception as e:
-        # LOG DE ERROR DETALLADO
-        error_msg = f"❌ Error enviando email a {to_email}: {str(e)}"
-        print(error_msg)
-        st.error(error_msg)
-        return False
-
-def generate_2fa_code():
-    return ''.join(random.choices(string.digits, k=6))
-
-# ==============================
-# CARGA DE DATOS CON CACHÉ INTELIGENTE
-# ==============================
-
-@cache_manager.cached(ttl=3600, dependencias=['cursos'])
-def load_courses():
-    try:
-        client = get_client()
-        if not client:
-            st.error("❌ No se pudo inicializar el cliente de Google Sheets. Verifica las credenciales.")
-            return {}
-        
-        # Verificar que el sheet_id esté disponible
-        if "google" not in st.secrets or "clases_sheet_id" not in st.secrets["google"]:
-            st.error("❌ No se encontró el ID de la hoja de clases en los secrets.")
-            return {}
-            
-        sheet_id = st.secrets["google"]["clases_sheet_id"]
-        
-        try:
-            clases_sheet = client.open_by_key(sheet_id)
-        except gspread.exceptions.SpreadsheetNotFound:
-            st.error(f"❌ No se encontró la hoja con ID: {sheet_id}. Verifica el ID.")
-            return {}
-        except gspread.exceptions.APIError as e:
-            error_details = e.response.json().get('error', {}) if hasattr(e.response, 'json') else {}
-            error_message = error_details.get('message', str(e))
-            error_code = error_details.get('code', 'Unknown')
-            st.error(f"❌ Error de API al acceder a la hoja: {error_message} (Código: {error_code})")
-            if error_code == 403:
-                st.info("💡 Verifica que el service account tenga permisos de edición en la hoja.")
-            elif error_code == 429:
-                st.info("💡 Límite de cuota de API alcanzado. Intenta de nuevo más tarde.")
-            return {}
-        
-        courses = {}
-        for worksheet in clases_sheet.worksheets():
-            sheet_name = worksheet.title
-            try:
-                # Leer columnas A y C
-                colA_raw = worksheet.col_values(1)
-                colC_raw = worksheet.col_values(3)  # Columna C para ASIGNATURA
-                
-                colA = [cell.strip() for cell in colA_raw if isinstance(cell, str) and cell.strip()]
-                colC = [cell.strip() for cell in colC_raw if isinstance(cell, str) and cell.strip()]
-                
-                colA_upper = [s.upper() for s in colA]
-                colC_upper = [s.upper() for s in colC]
-                
-                # Buscar ASIGNATURA en columna C
-                idx_asignatura = None
-                asignatura = ""
-                try:
-                    idx_asignatura = colC_upper.index("ASIGNATURA")
-                    if idx_asignatura + 1 < len(colC):
-                        asignatura = colC[idx_asignatura + 1]
-                except ValueError:
-                    # Si no encuentra ASIGNATURA, buscar en otras posiciones
-                    for i, cell in enumerate(colC_upper):
-                        if "ASIGNATURA" in cell:
-                            idx_asignatura = i
-                            if i + 1 < len(colC):
-                                asignatura = colC[i + 1]
-                            break
-                
-                # Resto del código existente para leer otras columnas...
-                idx_prof = colA_upper.index("PROFESOR")
-                profesor = colA[idx_prof + 1]
-                idx_dia = colA_upper.index("DIA")
-                dia = colA[idx_dia + 1]
-                idx_curso = colA_upper.index("CURSO")
-                curso_id = colA[idx_curso + 1]
-                horario = colA[idx_curso + 2]
-                fechas = []
-                estudiantes = []
-                idx_fechas = colA_upper.index("FECHAS")
-                idx_estudiantes = colA_upper.index("NOMBRES ESTUDIANTES")
-                for i in range(idx_fechas + 1, idx_estudiantes):
-                    if i < len(colA):
-                        fechas.append(colA[i])
-                for i in range(idx_estudiantes + 1, len(colA)):
-                    if colA[i]:
-                        estudiantes.append(colA[i])
-                try:
-                    colB_raw = worksheet.col_values(2)
-                    colB = [cell.strip() for cell in colB_raw if isinstance(cell, str) and cell.strip()]
-                    colB_upper = [s.upper() for s in colB]
-                    idx_sede = colB_upper.index("SEDE")
-                    sede = colB[idx_sede + 1] if (idx_sede + 1) < len(colB) else ""
-                except (ValueError, IndexError):
-                    sede = ""
-                
-                if profesor and dia and curso_id and horario and estudiantes:
-                    estudiantes = sorted([e for e in estudiantes if e.strip()])
-                    courses[sheet_name] = {
-                        "profesor": profesor,
-                        "dia": dia,
-                        "horario": horario,
-                        "curso_id": curso_id,
-                        "fechas": fechas or ["Sin fechas"],
-                        "estudiantes": estudiantes,
-                        "sede": sede,
-                        "asignatura": asignatura  # Nuevo campo agregado
-                    }
-            except Exception as e:
-                st.warning(f"⚠️ Error en hoja '{sheet_name}': {str(e)[:80]}")
-                continue
-        return courses
-    except Exception as e:
-        st.error(f"❌ Error crítico al cargar cursos: {str(e)}")
-        return {}
-
-@cache_manager.cached(ttl=7200)  # 2 horas para emails
-def load_emails():
-    try:
-        client = get_client()
-        if not client:
-            return {}, {}
-            
-        # Verificar que el sheet_id esté disponible
-        if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
-            st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
-            return {}, {}
-            
-        asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-        sheet_names = [ws.title for ws in asistencia_sheet.worksheets()]
-        if "MAILS" not in sheet_names:
-            return {}, {}
-        mails_sheet = asistencia_sheet.worksheet("MAILS")
-        data = mails_sheet.get_all_records()
-        if not data:
-            return {}, {}
-        emails = {}
-        nombres_apoderados = {}
-        for row in data:
-            nombre_estudiante = str(row.get("NOMBRE ESTUDIANTE", "")).strip().lower()
-            nombre_apoderado = str(row.get("NOMBRE APODERADO", "")).strip()
-            mail_apoderado = str(row.get("MAIL APODERADO", "")).strip()
-            if not nombre_estudiante:
-                continue
-            if mail_apoderado:
-                emails[nombre_estudiante] = mail_apoderado
-                nombres_apoderados[nombre_estudiante] = nombre_apoderado
-        return emails, nombres_apoderados
-    except Exception as e:
-        st.error(f"❌ Error cargando emails: {e}")
-        return {}, {}
-
-@cache_manager.cached(ttl=1800)  # 30 minutos para asistencia
-def load_all_asistencia():
-    client = get_client()
-    if not client:
-        return pd.DataFrame()
-        
-    # Verificar que el sheet_id esté disponible
-    if "google" not in st.secrets or "asistencia_sheet_id" not in st.secrets["google"]:
-        st.error("❌ No se encontró el ID de la hoja de asistencia en los secrets.")
-        return pd.DataFrame()
-        
-    asistencia_sheet = client.open_by_key(st.secrets["google"]["asistencia_sheet_id"])
-    all_data = []
-    for worksheet in asistencia_sheet.worksheets():
-        sheet_name = worksheet.title
-        if sheet_name in ["MAILS", "MEJORAS", "PROFESORES", "Respuestas de formulario 2", "AUDIT", "FECHAS_COMPLETADAS", "CAMBIOS_CURSOS"]:
-            continue
-        try:
-            all_values = worksheet.get_all_values()
-            if not all_values or len(all_values) < 5:
-                continue
-            all_values = all_values[3:]  # Skip first 3 rows
-            headers = all_values[0]
-            headers = [str(h).strip().upper() for h in headers if str(h).strip()]  # Case-insensitive
-            
-            curso_col = None
-            fecha_col = None
-            estudiante_col = None
-            asistencia_col = None
-            hora_registro_col = None
-            informacion_col = None
-            
-            for i, h in enumerate(headers):
-                h_upper = h.upper()
-                if "CURSO" in h_upper:
-                    curso_col = i
-                elif "FECHA" in h_upper:
-                    fecha_col = i
-                elif any(term in h_upper for term in ["ESTUDIANTE", "NOMBRE ESTUDIANTE", "ALUMNO"]):
-                    estudiante_col = i
-                elif "ASISTENCIA" in h_upper:
-                    asistencia_col = i
-                elif "HORA REGISTRO" in h_upper or "HORA" in h_upper:
-                    hora_registro_col = i
-                elif any(term in h_upper for term in ["INFORMACION", "MOTIVO", "OBSERVACION"]):
-                    informacion_col = i
-            
-            if asistencia_col is None or estudiante_col is None or fecha_col is None:
-                continue
-            
-            records_loaded = 0
-            for row in all_values[1:]:  # Skip header row
-                max_index = max(
-                    curso_col,
-                    fecha_col,
-                    estudiante_col,
-                    asistencia_col,
-                    hora_registro_col or 0,
-                    informacion_col or 0
-                )
-                if len(row) <= max_index:
-                    continue
-                
-                try:
-                    asistencia_val = int(row[asistencia_col]) if row[asistencia_col] else 0
-                except (ValueError, TypeError):
-                    asistencia_val = 0
-                
-                # Fallback: Use sheet name if curso_col is empty
-                curso = row[curso_col].strip() if curso_col is not None and len(row) > curso_col and row[curso_col] else sheet_name
-                fecha_str = row[fecha_col].strip() if len(row) > fecha_col and row[fecha_col] else ""
-                estudiante = row[estudiante_col].strip() if len(row) > estudiante_col and row[estudiante_col] else ""
-                hora_registro = row[hora_registro_col].strip() if (hora_registro_col is not None and len(row) > hora_registro_col and row[hora_registro_col]) else ""
-                informacion = row[informacion_col].strip() if (informacion_col is not None and len(row) > informacion_col and row[informacion_col]) else ""
-                
-                if estudiante and asistencia_val is not None:  # Only add if estudiante is valid
-                    all_data.append({
-                        "Curso": curso,
-                        "Fecha": fecha_str,
-                        "Estudiante": estudiante,
-                        "Asistencia": asistencia_val,
-                        "Hora Registro": hora_registro,
-                        "Información": informacion
-                    })
-                    records_loaded += 1
-            
-        except Exception as e:
-            continue
-    
-    df = pd.DataFrame(all_data)
-    
-    if not df.empty:
-        meses_espanol = {
-            'enero': '01', 'febrero': '02', 'marzo': '03', 'abril': '04',
-            'mayo': '05', 'junio': '06', 'julio': '07', 'agosto': '08',
-            'septiembre': '09', 'octubre': '10', 'noviembre': '11', 'diciembre': '12',
-            'ene': '01', 'feb': '02', 'mar': '03', 'abr': '04', 'may': '05', 'jun': '06',
-            'jul': '07', 'ago': '08', 'sep': '09', 'oct': '10', 'nov': '11', 'dic': '12'
-        }
-        def convertir_fecha_manual(fecha_str):
-            if not fecha_str or pd.isna(fecha_str) or fecha_str.strip() == "":
-                return pd.NaT
-            fecha_str = str(fecha_str).strip().lower()
-            try:
-                if ' de ' in fecha_str:
-                    partes = fecha_str.split(' de ')
-                    if len(partes) == 3:
-                        dia = partes[0].strip().zfill(2)
-                        mes_str = partes[1].strip()
-                        año = partes[2].strip()
-                        for mes_es, mes_num in meses_espanol.items():
-                            if mes_es in mes_str:
-                                fecha_iso = f"{año}-{mes_num}-{dia}"
-                                return pd.to_datetime(fecha_iso, format='%Y-%m-%d', errors='coerce')
-                elif '/' in fecha_str:
-                    return pd.to_datetime(fecha_str, format='%d/%m/%Y', errors='coerce')
-                elif '-' in fecha_str and len(fecha_str) == 10:
-                    return pd.to_datetime(fecha_str, format='%Y-%m-%d', errors='coerce')
-                return pd.to_datetime(fecha_str, errors='coerce')
-            except Exception:
-                return pd.NaT
-        df["Fecha"] = df["Fecha"].apply(convertir_fecha_manual)
-    
-    return df
+        with col2:
+            if st.button("📊 Métricas", use_container_width=True):
+                st.info(f"""
+                **Métricas Detalladas:**
+                - Uptime: {metricas['uptime_horas']:.1f} horas
+                - Peticiones/hora: {metricas['peticiones_por_hora']:.1f}
+                - Escrituras fallidas: {stats_colas['fallidas']}
+                """)
 
 # ==============================
 # FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
@@ -1720,116 +2111,127 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
         return False
 
 # ==============================
-# GESTIÓN DE CAMBIOS DE CURSO
+# GESTIÓN DE CAMBIOS DE CURSO (OPTIMIZADA)
 # ==============================
 
 def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiva):
-    """Ejecuta el cambio de curso en Google Sheets"""
+    """Ejecuta el cambio de curso en Google Sheets usando colas"""
     
-    try:
-        client = get_client()
-        if not client:
-            st.error("❌ Error de conexión con Google Sheets")
-            return False
-        
-        # Verificar que los sheet_ids estén disponibles
-        if "google" not in st.secrets:
-            st.error("❌ No se encontraron los secrets de Google.")
-            return False
-            
-        asistencia_sheet_id = st.secrets["google"].get("asistencia_sheet_id")
-        clases_sheet_id = st.secrets["google"].get("clases_sheet_id")
-        
-        if not asistencia_sheet_id or not clases_sheet_id:
-            st.error("❌ No se encontraron los IDs de las hojas en los secrets.")
-            return False
-        
-        asistencia_sheet = client.open_by_key(asistencia_sheet_id)
-        
-        # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
+    def _ejecutar_cambio_real():
         try:
-            sheet_origen = asistencia_sheet.worksheet(curso_origen)
-            records_origen = sheet_origen.get_all_records()
+            client = get_client()
+            if not client:
+                st.error("❌ Error de conexión con Google Sheets")
+                return False
             
-            # Encontrar y actualizar registros del estudiante
-            for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
-                if row.get('Estudiante') == estudiante:
-                    # Actualizar el curso en el registro
-                    sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
-        
-        # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
-        clases_sheet = client.open_by_key(clases_sheet_id)
-        
-        try:
-            # Remover de curso origen
-            sheet_clases_origen = clases_sheet.worksheet(curso_origen)
-            valores_origen = sheet_clases_origen.get_all_values()
+            # Verificar que los sheet_ids estén disponibles
+            if "google" not in st.secrets:
+                st.error("❌ No se encontraron los secrets de Google.")
+                return False
+                
+            asistencia_sheet_id = st.secrets["google"].get("asistencia_sheet_id")
+            clases_sheet_id = st.secrets["google"].get("clases_sheet_id")
             
-            for i, fila in enumerate(valores_origen):
-                if estudiante in fila:
-                    # Encontrar la columna del estudiante y limpiar
-                    for j, valor in enumerate(fila):
-                        if valor == estudiante:
-                            sheet_clases_origen.update_cell(i + 1, j + 1, "")
-                            break
-                    break
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
-        
-        try:
-            # Agregar a curso destino
-            sheet_clases_destino = clases_sheet.worksheet(curso_destino)
-            valores_destino = sheet_clases_destino.get_all_values()
+            if not asistencia_sheet_id or not clases_sheet_id:
+                st.error("❌ No se encontraron los IDs de las hojas en los secrets.")
+                return False
             
-            # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
-            idx_estudiantes = None
-            for i, fila in enumerate(valores_destino):
-                if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
-                    idx_estudiantes = i + 1
-                    break
+            asistencia_sheet = client.open_by_key(asistencia_sheet_id)
             
-            if idx_estudiantes is not None:
-                # Encontrar primera celda vacía en la columna de estudiantes
-                col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
-                for i in range(idx_estudiantes, len(valores_destino)):
-                    if not valores_destino[i][col_estudiantes].strip():
-                        sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
+            # 1. ACTUALIZAR HOJA DE ASISTENCIA DEL CURSO ORIGEN
+            try:
+                sheet_origen = asistencia_sheet.worksheet(curso_origen)
+                records_origen = sheet_origen.get_all_records()
+                
+                # Encontrar y actualizar registros del estudiante
+                for i, row in enumerate(records_origen, start=2):  # start=2 porque fila 1 son headers
+                    if row.get('Estudiante') == estudiante:
+                        # Actualizar el curso en el registro
+                        sheet_origen.update_cell(i, 1, curso_destino)  # Columna Curso
+                        
+            except gspread.exceptions.WorksheetNotFound:
+                st.warning(f"⚠️ No se encontró la hoja del curso origen: {curso_origen}")
+            
+            # 2. ACTUALIZAR HOJA DE CLASES (LISTA DE ESTUDIANTES)
+            clases_sheet = client.open_by_key(clases_sheet_id)
+            
+            try:
+                # Remover de curso origen
+                sheet_clases_origen = clases_sheet.worksheet(curso_origen)
+                valores_origen = sheet_clases_origen.get_all_values()
+                
+                for i, fila in enumerate(valores_origen):
+                    if estudiante in fila:
+                        # Encontrar la columna del estudiante y limpiar
+                        for j, valor in enumerate(fila):
+                            if valor == estudiante:
+                                sheet_clases_origen.update_cell(i + 1, j + 1, "")
+                                break
                         break
-                else:
-                    # Si no hay celdas vacías, agregar al final
-                    sheet_clases_destino.append_row([estudiante])
-                    
-        except gspread.exceptions.WorksheetNotFound:
-            st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
-        
-        # 3. REGISTRAR EN LOG DE CAMBIOS
-        try:
-            cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
-        except gspread.exceptions.WorksheetNotFound:
-            cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
+                        
+            except gspread.exceptions.WorksheetNotFound:
+                st.warning(f"⚠️ No se encontró la hoja de clases origen: {curso_origen}")
+            
+            try:
+                # Agregar a curso destino
+                sheet_clases_destino = clases_sheet.worksheet(curso_destino)
+                valores_destino = sheet_clases_destino.get_all_values()
+                
+                # Encontrar la sección de estudiantes (después de "NOMBRES ESTUDIANTES")
+                idx_estudiantes = None
+                for i, fila in enumerate(valores_destino):
+                    if "NOMBRES ESTUDIANTES" in [str(x).upper() for x in fila]:
+                        idx_estudiantes = i + 1
+                        break
+                
+                if idx_estudiantes is not None:
+                    # Encontrar primera celda vacía en la columna de estudiantes
+                    col_estudiantes = 0  # Asumiendo que los estudiantes están en columna 0 después del header
+                    for i in range(idx_estudiantes, len(valores_destino)):
+                        if not valores_destino[i][col_estudiantes].strip():
+                            sheet_clases_destino.update_cell(i + 1, col_estudiantes + 1, estudiante)
+                            break
+                    else:
+                        # Si no hay celdas vacías, agregar al final
+                        sheet_clases_destino.append_row([estudiante])
+                        
+            except gspread.exceptions.WorksheetNotFound:
+                st.warning(f"⚠️ No se encontró la hoja de clases destino: {curso_destino}")
+            
+            # 3. REGISTRAR EN LOG DE CAMBIOS
+            try:
+                cambios_sheet = asistencia_sheet.worksheet("CAMBIOS_CURSOS")
+            except gspread.exceptions.WorksheetNotFound:
+                cambios_sheet = asistencia_sheet.add_worksheet("CAMBIOS_CURSOS", 100, 6)
+                cambios_sheet.append_row([
+                    "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
+                    "Fecha Efectiva", "Administrador"
+                ])
+            
             cambios_sheet.append_row([
-                "Fecha Cambio", "Estudiante", "Curso Origen", "Curso Destino", 
-                "Fecha Efectiva", "Administrador"
+                datetime.now().strftime("%Y-%m-%d %H:%M"),
+                estudiante,
+                curso_origen,
+                curso_destino,
+                fecha_efectiva.strftime("%Y-%m-%d"),
+                st.session_state["user_name"]
             ])
-        
-        cambios_sheet.append_row([
-            datetime.now().strftime("%Y-%m-%d %H:%M"),
-            estudiante,
-            curso_origen,
-            curso_destino,
-            fecha_efectiva.strftime("%Y-%m-%d"),
-            st.session_state["user_name"]
-        ])
-        
-        return True
-        
-    except Exception as e:
-        st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
-        return False
+            
+            return True
+            
+        except Exception as e:
+            st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
+            return False
+    
+    # Usar sistema de colas para la escritura
+    sistema_colas.agregar_escritura(_ejecutar_cambio_real)
+    
+    # Invalidar cachés relevantes
+    cache_distribuido.invalidar('cursos')
+    cache_distribuido.invalidar('asistencia')
+    cache_manager.invalidar()
+    
+    return True  # Asumir éxito, la cola se encarga
 
 # ==============================
 # PANEL ADMINISTRATIVO MEJORADO
@@ -1837,11 +2239,14 @@ def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiv
 
 def admin_panel_mejorado():
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+        if time_module.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo.")
             st.session_state.clear()
             st.rerun()
             return
+    
+    # Registrar usuario en monitor
+    monitor.registrar_usuario(st.session_state["user_name"])
     
     # Header con ayuda contextual
     col1, col2 = st.columns([6, 1])
@@ -1868,12 +2273,12 @@ def admin_panel_mejorado():
     with col1:
         if boton_moderno("Aplicar duración", "primario", "⚙️", "apply_duration"):
             st.session_state['timeout_duration'] = selected_min * 60
-            st.session_state['login_time'] = time.time()
+            st.session_state['login_time'] = time_module.time()
             st.success(f"✅ Duración aplicada: {selected_min} minutos")
             st.rerun()
     with col2:
         if boton_moderno("Mantener sesión abierta", "secundario", "🔄", "keep_alive"):
-            st.session_state['login_time'] = time.time()
+            st.session_state['login_time'] = time_module.time()
             st.success("✅ Sesión mantenida abierta")
             st.rerun()
     
@@ -2528,7 +2933,7 @@ Preuniversitario CIMMA 2026""",
     with col1:
         if boton_moderno("🔄 RECARGAR DATOS", "primario", "🔄", "reload_data_admin"):
             cache_manager.invalidar()
-            st.cache_data.clear()
+            cache_distribuido.invalidar()
             st.session_state.email_status = "🔄 Datos recargados"
             st.rerun()
     
@@ -2550,11 +2955,14 @@ Preuniversitario CIMMA 2026""",
 
 def main_app_mejorada():
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+        if time_module.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo (5 minutos).")
             st.session_state.clear()
             st.rerun()
             return
+    
+    # Registrar usuario en monitor
+    monitor.registrar_usuario(st.session_state["user_name"])
     
     st.markdown('<h2 class="section-header">📱 Registro de Asistencia en Tiempo Real</h2>', unsafe_allow_html=True)
     
@@ -2676,7 +3084,7 @@ def main_app_mejorada():
                     motivo
                 ])
                 
-                # Marcar fecha como completada (suspensión)
+                # Marcar fecha como completada (suspensión) usando cola
                 sistema_fechas.marcar_fecha_completada(curso_seleccionado, fecha_seleccionada)
                 
                 st.success(f"✅ Suspensión registrada para la fecha **{fecha_seleccionada}**.")
@@ -2756,41 +3164,52 @@ def main_app_mejorada():
                     sheet.append_row(["Curso", "Fecha", "Estudiante", "Asistencia", "Log de correo", "Motivo suspensión"])
                 chile_time = get_chile_time()
                 log_base = f"{chile_time.strftime('%Y-%m-%d')}: Mail de asistencia enviado a las {chile_time.strftime('%H:%M')} (hora de Chile)."
-                rows = []
-                for estudiante, presente in asistencia.items():
-                    rows.append([
-                        curso_seleccionado,
-                        fecha_seleccionada,
-                        estudiante,
-                        1 if presente else 0,
-                        log_base,
-                        ""
-                    ])
-                sheet.append_rows(rows)
                 
-                # Marcar fecha como completada
+                # Usar sistema de colas para la escritura
+                def _guardar_asistencia_real():
+                    rows = []
+                    for estudiante, presente in asistencia.items():
+                        rows.append([
+                            curso_seleccionado,
+                            fecha_seleccionada,
+                            estudiante,
+                            1 if presente else 0,
+                            log_base,
+                            ""
+                        ])
+                    sheet.append_rows(rows)
+                
+                sistema_colas.agregar_escritura(_guardar_asistencia_real)
+                
+                # Marcar fecha como completada usando cola
                 sistema_fechas.marcar_fecha_completada(curso_seleccionado, fecha_seleccionada)
                 
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
                 
-                # Envío de emails
-                emails, nombres_apoderados = load_emails()
-                for estudiante, presente in asistencia.items():
-                    nombre_lower = estudiante.strip().lower()
-                    correo_destino = emails.get(nombre_lower)
-                    nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
-                    if not correo_destino:
-                        continue
-                    estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
-                    subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                    body = f"""Hola {nombre_apoderado},
-Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
-📅 Fecha: {fecha_seleccionada}
-👨‍🎓 Estudiante: {estudiante}
-📌 Estado: {estado}
-Saludos cordiales,
-Preuniversitario CIMMA 2026"""
-                    send_email(correo_destino, subject, body)
+                # Envío de emails (en segundo plano)
+                def _enviar_emails():
+                    emails, nombres_apoderados = load_emails()
+                    for estudiante, presente in asistencia.items():
+                        nombre_lower = estudiante.strip().lower()
+                        correo_destino = emails.get(nombre_lower)
+                        nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
+                        if not correo_destino:
+                            continue
+                        estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
+                        subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
+                        body = f"""Hola {nombre_apoderado},
+    Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
+    
+    📅 Fecha: {fecha_seleccionada}
+    👨‍🎓 Estudiante: {estudiante}
+    📌 Estado: {estado}
+
+    Saludos cordiales,
+    Preuniversitario CIMMA 2026"""
+                        send_email(correo_destino, subject, body)
+                
+                # Ejecutar envío de emails en segundo plano
+                threading.Thread(target=_enviar_emails, daemon=True).start()
                     
                 st.rerun()
                 
@@ -2819,7 +3238,12 @@ Preuniversitario CIMMA 2026"""
             except gspread.exceptions.WorksheetNotFound:
                 mejoras_sheet = sheet.add_worksheet("MEJORAS", 100, 3)
                 mejoras_sheet.append_row(["Fecha", "Sugerencia", "Usuario"])
-            mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
+            
+            # Usar cola para guardar sugerencia
+            def _guardar_sugerencia():
+                mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
+            
+            sistema_colas.agregar_escritura(_guardar_sugerencia)
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al guardar sugerencia: {e}")
@@ -2835,6 +3259,9 @@ def main():
         layout="wide",
         initial_sidebar_state="expanded"
     )
+    
+    # Iniciar sistemas de fondo
+    sistema_colas.iniciar_worker()
     
     # Verificar secrets antes de continuar
     if not verificar_secrets():
@@ -2872,7 +3299,7 @@ def main():
             st.session_state["2fa_user_name"] = None
             st.session_state["2fa_time"] = None
             st.session_state["2fa_attempts"] = 0
-            st.session_state["login_time"] = time.time()
+            st.session_state["login_time"] = time_module.time()
             st.session_state["timeout_duration"] = 5 * 60  # 5 minutos por defecto
         
         if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
@@ -2886,7 +3313,7 @@ def main():
                         if profesores.get(nombre) == clave:
                             st.session_state["user_type"] = "profesor"
                             st.session_state["user_name"] = nombre
-                            st.session_state['login_time'] = time.time()
+                            st.session_state['login_time'] = time_module.time()
                             st.session_state['timeout_duration'] = 5 * 60  # 5 minutos
                             st.rerun()
                         else:
@@ -2910,14 +3337,16 @@ def main():
                             subject = "Código de Verificación - Preuniversitario CIMMA"
                             body = f"""Estimado/a {nombre},
 
-Su código de verificación para acceder al sistema es: 
+    Su código de verificación para acceder al sistema es: 
 
-{code}
+    {'*' * 10}
+        {code}
+    {'*' * 10}
 
-Este código es válido por 10 minutos.
+    Este código es válido por 10 minutos.
 
-Saludos,
-Preuniversitario CIMMA"""
+    Saludos,
+    Preuniversitario CIMMA"""
                             if send_email(email, subject, body):
                                 st.session_state["2fa_code"] = code
                                 st.session_state["2fa_email"] = email
@@ -2964,7 +3393,7 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
                     st.session_state["2fa_time"] = None
-                    st.session_state['login_time'] = time.time()
+                    st.session_state['login_time'] = time_module.time()
                     st.session_state['timeout_duration'] = 30 * 60  # 30 minutos
                     st.rerun()
                 else:
@@ -2973,12 +3402,16 @@ Preuniversitario CIMMA"""
         else:
             st.success(f"👤 {st.session_state['user_name']}")
             
-            # Panel de monitoreo de caché solo para admins
+            # Panel de monitoreo de sistema para admins
             if st.session_state["user_type"] == "admin":
-                panel_monitoreo_cache()
+                panel_monitoreo_sistema()
                 sistema_ayuda.boton_ayuda_completa()
+            else:
+                panel_monitoreo_cache()
             
             if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
+                # Remover usuario del monitor
+                monitor.remover_usuario(st.session_state["user_name"])
                 st.session_state.clear()
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
