@@ -1502,5 +1502,6 @@ Preuniversitario CIMMA"""
     else:
         main_app_mejorada()
 
+
 if __name__ == "__main__":
     main()
