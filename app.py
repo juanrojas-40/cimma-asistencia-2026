@@ -3339,9 +3339,9 @@ def main():
 
     Su código de verificación para acceder al sistema es: 
 
-    {'-' * 40}
-        ** {code} **
-    {'-' * 40}
+            {'-' * 50}
+                         {code} 
+            {'-' * 50}
 
     Este código es válido por 10 minutos.
 
