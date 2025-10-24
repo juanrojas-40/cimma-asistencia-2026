@@ -2455,7 +2455,14 @@ Preuniversitario CIMMA 2026""",
         if "✅ Listo para enviar" in st.session_state.get('email_status', ''):
             st.success("**✅ SISTEMA PREPARADO** - Puedes proceder con el envío")
             enviar_resumen_asistencia(datos_filtrados, email_template)
-    
+
+
+
+
+
+
+
+
     # ==============================
     # EXPORTACIÓN DE DATOS
     # ==============================
@@ -2685,7 +2692,15 @@ def main_app_mejorada():
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
-    
+
+
+
+
+
+
+
+
+
     # ==============================
     # REGISTRO DE ASISTENCIA NORMAL
     # ==============================
@@ -2782,20 +2797,70 @@ def main_app_mejorada():
                     if not correo_destino:
                         continue
                     estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
+                    estado_html = "ASISTIÓ" if presente else "NO ASISTIÓ"
+                    estado_color = "#28a745" if presente else "#dc3545"
+                    estado_icono = "✅" if presente else "❌"
+                    
                     subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                    body = f"""Hola {nombre_apoderado},
-Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
-📅 Fecha: {fecha_seleccionada}
-👨‍🎓 Estudiante: {estudiante}
-📌 Estado: {estado}
-Saludos cordiales,
-Preuniversitario CIMMA 2026"""
-                    send_email(correo_destino, subject, body)
+                    
+                    body_html = f"""
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                            <h1 style="color: white; text-align: center; margin: 0;">Reporte de Asistencia</h1>
+                        </div>
+
+                        <p style="font-size: 16px;">
+                            Hola <strong>{nombre_apoderado}</strong>,
+                        </p>
+
+                        <p>
+                            Este es un reporte automático de asistencia para el curso <strong>{curso_seleccionado}</strong>.
+                        </p>
+
+                        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid {estado_color};">
+                            <h3 style="color: #004080; margin-top: 0;">📊 Información de Asistencia</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold; width: 120px;">📅 Fecha:</td>
+                                    <td style="padding: 8px 0;">{fecha_seleccionada}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold;">👨‍🎓 Estudiante:</td>
+                                    <td style="padding: 8px 0;"><strong>{estudiante}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold;">📌 Estado:</td>
+                                    <td style="padding: 8px 0; color: {estado_color}; font-weight: bold; font-size: 18px;">
+                                        {estado_icono} {estado_html}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <p style="text-align: center; font-style: italic; color: #666;">
+                            "La educación es el arma más poderosa para cambiar el mundo" - Nelson Mandela
+                        </p>
+
+                        <p>
+                            Saludos cordiales,<br>
+                            <strong>Preuniversitario CIMMA 2026</strong>
+                        </p>
+
+                        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                            <p style="color: #666; font-size: 14px;">
+                                Este reporte fue generado automáticamente por el sistema de asistencia<br>
+                                Preuniversitario CIMMA 2026
+                            </p>
+                        </div>
+                    </div>
+                    """
+
+                    # Ruta del logo GIF (ajusta la ruta según donde esté ubicado tu logo)
+                    logo_path = "LOGO.gif"
+                    
+                    send_email(correo_destino, subject, body_html, logo_path)
                     
                 st.rerun()
-                
-            except Exception as e:
-                st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
     
     # Sección de sugerencias
     st.divider()
