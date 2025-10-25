@@ -1,5 +1,0 @@
-# Sube el logo y el código
-git add app.py requirements.txt
-git commit -m "feat: agrega logo del preuniversitario"
-git pull --rebase origin main
-git push origin main
