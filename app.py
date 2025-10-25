@@ -2907,6 +2907,7 @@ def main_app_mejorada():
                             }}
                         }}
                     </style>
+                    """
 
                     # Ruta del logo GIF
                     logo_path = "LOGO.gif"
