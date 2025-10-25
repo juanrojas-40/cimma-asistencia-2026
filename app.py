@@ -2878,14 +2878,35 @@ def main_app_mejorada():
                         </p>
 
                         <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
-                            <!-- En lugar de logo estático, usar GIF animado -->
-                            <img src="https://media.giphy.com/media/3o7aD2d7hy9ktXNDP2/giphy.gif" style="width: 200px; height: auto;">
+                            <img src="cid:logo_institucion" style="width: 300px; height: auto; animation: fadeInPulse 2s ease-out, gentlePulse 3s ease-in-out 2s infinite;">
                             <p style="color: #666; font-size: 14px;">
                                 Este reporte fue generado automáticamente por el sistema de asistencia<br>
                                 Preuniversitario CIMMA 2026
                             </p>
                         </div>
                     </div>
+
+                    <style>
+                        @keyframes fadeInPulse {{
+                            0% {{
+                                opacity: 0;
+                                transform: scale(0.8);
+                            }}
+                            100% {{
+                                opacity: 1;
+                                transform: scale(1);
+                            }}
+                        }}
+                        
+                        @keyframes gentlePulse {{
+                            0%, 100% {{
+                                transform: scale(1);
+                            }}
+                            50% {{
+                                transform: scale(1.05);
+                            }}
+                        }}
+                    </style>
                     """
 
                     # Ruta del logo GIF
