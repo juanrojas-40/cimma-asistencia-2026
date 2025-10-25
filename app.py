@@ -2835,143 +2835,78 @@ def main_app_mejorada():
                     subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
                     
                     body_html = f"""
-                    <div style="font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #2d3748; max-width: 600px; margin: 0 auto;">
-
-                        <!-- Header elegante -->
-                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-                                    padding: 30px 20px; 
-                                    text-align: center; 
-                                    border-radius: 0 0 20px 20px;
-                                    animation: slideDown 0.8s ease-out;">
-                            <h1 style="color: white; margin: 0; font-weight: 300; letter-spacing: 1px;">
-                                🎓 Asistencia Registrada
-                            </h1>
-                            <div style="width: 50px; height: 3px; background: rgba(255,255,255,0.5); margin: 15px auto; animation: expandWidth 1s ease-out 0.5s both;"></div>
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                            <h1 style="color: white; text-align: center; margin: 0;">Reporte de Asistencia</h1>
                         </div>
 
-                        <!-- Contenido principal -->
-                        <div style="padding: 30px 20px; animation: fadeInScale 1s ease-out 0.3s both;">
-                            
-                            <div style="text-align: center; margin-bottom: 30px;">
-                                <div style="display: inline-block; padding: 20px; border-radius: 50%; background: {estado_color}; color: white; font-size: 2em; animation: rotateIn 1s ease-out 0.6s both;">
-                                    {estado_icono}
-                                </div>
-                                <h2 style="color: #2d3748; margin: 15px 0 5px 0;">Hola, {nombre_apoderado}</h2>
-                                <p style="color: #718096; margin: 0;">Se ha registrado la asistencia de</p>
-                            </div>
+                        <p style="font-size: 16px;">
+                            Hola <strong>{nombre_apoderado}</strong>,
+                        </p>
 
-                            <!-- Tarjeta de información -->
-                            <div style="background: white; 
-                                        border-radius: 15px; 
-                                        padding: 25px; 
-                                        box-shadow: 0 4px 20px rgba(0,0,0,0.08);
-                                        border: 1px solid #e2e8f0;
-                                        animation: cardReveal 1s ease-out 0.8s both;">
-                                
-                                <div style="display: grid; grid-template-columns: 1fr; gap: 15px;">
-                                    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f7fafc;">
-                                        <span style="color: #718096;">👨‍🎓 Estudiante:</span>
-                                        <span style="font-weight: 600; color: #2d3748;">{estudiante}</span>
-                                    </div>
-                                    
-                                    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f7fafc;">
-                                        <span style="color: #718096;">📅 Fecha:</span>
-                                        <span style="color: #2d3748;">{fecha_seleccionada}</span>
-                                    </div>
-                                    
-                                    <div style="display: flex; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid #f7fafc;">
-                                        <span style="color: #718096;">📚 Curso:</span>
-                                        <span style="color: #2d3748;">{curso_seleccionado}</span>
-                                    </div>
-                                    
-                                    <div style="display: flex; justify-content: space-between; padding: 12px 0;">
-                                        <span style="color: #718096;">📌 Estado:</span>
-                                        <span style="color: {estado_color}; font-weight: 700; animation: textPulse 2s infinite 1.2s both;">
-                                            {estado_icono} {estado_html}
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
+                        <p>
+                            Este es un reporte automático de asistencia para el curso <strong>{curso_seleccionado}</strong>.
+                        </p>
 
+                        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid {estado_color};">
+                            <h3 style="color: #004080; margin-top: 0;">📊 Información de Asistencia</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold; width: 120px;">📅 Fecha:</td>
+                                    <td style="padding: 8px 0;">{fecha_seleccionada}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold;">👨‍🎓 Estudiante:</td>
+                                    <td style="padding: 8px 0;"><strong>{estudiante}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold;">📌 Estado:</td>
+                                    <td style="padding: 8px 0; color: {estado_color}; font-weight: bold; font-size: 18px;">
+                                        {estado_icono} {estado_html}
+                                    </td>
+                                </tr>
+                            </table>
                         </div>
 
-                        <!-- Footer -->
-                        <div style="text-align: center; padding: 30px 20px; color: #718096; animation: fadeIn 1s ease-out 1.4s both;">
-                            <img src="cid:logo_institucion" style="width: 200px; height: auto; opacity: 0.8; animation: gentleFade 3s ease-in-out infinite;">
-                            <p style="margin: 15px 0 0 0; font-size: 0.9em;">
-                                Sistema de Gestión de Asistencia<br>
+                        <p style="text-align: center; font-style: italic; color: #666;">
+                            "La educación es el arma más poderosa para cambiar el mundo" - Nelson Mandela
+                        </p>
+
+                        <p>
+                            Saludos cordiales,<br>
+                            <strong>Preuniversitario CIMMA 2026</strong>
+                        </p>
+
+                        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                            <img src="cid:logo_institucion" style="width: 300px; height: auto; animation: fadeInPulse 2s ease-out, gentlePulse 3s ease-in-out 2s infinite;">
+                            <p style="color: #666; font-size: 14px;">
+                                Este reporte fue generado automáticamente por el sistema de asistencia<br>
                                 Preuniversitario CIMMA 2026
                             </p>
                         </div>
-
                     </div>
 
                     <style>
-                        @keyframes slideDown {{
-                            from {{
+                        @keyframes fadeInPulse {{
+                            0% {{
                                 opacity: 0;
-                                transform: translateY(-100%);
+                                transform: scale(0.8);
                             }}
-                            to {{
-                                opacity: 1;
-                                transform: translateY(0);
-                            }}
-                        }}
-                        
-                        @keyframes expandWidth {{
-                            from {{ width: 0; }}
-                            to {{ width: 50px; }}
-                        }}
-                        
-                        @keyframes fadeInScale {{
-                            from {{
-                                opacity: 0;
-                                transform: scale(0.95);
-                            }}
-                            to {{
+                            100% {{
                                 opacity: 1;
                                 transform: scale(1);
                             }}
                         }}
                         
-                        @keyframes rotateIn {{
-                            from {{
-                                opacity: 0;
-                                transform: rotate(-180deg) scale(0.5);
+                        @keyframes gentlePulse {{
+                            0%, 100% {{
+                                transform: scale(1);
                             }}
-                            to {{
-                                opacity: 1;
-                                transform: rotate(0) scale(1);
+                            50% {{
+                                transform: scale(1.05);
                             }}
-                        }}
-                        
-                        @keyframes cardReveal {{
-                            from {{
-                                opacity: 0;
-                                transform: translateY(30px);
-                            }}
-                            to {{
-                                opacity: 1;
-                                transform: translateY(0);
-                            }}
-                        }}
-                        
-                        @keyframes textPulse {{
-                            0%, 100% {{ opacity: 1; }}
-                            50% {{ opacity: 0.7; }}
-                        }}
-                        
-                        @keyframes gentleFade {{
-                            0%, 100% {{ opacity: 0.8; }}
-                            50% {{ opacity: 1; }}
-                        }}
-                        
-                        @keyframes fadeIn {{
-                            from {{ opacity: 0; }}
-                            to {{ opacity: 1; }}
                         }}
                     </style>
-                    """
 
                     # Ruta del logo GIF
                     logo_path = "LOGO.gif"
