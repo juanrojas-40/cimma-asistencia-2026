@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 import pytz
 import pandas as pd
 import random
@@ -19,6 +20,7 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
 from gspread.exceptions import APIError
+import os
 
 # ==============================
 # CONFIGURACIÓN INICIAL Y MANEJO DE SECRETS
@@ -1239,8 +1241,8 @@ def get_chile_time():
     chile_tz = pytz.timezone("America/Santiago")
     return datetime.now(chile_tz)
 
-def send_email(to_email: str, subject: str, body: str) -> bool:
-    """Envía email con mejor feedback de diagnóstico"""
+def send_email(to_email: str, subject: str, body: str, logo_path: str = None) -> bool:
+    """Envía email con mejor feedback de diagnóstico y soporte para HTML y logo"""
     try:
         # Verificar configuración de email
         if "EMAIL" not in st.secrets:
@@ -1253,12 +1255,38 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         sender_password = st.secrets["EMAIL"]["sender_password"]
         
         # Crear mensaje
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('related')
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
         msg["Date"] = formatdate(localtime=True)
-        msg.attach(MIMEText(body, "plain"))
+        
+        # Crear parte alternativa para HTML y texto plano
+        msg_alternative = MIMEMultipart('alternative')
+        msg.attach(msg_alternative)
+        
+        # Detectar si el cuerpo es HTML
+        if body.strip().startswith('<'):
+            # Es HTML - adjuntar como parte HTML
+            msg_html = MIMEText(body, 'html')
+            msg_alternative.attach(msg_html)
+        else:
+            # Es texto plano
+            msg_text = MIMEText(body, 'plain')
+            msg_alternative.attach(msg_text)
+        
+        # Adjuntar logo si existe
+        if logo_path and os.path.exists(logo_path):
+            try:
+                with open(logo_path, 'rb') as f:
+                    logo_data = f.read()
+                
+                logo = MIMEImage(logo_data)
+                logo.add_header('Content-ID', '<logo_institucion>')
+                logo.add_header('Content-Disposition', 'inline', filename='LOGO.gif')
+                msg.attach(logo)
+            except Exception as e:
+                print(f"⚠️ No se pudo adjuntar el logo: {e}")
         
         # Enviar email
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
@@ -2850,6 +2878,7 @@ def main_app_mejorada():
                         </p>
 
                         <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                            <img src="cid:logo_institucion" style="width: 300px; height: auto;">
                             <p style="color: #666; font-size: 14px;">
                                 Este reporte fue generado automáticamente por el sistema de asistencia<br>
                                 Preuniversitario CIMMA 2026
