@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, time
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 import pytz
 import pandas as pd
 import random
@@ -19,6 +20,7 @@ import plotly.express as px
 import time  # Para manejar tiempos y temporizadores
 import functools
 from gspread.exceptions import APIError
+import os
 
 # ==============================
 # CONFIGURACIÓN INICIAL Y MANEJO DE SECRETS
@@ -1239,8 +1241,8 @@ def get_chile_time():
     chile_tz = pytz.timezone("America/Santiago")
     return datetime.now(chile_tz)
 
-def send_email(to_email: str, subject: str, body: str) -> bool:
-    """Envía email con mejor feedback de diagnóstico"""
+def send_email(to_email: str, subject: str, body: str, logo_path: str = None) -> bool:
+    """Envía email con mejor feedback de diagnóstico y soporte para HTML y logo"""
     try:
         # Verificar configuración de email
         if "EMAIL" not in st.secrets:
@@ -1253,12 +1255,38 @@ def send_email(to_email: str, subject: str, body: str) -> bool:
         sender_password = st.secrets["EMAIL"]["sender_password"]
         
         # Crear mensaje
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('related')
         msg["From"] = sender_email
         msg["To"] = to_email
         msg["Subject"] = subject
         msg["Date"] = formatdate(localtime=True)
-        msg.attach(MIMEText(body, "plain"))
+        
+        # Crear parte alternativa para HTML y texto plano
+        msg_alternative = MIMEMultipart('alternative')
+        msg.attach(msg_alternative)
+        
+        # Detectar si el cuerpo es HTML
+        if body.strip().startswith('<'):
+            # Es HTML - adjuntar como parte HTML
+            msg_html = MIMEText(body, 'html')
+            msg_alternative.attach(msg_html)
+        else:
+            # Es texto plano
+            msg_text = MIMEText(body, 'plain')
+            msg_alternative.attach(msg_text)
+        
+        # Adjuntar logo si existe
+        if logo_path and os.path.exists(logo_path):
+            try:
+                with open(logo_path, 'rb') as f:
+                    logo_data = f.read()
+                
+                logo = MIMEImage(logo_data)
+                logo.add_header('Content-ID', '<logo_institucion>')
+                logo.add_header('Content-Disposition', 'inline', filename='LOGO.gif')
+                msg.attach(logo)
+            except Exception as e:
+                print(f"⚠️ No se pudo adjuntar el logo: {e}")
         
         # Enviar email
         server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
@@ -1891,7 +1919,7 @@ def admin_panel_mejorado():
     # Mostrar panel informativo
     mostrar_panel_informativo_fechas()
 
-    with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=False):
+    with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=True):
         cursos = load_courses()
         
         if not cursos:
@@ -1971,7 +1999,7 @@ def admin_panel_mejorado():
     
     st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
     
-    with st.expander("📋 Cambiar Estudiante de Curso", expanded=False):
+    with st.expander("📋 Cambiar Estudiante de Curso", expanded=True):
         st.warning("""
         **⚠️ IMPORTANTE:** Esta función mueve el historial completo de un estudiante a otro curso.
         - Mantiene todo el historial de asistencia
@@ -2455,7 +2483,14 @@ Preuniversitario CIMMA 2026""",
         if "✅ Listo para enviar" in st.session_state.get('email_status', ''):
             st.success("**✅ SISTEMA PREPARADO** - Puedes proceder con el envío")
             enviar_resumen_asistencia(datos_filtrados, email_template)
-    
+
+
+
+
+
+
+
+
     # ==============================
     # EXPORTACIÓN DE DATOS
     # ==============================
@@ -2685,7 +2720,15 @@ def main_app_mejorada():
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
         return
-    
+
+
+
+
+
+
+
+
+
     # ==============================
     # REGISTRO DE ASISTENCIA NORMAL
     # ==============================
@@ -2775,28 +2818,94 @@ def main_app_mejorada():
                 
                 # Envío de emails
                 emails, nombres_apoderados = load_emails()
+                emails_enviados = 0
+                emails_fallidos = 0
+                
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
                     correo_destino = emails.get(nombre_lower)
                     nombre_apoderado = nombres_apoderados.get(nombre_lower, "Apoderado")
                     if not correo_destino:
                         continue
-                    estado = "✅ ASISTIÓ" if presente else "❌ NO ASISTIÓ"
-                    subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
-                    body = f"""Hola {nombre_apoderado},
-Este es un reporte automático de asistencia para el curso {curso_seleccionado}.
-📅 Fecha: {fecha_seleccionada}
-👨‍🎓 Estudiante: {estudiante}
-📌 Estado: {estado}
-Saludos cordiales,
-Preuniversitario CIMMA 2026"""
-                    send_email(correo_destino, subject, body)
                     
-                st.rerun()
+                    estado_html = "ASISTIÓ" if presente else "NO ASISTIÓ"
+                    estado_color = "#28a745" if presente else "#dc3545"
+                    estado_icono = "✅" if presente else "❌"
+                    
+                    subject = f"Reporte de Asistencia - {curso_seleccionado} - {fecha_seleccionada}"
+                    
+                    body_html = f"""
+                    <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                            <h1 style="color: white; text-align: center; margin: 0;">Reporte de Asistencia</h1>
+                        </div>
+
+                        <p style="font-size: 16px;">
+                            Hola <strong>{nombre_apoderado}</strong>,
+                        </p>
+
+                        <p>
+                            Este es un reporte automático de asistencia para el curso <strong>{curso_seleccionado}</strong>.
+                        </p>
+
+                        <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid {estado_color};">
+                            <h3 style="color: #004080; margin-top: 0;">📊 Información de Asistencia</h3>
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold; width: 120px;">📅 Fecha:</td>
+                                    <td style="padding: 8px 0;">{fecha_seleccionada}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold;">👨‍🎓 Estudiante:</td>
+                                    <td style="padding: 8px 0;"><strong>{estudiante}</strong></td>
+                                </tr>
+                                <tr>
+                                    <td style="padding: 8px 0; font-weight: bold;">📌 Estado:</td>
+                                    <td style="padding: 8px 0; color: {estado_color}; font-weight: bold; font-size: 18px;">
+                                        {estado_icono} {estado_html}
+                                    </td>
+                                </tr>
+                            </table>
+                        </div>
+
+                        <p style="text-align: center; font-style: italic; color: #666;">
+                            "La educación es el arma más poderosa para cambiar el mundo" - Nelson Mandela
+                        </p>
+
+                        <p>
+                            Saludos cordiales,<br>
+                            <strong>Preuniversitario CIMMA 2026</strong>
+                        </p>
+
+                        <div style="text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee;">
+                            <img src="cid:logo_institucion" style="width: 300px; height: auto;">
+                            <p style="color: #666; font-size: 14px;">
+                                Este reporte fue generado automáticamente por el sistema de asistencia<br>
+                                Preuniversitario CIMMA 2026
+                            </p>
+                        </div>
+                    </div>
+                    """
+
+                    # Ruta del logo GIF
+                    logo_path = "LOGO.gif"
+                    
+                    try:
+                        send_email(correo_destino, subject, body_html, logo_path)
+                        emails_enviados += 1
+                    except Exception as e:
+                        st.error(f"❌ Error al enviar email a {correo_destino}: {e}")
+                        emails_fallidos += 1
                 
+                # Mostrar resumen de envíos
+                if emails_enviados > 0:
+                    st.success(f"📧 Se enviaron {emails_enviados} correos exitosamente")
+                if emails_fallidos > 0:
+                    st.error(f"❌ Falló el envío de {emails_fallidos} correos")
+                    
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
-    
+
     # Sección de sugerencias
     st.divider()
     st.markdown('<h3 class="section-header">💡 Sugerencias de Mejora</h3>', unsafe_allow_html=True)
@@ -2822,7 +2931,10 @@ Preuniversitario CIMMA 2026"""
             mejoras_sheet.append_row([datetime.now().strftime("%Y-%m-%d %H:%M"), mejora, st.session_state["user_name"]])
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
-            st.error(f"Error al guardar sugerencia: {e}")
+            st.error(f"Error al enviar sugerencia: {e}")
+
+
+
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
@@ -2912,7 +3024,7 @@ def main():
 
 Su código de verificación para acceder al sistema es: 
 
-             🔑 {code}
+{code}
 
 Este código es válido por 10 minutos.
 
