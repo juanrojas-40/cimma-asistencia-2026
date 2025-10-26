@@ -1919,7 +1919,7 @@ def admin_panel_mejorado():
     # Mostrar panel informativo
     mostrar_panel_informativo_fechas()
 
-    with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=True):
+    with st.expander("👁️ Visión Completa de Todas las Fechas", expanded=False):
         cursos = load_courses()
         
         if not cursos:
@@ -1999,7 +1999,7 @@ def admin_panel_mejorado():
     
     st.markdown('<h2 class="section-header">🔄 Gestión de Cambios de Curso</h2>', unsafe_allow_html=True)
     
-    with st.expander("📋 Cambiar Estudiante de Curso", expanded=True):
+    with st.expander("📋 Cambiar Estudiante de Curso", expanded=False):
         st.warning("""
         **⚠️ IMPORTANTE:** Esta función mueve el historial completo de un estudiante a otro curso.
         - Mantiene todo el historial de asistencia
@@ -2412,7 +2412,7 @@ def admin_panel_mejorado():
     with col2:
         st.markdown(sistema_ayuda.tooltip_contextual('envio_emails', 'derecha'), unsafe_allow_html=True)
     
-    with st.expander("📊 ENVÍO DE RESUMENES DE ASISTENCIA", expanded=True):
+    with st.expander("📊 ENVÍO DE RESUMENES DE ASISTENCIA", expanded=False):
         st.info("**📋 Esta función enviará un resumen de asistencia a TODOS los apoderados** cuyos estudiantes aparezcan en los datos actualmente filtrados.")
         
         email_template = st.text_area(
@@ -3024,7 +3024,7 @@ def main():
 
 Su código de verificación para acceder al sistema es: 
 
-{code}
+         🔑  {code}  🔑
 
 Este código es válido por 10 minutos.
 
