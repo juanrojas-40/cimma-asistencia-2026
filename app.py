@@ -704,7 +704,7 @@ def crear_header_moderno():
     """Crea un header moderno con logo y título"""
     col1, col2, col3 = st.columns([1, 3, 1])
     with col2:
-        st.markdown('<h1 class="main-header">🎓 Preuniversitario CIMMA</h1>', unsafe_allow_html=True)
+        st.markdown('<h1 class="main-header">🎓 PPPPreuniversitario CIMMA</h1>', unsafe_allow_html=True)
         st.markdown('<p style="text-align: center; color: #6B7280; font-size: 1.1rem;">Sistema de Gestión de Asistencia 2026</p>', unsafe_allow_html=True)
 
 def crear_tarjeta_metricas(titulo, valor, subtitulo="", icono="📊", color="#1A3B8F"):
