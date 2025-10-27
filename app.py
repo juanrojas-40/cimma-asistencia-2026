@@ -3293,7 +3293,7 @@ def main():
     
     with st.sidebar:
         st.image("LOGO.png", use_container_width=True)
-        st.markdown('<div class="card">', unsafe_allow_html=True)
+        #st.markdown('<div class="card">', unsafe_allow_html=True)
         st.title("🔐 Acceso")
         
         if "user_type" not in st.session_state:
