@@ -19,6 +19,7 @@ import traceback
 import plotly.express as px
 import time as time_module
 import functools
+from functools import wraps  # ✅ AGREGAR ESTA IMPORTACIÓN
 from gspread.exceptions import APIError
 import os
 import queue
@@ -67,7 +68,7 @@ class RateLimiter:
         self.lock = threading.Lock()
     
     def __call__(self, func):
-        @wraps(func)
+        @wraps(func)  # ✅ CORREGIDO: usar wraps directamente
         def wrapper(*args, **kwargs):
             with self.lock:
                 now = time_module.time()
@@ -374,14 +375,14 @@ def verificar_limite_usuarios():
     
     metricas = sistema_monitoreo.obtener_metricas()
     if metricas['usuarios_concurrentes'] >= max_usuarios:
-        st.error("""
+        st.error(f"""
         🚫 **Límite de usuarios alcanzado**
         
         El sistema tiene el número máximo de usuarios concurrentes ({max_usuarios}).
         Por favor, intenta nuevamente en unos minutos.
         
-        **Usuarios activos:** {concurrentes}
-        """.format(max_usuarios=max_usuarios, concurrentes=metricas['usuarios_concurrentes']))
+        **Usuarios activos:** {metricas['usuarios_concurrentes']}
+        """)
         return False
     return True
 
