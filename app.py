@@ -3292,7 +3292,7 @@ def main():
     crear_header_moderno()
     
     with st.sidebar:
-        st.image("https://github.com/juanrojas-40/cimma-asistencia-2026/blob/main/LOGO.jpg", use_container_width=True)
+        st.image("https://github.com/juanrojas-40/cimma-asistencia-2026/main/LOGO.jpg", use_container_width=True)
         st.markdown('<div class="card">', unsafe_allow_html=True)
         st.title("🔐 Acceso")
         
