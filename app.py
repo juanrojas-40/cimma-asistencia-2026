@@ -17,10 +17,13 @@ import socket
 from email.utils import formatdate
 import traceback
 import plotly.express as px
-import time  # Para manejar tiempos y temporizadores
+import time as time_module
 import functools
 from gspread.exceptions import APIError
 import os
+import queue
+import threading
+from concurrent.futures import ThreadPoolExecutor
 
 # ==============================
 # CONFIGURACIÓN INICIAL Y MANEJO DE SECRETS
@@ -51,63 +54,255 @@ def verificar_secrets():
     return True
 
 # ==============================
-# SISTEMA DE CACHÉ INTELIGENTE
+# SISTEMA DE RATE LIMITING
 # ==============================
 
-def open_sheet_with_retry(client, sheet_id, retries=3, delay=5):
-    for attempt in range(retries):
-        try:
-            return client.open_by_key(sheet_id)
-        except APIError as e:
-            if e.response.json().get('error', {}).get('code') == 429:
-                time.sleep(delay * (2 ** attempt))
-                continue
-            raise
-    raise Exception("Max retries exceeded for API quota")
+class RateLimiter:
+    """Sistema de rate limiting para APIs externas"""
+    
+    def __init__(self, max_calls, period):
+        self.max_calls = max_calls
+        self.period = period
+        self.calls = []
+        self.lock = threading.Lock()
+    
+    def __call__(self, func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            with self.lock:
+                now = time_module.time()
+                # Limpiar llamadas antiguas
+                self.calls = [call for call in self.calls if now - call < self.period]
+                
+                if len(self.calls) >= self.max_calls:
+                    sleep_time = self.period - (now - self.calls[0])
+                    if sleep_time > 0:
+                        time_module.sleep(sleep_time)
+                        self.calls = self.calls[1:]
+                
+                self.calls.append(now)
+            return func(*args, **kwargs)
+        return wrapper
 
-class CacheInteligente:
-    """Sistema de caché inteligente con invalidación automática"""
+# ==============================
+# SISTEMA DE COLA PARA EMAILS MASIVOS
+# ==============================
+
+class EmailQueueManager:
+    """Sistema de cola para envío masivo seguro de emails"""
+    
+    def __init__(self, max_workers=3, max_retries=3):
+        self.email_queue = queue.Queue()
+        self.max_workers = max_workers
+        self.max_retries = max_retries
+        self.is_running = False
+        self.workers = []
+        self.stats = {
+            'enviados': 0,
+            'fallidos': 0,
+            'en_cola': 0
+        }
+        self.lock = threading.Lock()
+        
+    def start_workers(self):
+        """Inicia workers para procesar la cola"""
+        self.is_running = True
+        for i in range(self.max_workers):
+            worker = threading.Thread(target=self._process_queue, daemon=True, name=f"EmailWorker-{i}")
+            worker.start()
+            self.workers.append(worker)
+        print(f"✅ Iniciados {self.max_workers} workers de email")
+    
+    def stop_workers(self):
+        """Detiene los workers"""
+        self.is_running = False
+        for worker in self.workers:
+            worker.join(timeout=5)
+        print("🛑 Workers de email detenidos")
+    
+    def add_email_to_queue(self, to_email, subject, body, logo_path=None):
+        """Agrega email a la cola"""
+        with self.lock:
+            self.stats['en_cola'] += 1
+            
+        self.email_queue.put({
+            'to_email': to_email,
+            'subject': subject,
+            'body': body,
+            'logo_path': logo_path,
+            'attempts': 0,
+            'timestamp': datetime.now()
+        })
+    
+    def _process_queue(self):
+        """Procesa emails de la cola"""
+        while self.is_running:
+            try:
+                email_data = self.email_queue.get(timeout=1)
+                if email_data is None:
+                    break
+                    
+                success = self._send_single_email(email_data)
+                
+                with self.lock:
+                    if success:
+                        self.stats['enviados'] += 1
+                    else:
+                        self.stats['fallidos'] += 1
+                    self.stats['en_cola'] -= 1
+                
+                if not success and email_data['attempts'] < self.max_retries:
+                    email_data['attempts'] += 1
+                    self.email_queue.put(email_data)
+                    # Backoff exponencial
+                    time_module.sleep(2 ** email_data['attempts'])
+                
+                self.email_queue.task_done()
+                
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"❌ Error en worker de email: {e}")
+                with self.lock:
+                    self.stats['fallidos'] += 1
+                    self.stats['en_cola'] -= 1
+    
+    def _send_single_email(self, email_data):
+        """Envía un email individual con manejo de errores"""
+        try:
+            return send_email(
+                email_data['to_email'],
+                email_data['subject'], 
+                email_data['body'],
+                email_data.get('logo_path')
+            )
+        except Exception as e:
+            print(f"❌ Error enviando email a {email_data['to_email']}: {e}")
+            return False
+    
+    def wait_until_complete(self, timeout=300):
+        """Espera a que se procesen todos los emails"""
+        try:
+            self.email_queue.join(timeout=timeout)
+            return True
+        except:
+            return False
+    
+    def get_stats(self):
+        """Obtiene estadísticas de la cola"""
+        with self.lock:
+            return self.stats.copy()
+
+# Instancia global del gestor de colas
+email_queue_manager = EmailQueueManager(max_workers=5)
+
+# ==============================
+# SISTEMA DE MONITOREO EN TIEMPO REAL
+# ==============================
+
+class SistemaMonitoreo:
+    """Monitorea uso del sistema en tiempo real"""
+    
+    def __init__(self):
+        self.metricas = {
+            'usuarios_activos': set(),
+            'requests_por_minuto': 0,
+            'emails_enviados': 0,
+            'errores': 0,
+            'cache_hit_rate': 0,
+            'inicio_sistema': datetime.now()
+        }
+        self.lock = threading.Lock()
+        self.ultimo_reset = time_module.time()
+    
+    def registrar_usuario(self, usuario):
+        with self.lock:
+            self.metricas['usuarios_activos'].add(usuario)
+    
+    def remover_usuario(self, usuario):
+        with self.lock:
+            self.metricas['usuarios_activos'].discard(usuario)
+    
+    def registrar_request(self):
+        with self.lock:
+            self.metricas['requests_por_minuto'] += 1
+            
+            # Reset cada minuto
+            if time_module.time() - self.ultimo_reset > 60:
+                self.metricas['requests_por_minuto'] = 0
+                self.ultimo_reset = time_module.time()
+    
+    def registrar_error(self):
+        with self.lock:
+            self.metricas['errores'] += 1
+    
+    def obtener_metricas(self):
+        with self.lock:
+            return {
+                'usuarios_concurrentes': len(self.metricas['usuarios_activos']),
+                'requests_por_minuto': self.metricas['requests_por_minuto'],
+                'emails_enviados': self.metricas['emails_enviados'],
+                'errores': self.metricas['errores'],
+                'uptime_minutos': int((datetime.now() - self.metricas['inicio_sistema']).total_seconds() / 60),
+                'estado_cola_email': email_queue_manager.get_stats()
+            }
+
+sistema_monitoreo = SistemaMonitoreo()
+
+# ==============================
+# SISTEMA DE CACHÉ INTELIGENTE MEJORADO
+# ==============================
+
+class CacheInteligenteMejorado:
+    """Sistema de caché mejorado para múltiples usuarios"""
     
     def __init__(self):
         self.cache_data = {}
         self.stats = {
             'hits': 0,
             'misses': 0,
-            'invalidaciones': 0
+            'invalidaciones': 0,
+            'usuarios_activos': set()
         }
+        self.lock = threading.RLock()  # Lock para thread safety
     
-    def cached(self, ttl=1800, max_size=100, dependencias=None):
-        """Decorador de caché inteligente"""
+    def cached(self, ttl=1800, max_size=100, dependencias=None, user_specific=False):
+        """Decorador de caché inteligente mejorado"""
         def decorator(func):
             @functools.wraps(func)
             def wrapper(*args, **kwargs):
-                # Generar clave única
-                cache_key = f"{func.__name__}_{str(args)}_{str(kwargs)}"
+                # Registrar request en monitoreo
+                sistema_monitoreo.registrar_request()
                 
-                # Verificar si está en caché y es válido
-                if (cache_key in self.cache_data and 
-                    datetime.now() < self.cache_data[cache_key]['expira'] and
-                    not self._dependencias_invalidadas(cache_key, dependencias)):
+                # Agregar usuario a la clave si es específico por usuario
+                user_key = f"user_{st.session_state.get('user_name', 'anon')}" if user_specific else "global"
+                cache_key = f"{func.__name__}_{user_key}_{str(args)}_{str(kwargs)}"
+                
+                with self.lock:
+                    # Verificar si está en caché y es válido
+                    if (cache_key in self.cache_data and 
+                        datetime.now() < self.cache_data[cache_key]['expira'] and
+                        not self._dependencias_invalidadas(cache_key, dependencias)):
+                        
+                        self.stats['hits'] += 1
+                        return self.cache_data[cache_key]['data']
                     
-                    self.stats['hits'] += 1
-                    return self.cache_data[cache_key]['data']
-                
-                # Cache miss - ejecutar función
-                self.stats['misses'] += 1
-                result = func(*args, **kwargs)
-                
-                # Guardar en caché
-                self.cache_data[cache_key] = {
-                    'data': result,
-                    'expira': datetime.now() + timedelta(seconds=ttl),
-                    'timestamp': datetime.now(),
-                    'dependencias': dependencias or []
-                }
-                
-                # Limpiar caché si excede tamaño máximo
-                self._limpiar_cache_excedente(max_size)
-                
-                return result
+                    # Cache miss - ejecutar función
+                    self.stats['misses'] += 1
+                    result = func(*args, **kwargs)
+                    
+                    # Guardar en caché
+                    self.cache_data[cache_key] = {
+                        'data': result,
+                        'expira': datetime.now() + timedelta(seconds=ttl),
+                        'timestamp': datetime.now(),
+                        'dependencias': dependencias or []
+                    }
+                    
+                    # Limpiar caché si excede tamaño máximo
+                    self._limpiar_cache_excedente(max_size)
+                    
+                    return result
             return wrapper
         return decorator
     
@@ -127,23 +322,33 @@ class CacheInteligente:
     
     def invalidar(self, clave=None):
         """Invalida caché específico o completo"""
-        if clave:
-            if clave in self.cache_data:
+        with self.lock:
+            if clave:
+                if clave in self.cache_data:
+                    del self.cache_data[clave]
+                    self.stats['invalidaciones'] += 1
+            else:
+                self.cache_data.clear()
+                self.stats['invalidaciones'] += len(self.cache_data)
+    
+    def invalidar_por_usuario(self, usuario):
+        """Invalida caché específico de un usuario"""
+        with self.lock:
+            claves_a_eliminar = [k for k in self.cache_data.keys() if f"user_{usuario}" in k]
+            for clave in claves_a_eliminar:
                 del self.cache_data[clave]
-                self.stats['invalidaciones'] += 1
-        else:
-            self.cache_data.clear()
-            self.stats['invalidaciones'] += len(self.cache_data)
+                self.stats['invalidaciones'] += len(claves_a_eliminar)
     
     def get_stats(self):
         """Estadísticas de uso del caché"""
-        total_requests = self.stats['hits'] + self.stats['misses']
-        hit_rate = (self.stats['hits'] / total_requests * 100) if total_requests > 0 else 0
-        return {
-            'total_entradas': len(self.cache_data),
-            'hit_rate': f"{hit_rate:.1f}%",
-            **self.stats
-        }
+        with self.lock:
+            total_requests = self.stats['hits'] + self.stats['misses']
+            hit_rate = (self.stats['hits'] / total_requests * 100) if total_requests > 0 else 0
+            return {
+                'total_entradas': len(self.cache_data),
+                'hit_rate': f"{hit_rate:.1f}%",
+                **self.stats
+            }
     
     def _limpiar_cache_excedente(self, max_size):
         """Limpia caché si excede el tamaño máximo"""
@@ -156,8 +361,140 @@ class CacheInteligente:
             for clave in claves_ordenadas[:len(self.cache_data) - max_size]:
                 del self.cache_data[clave]
 
-# Instancia global de caché
-cache_manager = CacheInteligente()
+# Instancia global de caché mejorado
+cache_manager = CacheInteligenteMejorado()
+
+# ==============================
+# VERIFICACIÓN DE LÍMITES DE USUARIOS
+# ==============================
+
+def verificar_limite_usuarios():
+    """Verifica que no se exceda el límite de usuarios concurrentes"""
+    max_usuarios = 35  # Límite configurable con margen
+    
+    metricas = sistema_monitoreo.obtener_metricas()
+    if metricas['usuarios_concurrentes'] >= max_usuarios:
+        st.error("""
+        🚫 **Límite de usuarios alcanzado**
+        
+        El sistema tiene el número máximo de usuarios concurrentes ({max_usuarios}).
+        Por favor, intenta nuevamente en unos minutos.
+        
+        **Usuarios activos:** {concurrentes}
+        """.format(max_usuarios=max_usuarios, concurrentes=metricas['usuarios_concurrentes']))
+        return False
+    return True
+
+# ==============================
+# CONFIGURACIÓN Y CONEXIONES CON RATE LIMITING
+# ==============================
+
+@RateLimiter(max_calls=50, period=60)  # 50 llamadas por minuto
+@st.cache_resource
+def get_client():
+    try:
+        # Verificar que los secrets estén disponibles
+        if "google" not in st.secrets or "credentials" not in st.secrets["google"]:
+            st.error("❌ No se encontraron las credenciales de Google en los secrets.")
+            return None
+            
+        creds_dict = json.loads(st.secrets["google"]["credentials"])
+        creds = Credentials.from_service_account_info(creds_dict, scopes=[
+            "https://spreadsheets.google.com/feeds",
+            "https://www.googleapis.com/auth/drive"
+        ])
+        return gspread.authorize(creds)
+    except (KeyError, json.JSONDecodeError) as e:
+        st.error(f"Error loading Google credentials: {e}")
+        sistema_monitoreo.registrar_error()
+        return None
+
+def get_chile_time():
+    chile_tz = pytz.timezone("America/Santiago")
+    return datetime.now(chile_tz)
+
+def send_email(to_email: str, subject: str, body: str, logo_path: str = None) -> bool:
+    """Envía email con mejor feedback de diagnóstico y soporte para HTML y logo"""
+    try:
+        # Verificar configuración de email
+        if "EMAIL" not in st.secrets:
+            st.error("❌ No se encontró la configuración de EMAIL en los secrets.")
+            return False
+            
+        smtp_server = st.secrets["EMAIL"]["smtp_server"]
+        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
+        sender_email = st.secrets["EMAIL"]["sender_email"]
+        sender_password = st.secrets["EMAIL"]["sender_password"]
+        
+        # Crear mensaje
+        msg = MIMEMultipart('related')
+        msg["From"] = sender_email
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg["Date"] = formatdate(localtime=True)
+        
+        # Crear parte alternativa para HTML y texto plano
+        msg_alternative = MIMEMultipart('alternative')
+        msg.attach(msg_alternative)
+        
+        # Detectar si el cuerpo es HTML
+        if body.strip().startswith('<'):
+            # Es HTML - adjuntar como parte HTML
+            msg_html = MIMEText(body, 'html')
+            msg_alternative.attach(msg_html)
+        else:
+            # Es texto plano
+            msg_text = MIMEText(body, 'plain')
+            msg_alternative.attach(msg_text)
+        
+        # Adjuntar logo si existe
+        if logo_path and os.path.exists(logo_path):
+            try:
+                with open(logo_path, 'rb') as f:
+                    logo_data = f.read()
+                
+                logo = MIMEImage(logo_data)
+                logo.add_header('Content-ID', '<logo_institucion>')
+                logo.add_header('Content-Disposition', 'inline', filename='LOGO.gif')
+                msg.attach(logo)
+            except Exception as e:
+                print(f"⚠️ No se pudo adjuntar el logo: {e}")
+        
+        # Enviar email
+        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
+        server.starttls()
+        server.login(sender_email, sender_password)
+        server.send_message(msg)
+        server.quit()
+        
+        # LOG DE ÉXITO
+        print(f"✅ Email enviado exitosamente a: {to_email}")
+        return True
+        
+    except Exception as e:
+        # LOG DE ERROR DETALLADO
+        error_msg = f"❌ Error enviando email a {to_email}: {str(e)}"
+        print(error_msg)
+        sistema_monitoreo.registrar_error()
+        return False
+
+def send_email_seguro(to_email: str, subject: str, body: str, logo_path: str = None) -> bool:
+    """Versión segura con límites y validaciones"""
+    
+    # Validar formato de email
+    if '@' not in to_email or '.' not in to_email.split('@')[-1]:
+        print(f"❌ Email inválido: {to_email}")
+        return False
+    
+    try:
+        return send_email(to_email, subject, body, logo_path)
+    except Exception as e:
+        sistema_monitoreo.registrar_error()
+        print(f"❌ Error en send_email_seguro: {e}")
+        return False
+
+def generate_2fa_code():
+    return ''.join(random.choices(string.digits, k=6))
 
 # ==============================
 # SISTEMA DE FECHAS COMPLETADAS
@@ -209,6 +546,7 @@ class SistemaFechasCompletadas:
             return fechas_curso
         except Exception as e:
             st.error(f"Error al cargar fechas completadas: {e}")
+            sistema_monitoreo.registrar_error()
             return []
     
     def marcar_fecha_completada(self, curso, fecha):
@@ -254,6 +592,7 @@ class SistemaFechasCompletadas:
             return True
         except Exception as e:
             st.error(f"Error al marcar fecha como completada: {e}")
+            sistema_monitoreo.registrar_error()
             return False
     
     def reactivar_fecha(self, curso, fecha):
@@ -281,6 +620,7 @@ class SistemaFechasCompletadas:
             return True
         except Exception as e:
             st.error(f"Error al reactivar fecha: {e}")
+            sistema_monitoreo.registrar_error()
             return False
     
     def obtener_estadisticas_fechas(self, curso, fechas_totales):
@@ -1177,13 +1517,16 @@ def implementar_temporizador_seguridad():
     """Implementa un temporizador de seguridad en tiempo real"""
     
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+        if time_module.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo.")
+            # Remover usuario del monitoreo
+            if 'user_name' in st.session_state:
+                sistema_monitoreo.remover_usuario(st.session_state['user_name'])
             st.session_state.clear()
             st.rerun()
             return
         
-        tiempo_restante = st.session_state['timeout_duration'] - (time.time() - st.session_state['login_time'])
+        tiempo_restante = st.session_state['timeout_duration'] - (time_module.time() - st.session_state['login_time'])
         if tiempo_restante > 0:
             minutos = int(tiempo_restante // 60)
             segundos = int(tiempo_restante % 60)
@@ -1215,104 +1558,53 @@ def panel_monitoreo_cache():
             st.success("Caché limpiado")
             st.rerun()
 
-# ==============================
-# CONFIGURACIÓN Y CONEXIONES
-# ==============================
-
-@st.cache_resource
-def get_client():
-    try:
-        # Verificar que los secrets estén disponibles
-        if "google" not in st.secrets or "credentials" not in st.secrets["google"]:
-            st.error("❌ No se encontraron las credenciales de Google en los secrets.")
-            return None
-            
-        creds_dict = json.loads(st.secrets["google"]["credentials"])
-        creds = Credentials.from_service_account_info(creds_dict, scopes=[
-            "https://spreadsheets.google.com/feeds",
-            "https://www.googleapis.com/auth/drive"
-        ])
-        return gspread.authorize(creds)
-    except (KeyError, json.JSONDecodeError) as e:
-        st.error(f"Error loading Google credentials: {e}")
-        return None
-
-def get_chile_time():
-    chile_tz = pytz.timezone("America/Santiago")
-    return datetime.now(chile_tz)
-
-def send_email(to_email: str, subject: str, body: str, logo_path: str = None) -> bool:
-    """Envía email con mejor feedback de diagnóstico y soporte para HTML y logo"""
-    try:
-        # Verificar configuración de email
-        if "EMAIL" not in st.secrets:
-            st.error("❌ No se encontró la configuración de EMAIL en los secrets.")
-            return False
-            
-        smtp_server = st.secrets["EMAIL"]["smtp_server"]
-        smtp_port = int(st.secrets["EMAIL"]["smtp_port"])
-        sender_email = st.secrets["EMAIL"]["sender_email"]
-        sender_password = st.secrets["EMAIL"]["sender_password"]
+def panel_monitoreo_sistema():
+    """Panel de monitoreo del sistema en tiempo real"""
+    with st.sidebar.expander("📈 MONITOREO SISTEMA", expanded=False):
+        metricas = sistema_monitoreo.obtener_metricas()
         
-        # Crear mensaje
-        msg = MIMEMultipart('related')
-        msg["From"] = sender_email
-        msg["To"] = to_email
-        msg["Subject"] = subject
-        msg["Date"] = formatdate(localtime=True)
+        st.metric("👥 Usuarios Activos", metricas['usuarios_concurrentes'])
+        st.metric("📊 Requests/min", metricas['requests_por_minuto'])
+        st.metric("⏱️ Uptime (min)", metricas['uptime_minutos'])
+        st.metric("❌ Errores", metricas['errores'])
         
-        # Crear parte alternativa para HTML y texto plano
-        msg_alternative = MIMEMultipart('alternative')
-        msg.attach(msg_alternative)
+        # Estado del sistema de colas de email
+        st.markdown("---")
+        st.subheader("📨 Cola de Emails")
+        email_stats = metricas['estado_cola_email']
+        st.metric("📧 Enviados", email_stats['enviados'])
+        st.metric("🔄 En cola", email_stats['en_cola'])
+        st.metric("❌ Fallidos", email_stats['fallidos'])
         
-        # Detectar si el cuerpo es HTML
-        if body.strip().startswith('<'):
-            # Es HTML - adjuntar como parte HTML
-            msg_html = MIMEText(body, 'html')
-            msg_alternative.attach(msg_html)
-        else:
-            # Es texto plano
-            msg_text = MIMEText(body, 'plain')
-            msg_alternative.attach(msg_text)
+        # Control de workers
+        st.markdown("---")
+        st.subheader("⚙️ Control Workers")
+        col1, col2 = st.columns(2)
         
-        # Adjuntar logo si existe
-        if logo_path and os.path.exists(logo_path):
-            try:
-                with open(logo_path, 'rb') as f:
-                    logo_data = f.read()
-                
-                logo = MIMEImage(logo_data)
-                logo.add_header('Content-ID', '<logo_institucion>')
-                logo.add_header('Content-Disposition', 'inline', filename='LOGO.gif')
-                msg.attach(logo)
-            except Exception as e:
-                print(f"⚠️ No se pudo adjuntar el logo: {e}")
+        with col1:
+            if st.button("▶️ Iniciar Workers", use_container_width=True):
+                if not email_queue_manager.is_running:
+                    email_queue_manager.start_workers()
+                    st.success("Workers iniciados")
+                else:
+                    st.info("Workers ya están en ejecución")
         
-        # Enviar email
-        server = smtplib.SMTP(smtp_server, smtp_port, timeout=30)
-        server.starttls()
-        server.login(sender_email, sender_password)
-        server.send_message(msg)
-        server.quit()
+        with col2:
+            if st.button("⏹️ Detener Workers", use_container_width=True):
+                if email_queue_manager.is_running:
+                    email_queue_manager.stop_workers()
+                    st.success("Workers detenidos")
+                else:
+                    st.info("Workers no están en ejecución")
         
-        # LOG DE ÉXITO
-        print(f"✅ Email enviado exitosamente a: {to_email}")
-        return True
-        
-    except Exception as e:
-        # LOG DE ERROR DETALLADO
-        error_msg = f"❌ Error enviando email a {to_email}: {str(e)}"
-        print(error_msg)
-        st.error(error_msg)
-        return False
-
-def generate_2fa_code():
-    return ''.join(random.choices(string.digits, k=6))
+        if st.button("🔄 Actualizar Métricas", use_container_width=True):
+            st.rerun()
 
 # ==============================
-# CARGA DE DATOS CON CACHÉ INTELIGENTE
+# CARGA DE DATOS CON CACHÉ INTELIGENTE Y RATE LIMITING
 # ==============================
 
+@RateLimiter(max_calls=30, period=60)  # 30 llamadas por minuto
 @cache_manager.cached(ttl=3600, dependencias=['cursos'])
 def load_courses():
     try:
@@ -1342,6 +1634,7 @@ def load_courses():
                 st.info("💡 Verifica que el service account tenga permisos de edición en la hoja.")
             elif error_code == 429:
                 st.info("💡 Límite de cuota de API alcanzado. Intenta de nuevo más tarde.")
+            sistema_monitoreo.registrar_error()
             return {}
         
         courses = {}
@@ -1419,8 +1712,10 @@ def load_courses():
         return courses
     except Exception as e:
         st.error(f"❌ Error crítico al cargar cursos: {str(e)}")
+        sistema_monitoreo.registrar_error()
         return {}
 
+@RateLimiter(max_calls=20, period=60)
 @cache_manager.cached(ttl=7200)  # 2 horas para emails
 def load_emails():
     try:
@@ -1455,8 +1750,10 @@ def load_emails():
         return emails, nombres_apoderados
     except Exception as e:
         st.error(f"❌ Error cargando emails: {e}")
+        sistema_monitoreo.registrar_error()
         return {}, {}
 
+@RateLimiter(max_calls=15, period=60)
 @cache_manager.cached(ttl=1800)  # 30 minutos para asistencia
 def load_all_asistencia():
     client = get_client()
@@ -1583,44 +1880,38 @@ def load_all_asistencia():
     return df
 
 # ==============================
-# FUNCIÓN DE ENVÍO DE EMAIL MEJORADA
+# FUNCIÓN DE ENVÍO MASIVO MEJORADA
 # ==============================
 
-def enviar_resumen_asistencia(datos_filtrados, email_template):
-    """Envía un resumen de asistencia a TODOS los apoderados con email registrado"""
+def enviar_resumen_asistencia_masivo(datos_filtrados, email_template):
+    """Versión mejorada para envío masivo seguro usando sistema de colas"""
+    
+    # Iniciar workers si no están corriendo
+    if not email_queue_manager.is_running:
+        email_queue_manager.start_workers()
     
     progress_placeholder = st.empty()
     status_placeholder = st.empty()
     
-    progress_placeholder.info("🚀 INICIANDO PROCESO DE ENVÍO DE RESUMENES...")
-    
     try:
         if datos_filtrados.empty:
-            progress_placeholder.error("❌ ERROR: Los datos filtrados están VACÍOS")
+            st.error("❌ No hay datos para enviar")
             return False
         
-        progress_placeholder.success(f"✅ Datos recibidos: {len(datos_filtrados)} registros")
-        
-        status_placeholder.info("🔄 Cargando información de apoderados...")
+        progress_placeholder.info("🔄 Cargando información de apoderados...")
         emails, nombres_apoderados = load_emails()
         
         if not emails:
-            progress_placeholder.error("❌ ERROR: No se encontraron emails de apoderados")
+            st.error("❌ No se encontraron emails de apoderados")
             return False
         
         estudiantes_filtrados = datos_filtrados['Estudiante'].unique()
         estudiantes_con_email = []
-        estudiantes_sin_email = []
         
         for estudiante in estudiantes_filtrados:
-            nombre_variantes = [
-                estudiante.strip().lower(),
-                estudiante.strip(),
-                estudiante.lower(),
-                estudiante
-            ]
-            
+            nombre_variantes = [estudiante.strip().lower(), estudiante.strip()]
             email_encontrado = None
+            
             for variante in nombre_variantes:
                 if variante in emails:
                     email_encontrado = emails[variante]
@@ -1632,39 +1923,58 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                     'email': email_encontrado,
                     'apoderado': nombres_apoderados.get(variante, "Apoderado")
                 })
-            else:
-                estudiantes_sin_email.append(estudiante)
         
         if not estudiantes_con_email:
-            progress_placeholder.error("🚫 No hay estudiantes con email registrado")
+            st.error("🚫 No hay estudiantes con email registrado")
             return False
         
-        with st.expander("👀 VER DETALLES DE ENVÍO PROGRAMADO", expanded=True):
-            st.success(f"📧 **ENVÍO PROGRAMADO:** {len(estudiantes_con_email)} emails a enviar")
+        # Mostrar resumen
+        total_emails = len(estudiantes_con_email)
+        st.success(f"📧 **ENVÍO PROGRAMADO:** {total_emails} emails en cola")
+        
+        with st.expander("👀 VER DETALLES DE ENVÍO", expanded=True):
+            st.info(f"""
+            **📋 RESUMEN DEL ENVÍO MASIVO:**
+            - 📧 Emails a enviar: **{total_emails}**
+            - ⚡ Modo: **Envío en segundo plano**
+            - 🔄 Workers activos: **{email_queue_manager.max_workers}**
+            - ⏱️ Tiempo estimado: **{total_emails // email_queue_manager.max_workers * 2} segundos**
+            """)
             
-            if estudiantes_sin_email:
-                st.warning(f"⚠️ {len(estudiantes_sin_email)} estudiantes sin email registrado")
+            # Lista de destinatarios
+            if total_emails <= 20:  # Mostrar lista solo si son pocos
+                st.write("**👥 Destinatarios:**")
+                for est in estudiantes_con_email:
+                    st.write(f"- {est['nombre_original']} → {est['email']}")
         
-        fecha_inicio = st.session_state.get('fecha_inicio', date.today())
-        fecha_fin = st.session_state.get('fecha_fin', date.today())
+        # Configuración de envío
+        st.warning("""
+        **⚡ MODO ENVÍO MASIVO ACTIVADO**
+        - Los emails se enviarán en segundo plano
+        - Puedes continuar usando la aplicación
+        - Revisa el panel de monitoreo para ver el progreso
+        """)
         
-        if boton_moderno("🚀 EJECUTAR ENVÍO DE RESUMENES", "exito", "📧", "execute_email_send"):
+        if boton_moderno("🚀 INICIAR ENVÍO MASIVO", "exito", "📧", "start_mass_send"):
+            
+            # Progreso en tiempo real
             progress_bar = st.progress(0)
-            resultados = []
-            emails_enviados = 0
+            status_text = st.empty()
+            
+            # Agregar emails a la cola
+            emails_encolados = 0
+            fecha_inicio = st.session_state.get('fecha_inicio', date.today())
+            fecha_fin = st.session_state.get('fecha_fin', date.today())
             
             for i, est_data in enumerate(estudiantes_con_email):
+                # Preparar contenido del email
                 estudiante = est_data['nombre_original']
-                correo_destino = est_data['email']
-                nombre_apoderado = est_data['apoderado']
-                
-                status_placeholder.info(f"📨 Enviando {i+1}/{len(estudiantes_con_email)}: {estudiante}")
-                
                 datos_estudiante = datos_filtrados[datos_filtrados['Estudiante'] == estudiante]
                 
                 if datos_estudiante.empty:
                     continue
                 
+                # Generar resumen
                 total_clases = len(datos_estudiante)
                 asistencias = datos_estudiante['Asistencia'].sum()
                 ausencias = total_clases - asistencias
@@ -1680,10 +1990,9 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                     porcentaje_curso = (asistencias_curso / total_curso * 100) if total_curso > 0 else 0
                     resumen_cursos.append(f"  • {curso}: {asistencias_curso}/{total_curso} clases ({porcentaje_curso:.1f}%)")
                 
-                subject = f"Resumen de Asistencia - {estudiante} - Preuniversitario CIMMA"
-                
+                # Generar body del email
                 body = email_template.format(
-                    nombre_apoderado=nombre_apoderado,
+                    nombre_apoderado=est_data['apoderado'],
                     estudiante=estudiante,
                     total_clases=total_clases,
                     asistencias=asistencias,
@@ -1694,56 +2003,70 @@ def enviar_resumen_asistencia(datos_filtrados, email_template):
                     fecha_fin=fecha_fin.strftime('%d/%m/%Y')
                 )
                 
-                with st.spinner(f"Enviando a {estudiante}..."):
-                    exito = send_email(correo_destino, subject, body)
+                subject = f"Resumen de Asistencia - {estudiante} - Preuniversitario CIMMA"
                 
-                if exito:
-                    emails_enviados += 1
-                    st.success(f"✅ **{i+1}/{len(estudiantes_con_email)}:** Email enviado a {estudiante}")
-                else:
-                    st.error(f"❌ **{i+1}/{len(estudiantes_con_email)}:** Falló envío a {estudiante}")
+                # Agregar a cola
+                email_queue_manager.add_email_to_queue(
+                    est_data['email'], subject, body
+                )
                 
-                resultados.append({
-                    'estudiante': estudiante,
-                    'exito': exito
-                })
-                
-                progress_bar.progress((i + 1) / len(estudiantes_con_email))
+                emails_encolados += 1
+                progress_bar.progress((i + 1) / total_emails)
+                status_text.text(f"📨 Encolados: {emails_encolados}/{total_emails}")
             
-            progress_placeholder.empty()
-            status_placeholder.empty()
-            progress_bar.empty()
+            # Monitorear progreso
+            st.info("🔄 Procesando envíos en segundo plano...")
             
+            # Mostrar panel de monitoreo en tiempo real
+            with st.expander("📊 MONITOREO EN TIEMPO REAL", expanded=True):
+                monitor_placeholder = st.empty()
+                
+                # Simular monitoreo por 30 segundos
+                for i in range(30):
+                    email_stats = email_queue_manager.get_stats()
+                    monitor_placeholder.info(f"""
+                    **📈 Progreso del Envío:**
+                    - ✅ Enviados: {email_stats['enviados']}
+                    - 🔄 En cola: {email_stats['en_cola']}
+                    - ❌ Fallidos: {email_stats['fallidos']}
+                    - ⏱️ Tiempo transcurrido: {i} segundos
+                    """)
+                    time_module.sleep(1)
+                    
+                    # Si ya se procesaron todos, salir
+                    if email_stats['enviados'] + email_stats['fallidos'] >= emails_encolados:
+                        break
+            
+            # Resultado final
+            email_stats = email_queue_manager.get_stats()
             st.markdown("---")
-            st.subheader("📊 RESULTADO FINAL DEL ENVÍO")
-            
-            exitosos = sum(1 for r in resultados if r['exito'])
-            fallidos = len(resultados) - exitosos
+            st.subheader("📊 RESULTADO FINAL DEL ENVÍO MASIVO")
             
             col1, col2, col3 = st.columns(3)
             
             with col1:
-                st.metric("📧 Total Programados", len(resultados))
+                st.metric("📧 Total Programados", emails_encolados)
             with col2:
-                st.metric("✅ Envíos Exitosos", exitosos)
+                st.metric("✅ Envíos Exitosos", email_stats['enviados'])
             with col3:
-                st.metric("❌ Envíos Fallidos", fallidos)
+                st.metric("❌ Envíos Fallidos", email_stats['fallidos'])
             
-            if exitosos == len(resultados):
+            if email_stats['enviados'] == emails_encolados:
                 st.balloons()
-                st.success(f"🎉 **¡ÉXITO TOTAL!** Todos los {exitosos} emails fueron enviados")
-                st.session_state.email_status = f"🎉 ¡ÉXITO! {exitosos} emails enviados"
-            elif exitosos > 0:
-                st.warning(f"⚠️ **ENVÍO PARCIALMENTE EXITOSO:** {exitosos} de {len(resultados)} emails enviados")
-                st.session_state.email_status = f"⚠️ Envío parcial: {exitosos}/{len(resultados)} emails"
+                st.success(f"🎉 **¡ÉXITO TOTAL!** Todos los {email_stats['enviados']} emails fueron enviados")
+                st.session_state.email_status = f"🎉 ¡ÉXITO! {email_stats['enviados']} emails enviados"
+            elif email_stats['enviados'] > 0:
+                st.warning(f"⚠️ **ENVÍO PARCIALMENTE EXITOSO:** {email_stats['enviados']} de {emails_encolados} emails enviados")
+                st.session_state.email_status = f"⚠️ Envío parcial: {email_stats['enviados']}/{emails_encolados} emails"
             else:
                 st.error("❌ **FALLO TOTAL:** No se pudo enviar ningún email")
                 st.session_state.email_status = "❌ Falló el envío de emails"
             
-            return exitosos > 0
+            return email_stats['enviados'] > 0
             
     except Exception as e:
         progress_placeholder.error(f"❌ ERROR CRÍTICO en el proceso: {str(e)}")
+        sistema_monitoreo.registrar_error()
         st.session_state.email_status = f"❌ Error crítico: {str(e)}"
         return False
 
@@ -1857,6 +2180,7 @@ def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiv
         
     except Exception as e:
         st.error(f"❌ Error ejecutando cambio de curso: {str(e)}")
+        sistema_monitoreo.registrar_error()
         return False
 
 # ==============================
@@ -1865,8 +2189,9 @@ def ejecutar_cambio_curso(estudiante, curso_origen, curso_destino, fecha_efectiv
 
 def admin_panel_mejorado():
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+        if time_module.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo.")
+            sistema_monitoreo.remover_usuario(st.session_state['user_name'])
             st.session_state.clear()
             st.rerun()
             return
@@ -1896,12 +2221,12 @@ def admin_panel_mejorado():
     with col1:
         if boton_moderno("Aplicar duración", "primario", "⚙️", "apply_duration"):
             st.session_state['timeout_duration'] = selected_min * 60
-            st.session_state['login_time'] = time.time()
+            st.session_state['login_time'] = time_module.time()
             st.success(f"✅ Duración aplicada: {selected_min} minutos")
             st.rerun()
     with col2:
         if boton_moderno("Mantener sesión abierta", "secundario", "🔄", "keep_alive"):
-            st.session_state['login_time'] = time.time()
+            st.session_state['login_time'] = time_module.time()
             st.success("✅ Sesión mantenida abierta")
             st.rerun()
     
@@ -2400,7 +2725,7 @@ def admin_panel_mejorado():
     st.dataframe(datos_tabla, use_container_width=True, height=400)
     
     # ==============================
-    # SECCIÓN DE EMAIL MEJORADA
+    # SECCIÓN DE EMAIL MEJORADA CON SISTEMA DE COLAS
     # ==============================
     
     st.markdown("---")
@@ -2412,8 +2737,16 @@ def admin_panel_mejorado():
     with col2:
         st.markdown(sistema_ayuda.tooltip_contextual('envio_emails', 'derecha'), unsafe_allow_html=True)
     
-    with st.expander("📊 ENVÍO DE RESUMENES DE ASISTENCIA", expanded=False):
-        st.info("**📋 Esta función enviará un resumen de asistencia a TODOS los apoderados** cuyos estudiantes aparezcan en los datos actualmente filtrados.")
+    with st.expander("📊 ENVÍO MASIVO DE RESUMENES", expanded=False):
+        st.info("""
+        **📋 SISTEMA DE ENVÍO MASIVO MEJORADO**
+        
+        Esta función utiliza un sistema de colas para enviar emails de forma segura y eficiente:
+        - 🔄 **Envío en segundo plano** - No bloquea la aplicación
+        - ⚡ **Múltiples workers** - Envío paralelo de emails
+        - 🔁 **Reintentos automáticos** - En caso de errores temporales
+        - 📊 **Monitoreo en tiempo real** - Seguimiento del progreso
+        """)
         
         email_template = st.text_area(
             "**✏️ Plantilla de Email:**",
@@ -2443,10 +2776,10 @@ Preuniversitario CIMMA 2026""",
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            if boton_moderno("🔍 PREPARAR ENVÍO DE RESUMENES", "primario", "🔍", "prepare_emails_admin"):
+            if boton_moderno("🔍 PREPARAR ENVÍO MASIVO", "primario", "🔍", "prepare_mass_emails_admin"):
                 st.session_state.email_status = ""
                 
-                with st.spinner("🔄 Analizando datos y preparando envío..."):
+                with st.spinner("🔄 Analizando datos y preparando envío masivo..."):
                     try:
                         if datos_filtrados.empty:
                             st.session_state.email_status = "❌ No hay datos filtrados para enviar"
@@ -2468,7 +2801,7 @@ Preuniversitario CIMMA 2026""",
                             st.session_state.email_status = "❌ No hay estudiantes con email en los datos filtrados"
                             st.rerun()
                         
-                        st.session_state.email_status = f"✅ Listo para enviar: {estudiantes_con_email} resúmenes"
+                        st.session_state.email_status = f"✅ Listo para envío masivo: {estudiantes_con_email} resúmenes"
                         st.rerun()
                         
                     except Exception as e:
@@ -2480,16 +2813,10 @@ Preuniversitario CIMMA 2026""",
                 st.session_state.email_status = ""
                 st.rerun()
         
-        if "✅ Listo para enviar" in st.session_state.get('email_status', ''):
-            st.success("**✅ SISTEMA PREPARADO** - Puedes proceder con el envío")
-            enviar_resumen_asistencia(datos_filtrados, email_template)
-
-
-
-
-
-
-
+        if "✅ Listo para envío masivo" in st.session_state.get('email_status', ''):
+            st.success("**✅ SISTEMA PREPARADO** - Puedes proceder con el envío masivo")
+            # Usar la nueva función de envío masivo
+            enviar_resumen_asistencia_masivo(datos_filtrados, email_template)
 
     # ==============================
     # EXPORTACIÓN DE DATOS
@@ -2585,8 +2912,9 @@ Preuniversitario CIMMA 2026""",
 
 def main_app_mejorada():
     if 'login_time' in st.session_state and 'timeout_duration' in st.session_state:
-        if time.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
+        if time_module.time() - st.session_state['login_time'] > st.session_state['timeout_duration']:
             st.error("❌ Sesión expirada por límite de tiempo (5 minutos).")
+            sistema_monitoreo.remover_usuario(st.session_state['user_name'])
             st.session_state.clear()
             st.rerun()
             return
@@ -2719,15 +3047,8 @@ def main_app_mejorada():
                 
             except Exception as e:
                 st.error(f"❌ Error al registrar suspensión: {e}")
+                sistema_monitoreo.registrar_error()
         return
-
-
-
-
-
-
-
-
 
     # ==============================
     # REGISTRO DE ASISTENCIA NORMAL
@@ -2816,10 +3137,13 @@ def main_app_mejorada():
                 
                 st.success(f"✅ ¡Asistencia guardada para **{curso_seleccionado}**!")
                 
-                # Envío de emails
+                # Envío de emails usando el sistema de colas
                 emails, nombres_apoderados = load_emails()
-                emails_enviados = 0
-                emails_fallidos = 0
+                
+                if not email_queue_manager.is_running:
+                    email_queue_manager.start_workers()
+                
+                emails_encolados = 0
                 
                 for estudiante, presente in asistencia.items():
                     nombre_lower = estudiante.strip().lower()
@@ -2887,24 +3211,21 @@ def main_app_mejorada():
                     </div>
                     """
 
-                    # Ruta del logo GIF
-                    logo_path = "LOGO.gif"
-                    
-                    try:
-                        send_email(correo_destino, subject, body_html, logo_path)
-                        emails_enviados += 1
-                    except Exception as e:
-                        st.error(f"❌ Error al enviar email a {correo_destino}: {e}")
-                        emails_fallidos += 1
+                    # Agregar email a la cola
+                    email_queue_manager.add_email_to_queue(
+                        correo_destino, subject, body_html, "LOGO.gif"
+                    )
+                    emails_encolados += 1
                 
-                # Mostrar resumen de envíos
-                if emails_enviados > 0:
-                    st.success(f"📧 Se enviaron {emails_enviados} correos exitosamente")
-                if emails_fallidos > 0:
-                    st.error(f"❌ Falló el envío de {emails_fallidos} correos")
+                if emails_encolados > 0:
+                    st.success(f"📧 {emails_encolados} emails encolados para envío en segundo plano")
+                    st.info("🔍 Revisa el panel de monitoreo para ver el progreso de los envíos")
+                else:
+                    st.warning("⚠️ No se encontraron emails para enviar")
                     
             except Exception as e:
                 st.error(f"❌ Error al guardar o enviar notificaciones: {e}")
+                sistema_monitoreo.registrar_error()
 
     # Sección de sugerencias
     st.divider()
@@ -2932,9 +3253,7 @@ def main_app_mejorada():
             st.success("¡Gracias por tu aporte!")
         except Exception as e:
             st.error(f"Error al enviar sugerencia: {e}")
-
-
-
+            sistema_monitoreo.registrar_error()
 
 # ==============================
 # MENÚ LATERAL Y AUTENTICACIÓN
@@ -2984,7 +3303,7 @@ def main():
             st.session_state["2fa_user_name"] = None
             st.session_state["2fa_time"] = None
             st.session_state["2fa_attempts"] = 0
-            st.session_state["login_time"] = time.time()
+            st.session_state["login_time"] = time_module.time()
             st.session_state["timeout_duration"] = 5 * 60  # 5 minutos por defecto
         
         if st.session_state["user_type"] is None and not st.session_state["awaiting_2fa"]:
@@ -2996,10 +3315,15 @@ def main():
                     clave = st.text_input("Clave", type="password", key="prof_pass")
                     if boton_moderno("Ingresar como Profesor", "primario", "👨‍🏫", "prof_login"):
                         if profesores.get(nombre) == clave:
+                            # Verificar límite de usuarios
+                            if not verificar_limite_usuarios():
+                                return
+                                
                             st.session_state["user_type"] = "profesor"
                             st.session_state["user_name"] = nombre
-                            st.session_state['login_time'] = time.time()
+                            st.session_state['login_time'] = time_module.time()
                             st.session_state['timeout_duration'] = 5 * 60  # 5 minutos
+                            sistema_monitoreo.registrar_usuario(nombre)
                             st.rerun()
                         else:
                             st.error("❌ Clave incorrecta")
@@ -3017,6 +3341,10 @@ def main():
                     clave = st.text_input("Clave", type="password", key="admin_pass")
                     if boton_moderno("Ingresar como Admin", "primario", "👨‍💼", "admin_login"):
                         if admins.get(nombre) == clave:
+                            # Verificar límite de usuarios
+                            if not verificar_limite_usuarios():
+                                return
+                                
                             code = generate_2fa_code()
                             email = admin_emails.get(nombre, "profereport@gmail.com")
                             subject = "Código de Verificación - Preuniversitario CIMMA"
@@ -3030,7 +3358,7 @@ Este código es válido por 10 minutos.
 
 Saludos,
 Preuniversitario CIMMA"""
-                            if send_email(email, subject, body):
+                            if send_email_seguro(email, subject, body):
                                 st.session_state["2fa_code"] = code
                                 st.session_state["2fa_email"] = email
                                 st.session_state["awaiting_2fa"] = True
@@ -3076,8 +3404,9 @@ Preuniversitario CIMMA"""
                     st.session_state["2fa_email"] = None
                     st.session_state["2fa_attempts"] = 0
                     st.session_state["2fa_time"] = None
-                    st.session_state['login_time'] = time.time()
+                    st.session_state['login_time'] = time_module.time()
                     st.session_state['timeout_duration'] = 30 * 60  # 30 minutos
+                    sistema_monitoreo.registrar_usuario(st.session_state["user_name"])
                     st.rerun()
                 else:
                     st.session_state["2fa_attempts"] += 1
@@ -3085,12 +3414,15 @@ Preuniversitario CIMMA"""
         else:
             st.success(f"👤 {st.session_state['user_name']}")
             
-            # Panel de monitoreo de caché solo para admins
+            # Panel de monitoreo de caché y sistema solo para admins
             if st.session_state["user_type"] == "admin":
                 panel_monitoreo_cache()
+                panel_monitoreo_sistema()
                 sistema_ayuda.boton_ayuda_completa()
             
             if boton_moderno("Cerrar sesión", "peligro", "🚪", "logout"):
+                # Remover usuario del monitoreo
+                sistema_monitoreo.remover_usuario(st.session_state['user_name'])
                 st.session_state.clear()
                 st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
