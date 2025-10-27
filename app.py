@@ -3285,6 +3285,7 @@ def main():
         Consulta la documentación para más detalles.
         """)
         return
+
     
     # Aplicar tema moderno
     aplicar_tema_moderno()
